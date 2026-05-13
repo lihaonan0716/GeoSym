@@ -1,0 +1,313 @@
+"""Shared constants, config utilities, dataset helpers, and LLM adapter factory.
+
+Extracted from app.py to allow reuse across modules without circular imports.
+"""
+
+import json
+import os
+import shutil
+import sys
+import warnings
+from pathlib import Path
+from typing import Dict, List, Tuple, Any
+
+import cv2
+import numpy as np
+import yaml
+
+# Add project root to path (one level up from app/ package)
+_root = Path(__file__).resolve().parent.parent
+if str(_root) not in sys.path:
+    sys.path.insert(0, str(_root))
+
+from generator.config_loader import load_config
+from i18n import t, LANG_EN, LANG_ZH, set_lang
+from evaluator.adapters.base import BaseLLMAdapter
+
+# ==================== Global State ====================
+_config = load_config()
+_dataset_dir = _root / "dataset"
+_images_dir = _dataset_dir / "images"
+_gt_dir = _dataset_dir / "ground_truth"
+_reports_dir = _root / "reports"
+_api_keys_path = _root / "config" / "api_keys.yaml"
+
+
+# ==================== API Key Persistence ====================
+
+def _load_api_keys() -> Dict[str, str]:
+    """Load saved API keys from config/api_keys.yaml."""
+    if _api_keys_path.exists():
+        try:
+            with open(_api_keys_path, "r", encoding="utf-8") as f:
+                data = yaml.safe_load(f) or {}
+            return {k: str(v) for k, v in data.items() if v}
+        except Exception:
+            pass
+    return {}
+
+
+def _get_saved_key(method: str) -> str:
+    """Get saved API key for a given display-name model.
+
+    Resolves the provider-level key name via _MODEL_KEY_MAP (built from
+    the ``models`` section in default_config.yaml).  Falls back to a
+    slugified version of the display name for backward compatibility.
+    """
+    keys = _load_api_keys()
+    key_name = _MODEL_KEY_MAP.get(method, method.lower().replace("-", "_").replace(" ", "_"))
+    return keys.get(key_name, "")
+
+
+# ==================== Theme ====================
+NAVY_BLUE = "#1a237e"
+DARK_NAVY = "#0d1421"
+ACCENT_BLUE = "#3949ab"
+TEXT_COLOR = "#e0e0e0"
+
+custom_css = f"""
+.gradio-container {{
+    background-color: {DARK_NAVY} !important;
+}}
+.dark {{
+    background-color: {DARK_NAVY} !important;
+}}
+.block {{
+    background-color: #1e2433 !important;
+    border-color: {NAVY_BLUE} !important;
+}}
+.label-wrap {{
+    color: {TEXT_COLOR} !important;
+}}
+button.primary {{
+    background-color: {ACCENT_BLUE} !important;
+    border-color: {NAVY_BLUE} !important;
+}}
+button.secondary {{
+    background-color: #2c3e50 !important;
+    border-color: {NAVY_BLUE} !important;
+}}
+.tabs > .tab-nav > button {{
+    background-color: #1e2433 !important;
+    color: {TEXT_COLOR} !important;
+}}
+.tabs > .tab-nav > button.selected {{
+    background-color: {NAVY_BLUE} !important;
+    color: white !important;
+}}
+h1, h2, h3, h4, p, span, label {{
+    color: {TEXT_COLOR} !important;
+}}
+.markdown-text {{
+    color: {TEXT_COLOR} !important;
+}}
+input, textarea, select {{
+    background-color: #2c3e50 !important;
+    color: {TEXT_COLOR} !important;
+    border-color: {NAVY_BLUE} !important;
+}}
+.dataframe {{
+    background-color: #1e2433 !important;
+}}
+"""
+
+# ==================== Helper Functions ====================
+
+def list_dataset_images() -> List[str]:
+    """List all images in dataset (supports subset sub-directories)."""
+    if not _images_dir.exists():
+        return []
+    results = []
+    for f in _images_dir.rglob("*.png"):
+        rel = f.relative_to(_images_dir)
+        results.append(str(rel.with_suffix("")))
+    return sorted(results)
+
+
+def load_image_and_gt(image_name: str) -> Tuple[np.ndarray | None, dict | None]:
+    """Load image and its ground truth (supports subset sub-paths like linear-clean_render/img)."""
+    img_path = _images_dir / f"{image_name}.png"
+    gt_path = _gt_dir / f"{image_name}.json"
+
+    img = None
+    gt = None
+
+    if img_path.exists():
+        img = cv2.imread(str(img_path))
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+    if gt_path.exists():
+        with open(gt_path, "r", encoding="utf-8") as f:
+            gt = json.load(f)
+
+    # Backfill: if ground_truth.coordinates is missing, derive from top-level intersections
+    if gt is not None:
+        q = gt.get("question", {})
+        gt_data = q.get("ground_truth", {})
+        if gt_data and "coordinates" not in gt_data:
+            intersections = gt.get("intersections", [])
+            gt_data["coordinates"] = [
+                [p["coordinate_x"], p["coordinate_y"]] for p in intersections
+            ]
+
+    return img, gt
+
+
+def format_gt_coords(gt: dict, lang: str) -> str:
+    """Format ground truth coordinates as string."""
+    if not gt or "intersections" not in gt:
+        return t("no_intersections", lang)
+    coords = gt["intersections"]
+    lines = [f"({c['coordinate_x']}, {c['coordinate_y']}) - {c['type']}" for c in coords]
+    return "\n".join(lines) if lines else t("no_intersections", lang)
+
+
+def format_gt_functions(gt: dict, lang: str) -> str:
+    """Format ground truth function expressions and math properties."""
+    if not gt or "functions" not in gt:
+        return "N/A"
+    functions = gt["functions"]
+    if not functions:
+        return "N/A"
+    is_zh = lang == LANG_ZH
+    lines = []
+    for i, fn in enumerate(functions, 1):
+        ftype = fn.get("type", "unknown")
+        latex = fn.get("expression_latex", "N/A")
+        sympy_expr = fn.get("expression_sympy", "N/A")
+        params = fn.get("parameters", {})
+        lines.append(f"{'曲线' if is_zh else 'Curve'} {i} [{ftype}]")
+        lines.append(f"  LaTeX:  {latex}")
+        lines.append(f"  Sympy:  {sympy_expr}")
+        lines.append(f"  Params: {params}")
+
+        mp = fn.get("math_properties", {})
+        if mp:
+            lines.append(f"  {'定义域' if is_zh else 'Domain'}: {mp.get('domain', '')}")
+            lines.append(f"  {'值域' if is_zh else 'Range'}:  {mp.get('range', '')}")
+            zeros = mp.get("zeros", [])
+            zeros_str = ", ".join(str(z) for z in zeros) if zeros else ("无" if is_zh else "None")
+            lines.append(f"  {'零点' if is_zh else 'Zeros'}:  {zeros_str}")
+        lines.append("")
+
+    question = gt.get("question", {})
+    gt_data = question.get("ground_truth", {})
+    if gt_data:
+        coords = gt_data.get("coordinates", [])
+        if coords:
+            lines.append(f"{'关键点坐标' if is_zh else 'Key Coordinates'}: {len(coords)} {'个' if is_zh else 'points'}")
+            for c in coords[:20]:
+                lines.append(f"  ({c[0]}, {c[1]})")
+            if len(coords) > 20:
+                lines.append(f"  ... +{len(coords)-20} more")
+
+        pred_tgt = gt_data.get("prediction_targets", {})
+        if pred_tgt:
+            lines.append("")
+            lines.append(f"{'函数值预测真值' if is_zh else 'Prediction Targets'}:")
+            for x, y in pred_tgt.items():
+                lines.append(f"  f({x}) = {y}")
+
+        roc = gt_data.get("rate_of_change", {})
+        if roc and "gt_value" in roc:
+            lines.append(f"{'变化率真值' if is_zh else 'Rate of Change'}: {roc['gt_value']} "
+                         f"(x∈[{roc.get('x1', '?')},{roc.get('x2', '?')}])")
+
+    return "\n".join(lines)
+
+
+def get_next_index(subset_dir: Path) -> int:
+    """Get next available image index within a subset directory."""
+    existing = list(subset_dir.glob("*.png"))
+    if not existing:
+        return 0
+    indices = []
+    for f in existing:
+        parts = f.stem.rsplit("_", 1)
+        if len(parts) == 2:
+            try:
+                indices.append(int(parts[1]))
+            except ValueError:
+                pass
+    return max(indices) + 1 if indices else 0
+
+
+def clear_subset(subset_id: str):
+    """Clear a single subset's images and ground truth."""
+    img_sub = _images_dir / subset_id
+    gt_sub = _gt_dir / subset_id
+    if img_sub.exists():
+        shutil.rmtree(img_sub)
+    if gt_sub.exists():
+        shutil.rmtree(gt_sub)
+
+
+def clear_dataset():
+    """Clear all images and ground truth files."""
+    if _images_dir.exists():
+        shutil.rmtree(_images_dir)
+    if _gt_dir.exists():
+        shutil.rmtree(_gt_dir)
+    _images_dir.mkdir(parents=True, exist_ok=True)
+    _gt_dir.mkdir(parents=True, exist_ok=True)
+
+
+def _resolve_coord_mode(coord_mode_label: str) -> str:
+    """Map UI label to internal coord_mode key."""
+    low = coord_mode_label.lower()
+    if "adaptive" in low or "自适应" in low:
+        return "adaptive"
+    if "static" in low or "静态" in low:
+        return "static"
+    return "manual"
+
+
+# ---------------------------------------------------------------------------
+# YAML-driven model registry (loaded from config/default_config.yaml → models)
+# ---------------------------------------------------------------------------
+
+def _build_model_registry(cfg: dict):
+    """Parse the ``models`` section of default_config.yaml and build:
+
+    * MODEL_REGISTRY  – {display_name: (module_path, class_name, api_model_id)}
+    * PROVIDER_MAP    – OrderedDict {provider: [display_name, ...]}
+    * _MODEL_KEY_MAP  – {display_name: api_key_name}  (for key lookup)
+    """
+    from collections import OrderedDict
+    registry: Dict[str, Tuple[str, str, str]] = {}
+    provider_map: OrderedDict = OrderedDict()
+    key_map: Dict[str, str] = {}
+
+    models_cfg = cfg.get("models", {})
+    for provider, pdata in models_cfg.items():
+        adapter_full = pdata.get("adapter", "")
+        api_key_name = pdata.get("api_key_name", provider.lower())
+        module_path, class_name = adapter_full.rsplit(".", 1)
+        display_names = []
+        for display_name, api_model_id in pdata.get("models", {}).items():
+            registry[display_name] = (module_path, class_name, api_model_id)
+            key_map[display_name] = api_key_name
+            display_names.append(display_name)
+        if display_names:
+            provider_map[provider] = display_names
+    return registry, provider_map, key_map
+
+
+MODEL_REGISTRY, PROVIDER_MAP, _MODEL_KEY_MAP = _build_model_registry(_config)
+
+
+def _create_llm_adapter(method: str, api_key: str):
+    """Create the appropriate LLM adapter based on method (display name)."""
+    import importlib
+    entry = MODEL_REGISTRY.get(method)
+    if entry is None:
+        return None
+    module_path, class_name, api_model_id = entry
+    mod = importlib.import_module(module_path)
+    cls = getattr(mod, class_name)
+    return cls(api_key=api_key, model=api_model_id)
+
+
+LLM_METHODS = list(MODEL_REGISTRY.keys())
+ALL_METHODS = ["GeoSym"] + LLM_METHODS
+PROVIDER_NAMES = list(PROVIDER_MAP.keys())

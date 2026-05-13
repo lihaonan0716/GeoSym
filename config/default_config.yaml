@@ -1,0 +1,208 @@
+# experiment image generator – default config
+# Integer ticks only; no π. Axes/grid black, curves use dark blue for color detection.
+
+# Server ports – change here or override via env vars:
+#   GEOSYM_APP_PORT, GEOSYM_APP_HOST,
+#   GEOSYM_RECOGNIZER_UI_PORT, GEOSYM_RECOGNIZER_UI_HOST
+server:
+  app:
+    host: "127.0.0.1"
+    port: 8870
+  recognizer_ui:
+    host: "127.0.0.1"
+    port: 8860
+
+page:
+  width: 1440
+  height: 1440
+  layout: random
+  layout_options: [top_bottom]
+  margin_px: 40
+
+chart:
+  area_ratio_range: [0.80, 0.95]
+  aspect_ratio_range: [1.0, 1.8]
+  padding_px: 80
+  border:
+    enabled: true
+    color: [0, 0, 0]
+    thickness: 3
+    margin: 10
+
+coords:
+  x_range: [-7, 7]
+  y_range: [-7, 7]
+  grid_step_x: 1
+  grid_step_y: 1
+  min_intersections: 6
+
+ticks:
+  # 较大字体提高 OCR 识别率
+  font_size: 36
+  label_color: [0, 0, 0]
+
+axes:
+  line_width: 2
+  color: [0, 0, 0]
+
+grid:
+  line_width: 1
+  color: [140, 140, 140]
+  dash_on: 10
+  dash_off: 6
+
+stem:
+  font_size: 28
+  color: [30, 30, 30]
+  placeholder_lines:
+    - "Consider the graph of the function shown below."
+    - "Find the coordinates of all intersections as described."
+  max_lines: 5
+
+curves:
+  # 8 function types, each with grid-aligned key feature points.
+  # One curve per image for benchmark evaluation.
+  function_types:
+    # Elementary
+    - linear            # y = ax + b
+    - quadratic         # y = a(x-h)² + k
+    - absolute          # y = a|x-h| + k
+    # Polynomial
+    - cubic             # y = a(x-h)³ + b(x-h) + k
+    - piecewise_linear  # y = s₁(x-h)+k / s₂(x-h)+k
+    # Transcendental
+    - exponential       # y = a·b^(x-h) + k
+    - logarithmic       # y = a·log₂(x-h) + k
+    # Special
+    - rational          # y = a/(x-h) + k
+  num_curves_range: [1, 1]
+  color: [139, 0, 0]
+  line_width: 3
+
+generation:
+  candidate_attempts: 150
+  selection_pool_size: 10
+  selection_score_margin: 3.0
+  diversity_retry_attempts: 24
+  family_soft_cap: 12
+  intersection_targets:
+    linear: {hard_min: 8, preferred_min: 10, preferred_max: 14}
+    quadratic: {hard_min: 4, preferred_min: 4, preferred_max: 5}
+    absolute: {hard_min: 7, preferred_min: 9, preferred_max: 14}
+    cubic: {hard_min: 5, preferred_min: 5, preferred_max: 5}
+    piecewise_linear: {hard_min: 8, preferred_min: 10, preferred_max: 14}
+    exponential: {hard_min: 3, preferred_min: 4, preferred_max: 5}
+    logarithmic: {hard_min: 4, preferred_min: 4, preferred_max: 4}
+    rational: {hard_min: 6, preferred_min: 6, preferred_max: 6}
+
+# Digital degradation families for benchmark rendering.
+noise:
+  enabled: true
+  # Optional safeguard: shrink degradation for structurally fragile charts.
+  ocr_safe_adaptation: false
+  fragile_tone_scale: 0.75
+  fragile_noise_scale: 0.75
+  fragile_blur_scale: 0.80
+  fragile_geometry_scale: 0.60
+  tone:
+    enabled: true
+    brightness_range: [0.97, 1.03]
+    contrast_range: [0.98, 1.02]
+  sensor_noise:
+    enabled: false
+    gaussian_sigma: 1.5
+  blur:
+    enabled: false
+    ksize_range: [0, 3]
+  compression:
+    enabled: false
+    jpeg_quality_range: [88, 96]
+  resample:
+    enabled: false
+    scale_range: [0.92, 0.98]
+  geometry:
+    enabled: false
+    rotation_angle_range: [-0.5, 0.5]
+    perspective_strength_range: [0.0, 0.0]
+
+reasoning:
+  layers:
+    G1_visual_readout:
+      weight: 0.30
+      dimensions:
+        intercepts: 0.50
+        extrema: 0.50
+    G2_quantitative_analysis:
+      weight: 0.30
+      dimensions:
+        predictions: 0.25
+        rate_of_change: 0.15
+        monotonicity: 0.35
+        symmetry: 0.25
+    G3_mathematical_inference:
+      weight: 0.40
+      dimensions:
+        expression: 0.30
+        domain: 0.20
+        range: 0.20
+        judge_inference_score: 0.30
+  intervention:
+    # Active configuration for the unified six-condition experiment matrix.
+    # E3/E4 use OCR + rules baselines, and E5 uses the GeoSym fusion modes below.
+    # Legacy factorized naming has been retired.
+    default_path_b_mode: "visual_facts_flat"
+    fusion_modes: ["visual_facts_flat", "visual_facts_full"]
+    baseline_modes: ["ocr_baseline", "plain_table"]
+    ablation_modes: []
+  judge:
+    enabled: true
+    model: ""
+    temperature: 0.0
+
+# ---------------------------------------------------------------------------
+# LLM model providers — edit this section to add/remove models.
+# Each provider shares one API key (looked up from api_keys.yaml by api_key_name).
+# Claude is special: it auto-detects config/claude_credentials.json for Vertex AI.
+# ---------------------------------------------------------------------------
+models:
+  OpenAI:
+    adapter: "evaluator.adapters.openai.OpenAIAdapter"
+    api_key_name: "openai"
+    models:
+      "GPT-5.4": "gpt-5.4"
+      "GPT-5.2": "gpt-5.2"
+  Google:
+    adapter: "evaluator.adapters.gemini.GeminiAdapter"
+    api_key_name: "gemini"
+    models:
+      "Gemini-3.1-Pro": "gemini-3.1-pro-preview"
+      "Gemini-3-Pro": "gemini-3-pro-preview"
+  Qwen:
+    adapter: "evaluator.adapters.qwen.QwenVLAdapter"
+    api_key_name: "qwen"
+    models:
+      "Qwen3.5-Plus": "qwen3.5-plus"
+      "Qwen3-VL-Plus": "qwen3-vl-plus"
+  Kimi:
+    adapter: "evaluator.adapters.kimi.KimiAdapter"
+    api_key_name: "kimi"
+    models:
+      "Kimi-K2.5": "kimi-k2.5"
+      "Moonshot-V1-128K-Vision": "moonshot-v1-128k-vision-preview"
+  GLM:
+    adapter: "evaluator.adapters.glm.GLMAdapter"
+    api_key_name: "glm"
+    models:
+      "GLM-4.6V": "glm-4.6v"
+  Claude:
+    adapter: "evaluator.adapters.claude.ClaudeAdapter"
+    api_key_name: "claude"
+    models:
+      "Claude-Opus-4.6": "claude-opus-4-6"
+      "Claude-Sonnet-4.6": "claude-sonnet-4-6"
+
+output:
+  image_dir: "dataset/images"
+  gt_dir: "dataset/ground_truth"
+  image_format: "png"
+  image_dpi: null

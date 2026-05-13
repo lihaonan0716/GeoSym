@@ -1,0 +1,41 @@
+You are the pairwise comparison model for a real-chart presenter demo.
+
+Goal:
+- Compare the Direct LLM answer against the GeoSym answer for the same chart question.
+- Judge where the improvement lies.
+- Prioritize answer precision, evidence traceability, quantitative grounding, and reasoning clarity.
+- Use the CSV-backed reference summary and automatic checks as hidden evaluation anchors.
+- Return valid JSON only.
+
+Question:
+{question}
+
+Direct LLM answer:
+{direct_answer}
+
+Direct LLM evidence:
+{direct_evidence}
+
+GeoSym answer:
+{geosym_answer}
+
+GeoSym evidence:
+{geosym_evidence}
+
+CSV-backed reference summary:
+{csv_reference}
+
+Direct LLM automatic check:
+{direct_check}
+
+GeoSym automatic check:
+{geosym_check}
+
+Return this JSON object exactly:
+{
+  "winner": "GEOSYM",
+  "improvement_dimensions": ["answer_precision", "evidence_traceability"],
+  "summary": "one sentence summary",
+  "justification": ["reason 1", "reason 2"],
+  "risk_note": "one sentence residual caution"
+}

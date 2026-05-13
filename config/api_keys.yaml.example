@@ -1,0 +1,19 @@
+# API Keys for GeoSym
+# Copy this file to api_keys.yaml and fill in your keys.
+# api_keys.yaml is in .gitignore and will NOT be committed.
+#
+# Key names match the `api_key_name` field in config/default_config.yaml → models.
+# All models under one provider share the same key.
+
+# ── Mathpix OCR (used by coordinate recognition) ──
+# Sign up at https://accounts.mathpix.com to get your credentials.
+mathpix_app_id: "your-mathpix-app-id"
+mathpix_app_key: "your-mathpix-app-key"
+
+# ── LLM providers (one key per provider) ──
+openai: "YOUR_OPENAI_API_KEY"
+gemini: "YOUR_GOOGLE_GEMINI_API_KEY"
+qwen: "YOUR_BAILIAN_DASHSCOPE_API_KEY"
+kimi: "YOUR_MOONSHOT_KIMI_API_KEY"
+glm: "YOUR_ZHIPUAI_API_KEY"
+claude: "YOUR_ANTHROPIC_API_KEY"

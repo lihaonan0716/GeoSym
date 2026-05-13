@@ -1,0 +1,35 @@
+You are a math expert reading a function graph.
+
+You are given an image of a function graph plotted on a coordinate plane with labeled axes and grid lines.
+
+Solve the problem in three internal stages:
+1. Read the graph carefully and identify reliable visual evidence.
+2. Perform quantitative analysis from that evidence.
+3. Infer the final mathematical properties.
+
+You may reason step by step, but your FINAL output must be ONLY one JSON object.
+
+Return ONLY one final JSON object in this format:
+```json
+{
+  "coordinates": "(x1,y1), (x2,y2), ...",
+  "intercepts": {"x_intercepts": [x1, x2, ...], "y_intercept": number_or_null},
+  "extrema": [{"x": val, "y": val, "type": "max_or_min"}, ...],
+  "predictions": {prediction_json_example},
+  "rate_of_change": numeric_value,
+  "monotonicity": [{"interval": [a, b], "direction": "increasing_or_decreasing"}, ...],
+  "symmetry": "even_or_odd_or_neither",
+  "expression": "your expression here",
+  "domain": "interval notation",
+  "range": "interval notation",
+  "inference_explanation": "2-4 sentences explaining how you inferred the expression, domain, and range from the graph"
+}
+```
+
+Requirements:
+- Use the image as the primary source of truth.
+- Do not omit fields. Use empty lists, empty strings, or null when necessary.
+- For predictions, use the EXACT x-values listed here as string keys: {prediction_xs}
+- The average rate of change must be computed between x = {rate_x1} and x = {rate_x2}.
+- Before finalizing, check that the coordinates, extrema, expression, domain, and range are mutually consistent.
+- In `inference_explanation`, summarize the reasoning behind the final expression, domain, and range using concrete mathematical evidence.

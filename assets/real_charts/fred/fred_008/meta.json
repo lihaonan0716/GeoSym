@@ -1,0 +1,28 @@
+{
+  "sample_id": "fred_008",
+  "title": "University of Michigan: Consumer Sentiment",
+  "source_family": "FRED",
+  "source_url": "https://fred.stlouisfed.org/series/UMCSENT",
+  "image_path": "assets/real_charts/fred/fred_008/image.png",
+  "question": "At what period does university of michigan: consumer sentiment reach its highest visible peak, and how much lower is the latest value?",
+  "gold_answer": {
+    "short_answer": "January 2000; about 55.6 points lower",
+    "long_answer": "The highest visible peak occurs in January 2000 at about 112. The latest visible value is about 56.4 in January 2026, which is about 55.6 points lower."
+  },
+  "answer_validation": {
+    "required_any_phrase_groups": [
+      [
+        "january 2000",
+        "2000-01",
+        "2000/01",
+        "2000-01-01"
+      ]
+    ],
+    "required_numeric_targets": [
+      {
+        "value": 55.6,
+        "tolerance": 3.0
+      }
+    ]
+  }
+}

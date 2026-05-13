@@ -1,0 +1,31 @@
+{
+  "sample_id": "omniscience_001",
+  "title": "Engineering hybrid nanotube wires for high-power biofuel cells",
+  "source_family": "OmniScience",
+  "source_url": "https://www.nature.com/articles/ncomms1000",
+  "doi": "10.1038/ncomms1000",
+  "journal": "Nature Communications",
+  "subject": "Physics",
+  "image_path": "assets/real_charts/omniscience/omniscience_001/image.png",
+  "question": "What is the percentage of retained current density (I/I₀) for the Carbon Nanotube (CNT) fibre electrode (solid circles) at the 7-hour mark, according to the chart and its caption?",
+  "gold_answer": {
+    "short_answer": "Approximately 82%.",
+    "long_answer": "The chart shows the relative electrode stability over time. The solid circles represent the Carbon Nanotube (CNT) fibre electrode. At the 7-hour mark on the horizontal axis, the corresponding solid circle is located at approximately 82% on the vertical axis (I/I₀). This value is explicitly confirmed in the original caption."
+  },
+  "original_caption": "Scatter plot depicting the temporal dependence of relative electrode stability ($I/I_0$, %) over a 7-hour period for two electrode types. The vertical axis represents the percentage of retained current density (scale 0–120%), and the horizontal axis represents time in hours (0–8 h). Solid circles correspond to the Carbon Nanotube (CNT) fibre electrode, which demonstrates high stability with a slow, linear decay rate, retaining approximately 82% of its initial current by hour 7. Open circles repr",
+  "chart_type_hint": "line",
+  "answer_validation": {
+    "required_any_phrase_groups": [
+      [
+        "82",
+        "eighty-two"
+      ]
+    ],
+    "required_numeric_targets": [
+      {
+        "value": 82,
+        "tolerance": 2
+      }
+    ]
+  }
+}

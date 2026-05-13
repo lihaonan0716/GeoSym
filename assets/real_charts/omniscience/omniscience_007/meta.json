@@ -1,0 +1,39 @@
+{
+  "sample_id": "omniscience_007",
+  "title": "Jurassic climate mode governed by ocean gateway",
+  "source_family": "OmniScience",
+  "source_url": "https://www.nature.com/articles/ncomms10015",
+  "doi": "10.1038/ncomms10015",
+  "journal": "Nature Communications",
+  "subject": "Ecology",
+  "image_path": "assets/real_charts/omniscience/omniscience_007/image.png",
+  "question": "What is the approximate minimum δ¹⁸O_carb value recorded during the Toarcian Oceanic Anoxic Event (OAE), and what is the corresponding inferred palaeotemperature?",
+  "gold_answer": {
+    "short_answer": "The minimum δ¹⁸O_carb is approximately -5.8‰ PDB, which corresponds to an inferred palaeotemperature of about 34°C.",
+    "long_answer": "The chart displays a significant negative excursion in the oxygen-isotope ratio (δ¹⁸O_carb) during the Toarcian Oceanic Anoxic Event (OAE), which begins around biosubzone no. 44. The lowest data point within this event, a grey triangle, reaches a minimum δ¹⁸O_carb value of approximately -5.8‰ PDB. According to the right y-axis, this δ¹⁸O value corresponds to a maximum inferred palaeotemperature of about 34°C."
+  },
+  "original_caption": "The image displays a scientific chart (Figure 2) plotting the oxygen-isotope ratio (δ¹⁸O_carb ‰ PDB) against geological age (in million years) and biosubzone number for the Pliensbachian to Bajocian stages of the Early to Middle Jurassic. The x-axis spans from approximately 182.7 to 170.3 million years ago, divided into biosubzones numbered 35 to 70. The y-axis on the left shows δ¹⁸O values ranging from -6‰ to +2‰, while the right y-axis indicates inferred palaeotemperature in °C, ranging from 0",
+  "chart_type_hint": "area",
+  "answer_validation": {
+    "required_any_phrase_groups": [
+      [
+        "-5.8",
+        "negative 5.8"
+      ],
+      [
+        "34",
+        "thirty-four"
+      ]
+    ],
+    "required_numeric_targets": [
+      {
+        "value": -5.8,
+        "tolerance": 0.2
+      },
+      {
+        "value": 34,
+        "tolerance": 1.5
+      }
+    ]
+  }
+}

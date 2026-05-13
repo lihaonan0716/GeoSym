@@ -1,0 +1,18 @@
+{
+  "sample_id": "omniscience_008",
+  "title": "Atlantic multi-decadal oscillation covaries with Agulhas leakage",
+  "source_family": "OmniScience",
+  "source_url": "https://www.nature.com/articles/ncomms10082",
+  "doi": "10.1038/ncomms10082",
+  "journal": "Nature Communications",
+  "subject": "Ecology",
+  "image_path": "assets/real_charts/omniscience/omniscience_008/image.png",
+  "question": "According to the chart, what was the approximate value of heat transport via Agulhas leakage (solid black line) in 1965?",
+  "gold_answer": {
+    "short_answer": "Approximately 0.08 PW",
+    "long_answer": "In 1965, the solid black line representing heat transport via Agulhas leakage is at approximately 0.08 PW on the left y-axis."
+  },
+  "original_caption": "The chart displays two time series from 1950 to approximately 2005, representing heat transport (left y-axis, in PW) and freshwater transport (right y-axis, in mSv, negative values indicating salt transport), both associated with Agulhas leakage and meridional transports in the South Atlantic.\n\n- **Heat transport (black lines, left y-axis, 0.00–0.60 PW)**:\n  - Solid black line: Heat transport via Agulhas leakage. It starts near 0.15 PW in 1950, dips to ~0.08 PW around 1965, then gradually rises ",
+  "chart_type_hint": "line",
+  "m0_mode": "grid_free"
+}

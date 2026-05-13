@@ -1,0 +1,28 @@
+{
+  "sample_id": "fred_003",
+  "title": "Sticky Price Consumer Price Index less Food and Energy",
+  "source_family": "FRED",
+  "source_url": "https://fred.stlouisfed.org/series/CORESTICKM159SFRBATL#",
+  "image_path": "assets/real_charts/fred/fred_003/image.png",
+  "question": "At what period does sticky core inflation reach its highest visible peak, and how much lower is the latest value?",
+  "gold_answer": {
+    "short_answer": "June 1980; about 12.9 points lower",
+    "long_answer": "The highest visible peak occurs in June 1980. Relative to the latest visible value in the static chart, the drop is about 12.9 points."
+  },
+  "answer_validation": {
+    "required_any_phrase_groups": [
+      [
+        "june 1980",
+        "1980-06",
+        "1980/06",
+        "1980-06-01"
+      ]
+    ],
+    "required_numeric_targets": [
+      {
+        "value": 12.9,
+        "tolerance": 0.8
+      }
+    ]
+  }
+}

@@ -1,0 +1,36 @@
+You are a math expert performing quantitative analysis on a function graph.
+
+== DATA FROM PREVIOUS STEP (Step 1 results — treat as established facts) ==
+{L1_results}
+
+== YOUR TASK (Step 2: Quantitative Analysis) ==
+Using the data extracted in Step 1 AND the image, perform the following quantitative analyses. Do NOT determine the function expression yet.
+
+(d) Estimate the function value at these x-positions: {prediction_xs}
+    - Use the known coordinate points from Step 1 and the curve's visual shape.
+    - You may interpolate between known points.
+
+(e) What is the average rate of change of f(x) between x = {rate_x1} and x = {rate_x2}?
+    - rate of change = (f(x2) - f(x1)) / (x2 - x1)
+    - Use the known coordinates or visually estimate f(x1) and f(x2).
+
+(f) Determine the monotonicity: on which intervals is the function increasing or decreasing?
+    - Use the coordinate points from Step 1 AND the curve's visual trend in the image.
+    - Reason about the FULL mathematical domain, not just the observed coordinate range.
+    - If the curve clearly continues rising/falling beyond the visible region, extend the interval to -∞ or +∞ accordingly (e.g. use -Infinity / Infinity in JSON).
+    - List each interval with its direction.
+
+(g) Is the function even, odd, or neither?
+    - Check if the known points satisfy f(-x) = f(x) (even) or f(-x) = -f(x) (odd).
+    - Also consider the visual symmetry of the curve.
+
+Provide step-by-step reasoning, then output your final answers in this JSON format:
+```json
+{
+  "predictions": {prediction_json_example},
+  "rate_of_change": numeric_value,
+  "monotonicity": [{"interval": [a, b], "direction": "increasing_or_decreasing"}, ...],
+  "symmetry": "even_or_odd_or_neither"
+}
+```
+IMPORTANT: In "predictions", use the EXACT x-values listed above as string keys (e.g. "-6.5", not "x_val1").

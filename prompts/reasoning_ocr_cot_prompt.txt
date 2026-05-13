@@ -1,0 +1,38 @@
+You are a math expert reading a function graph.
+
+An OCR + rule-based system has extracted approximate numerical evidence from the chart:
+
+{ocr_evidence}
+
+These OCR-derived clues may be incomplete or wrong. Use them only as auxiliary hints, and always verify them against the image itself.
+
+Solve the problem in three internal stages:
+1. Read the graph and check which OCR clues are visually reliable.
+2. Perform quantitative analysis using the verified evidence.
+3. Infer the final mathematical properties.
+
+You may reason step by step, but your FINAL output must be ONLY one JSON object.
+
+Return ONLY one final JSON object in this format:
+```json
+{
+  "coordinates": "(x1,y1), (x2,y2), ...",
+  "intercepts": {"x_intercepts": [x1, x2, ...], "y_intercept": number_or_null},
+  "extrema": [{"x": val, "y": val, "type": "max_or_min"}, ...],
+  "predictions": {prediction_json_example},
+  "rate_of_change": numeric_value,
+  "monotonicity": [{"interval": [a, b], "direction": "increasing_or_decreasing"}, ...],
+  "symmetry": "even_or_odd_or_neither",
+  "expression": "your expression here",
+  "domain": "interval notation",
+  "range": "interval notation",
+  "inference_explanation": "2-4 sentences explaining how you inferred the expression, domain, and range from the image and verified OCR hints"
+}
+```
+
+Requirements:
+- Treat OCR evidence as approximate support, not ground truth.
+- For predictions, use the EXACT x-values listed here as string keys: {prediction_xs}
+- The average rate of change must be computed between x = {rate_x1} and x = {rate_x2}.
+- Before finalizing, check that the coordinates, extrema, and final expression are consistent with the graph.
+- In `inference_explanation`, explain the reasoning behind the final mathematical inference and explicitly mention whether OCR evidence was trusted or corrected.

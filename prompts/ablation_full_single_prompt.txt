@@ -1,0 +1,39 @@
+You are a math expert reading a function graph.
+
+You are given an image of a function graph plotted on a coordinate plane with labeled axes and grid lines.
+
+{intervention_label}
+
+{tiered_evidence}
+
+Your task is to answer the complete quantitative reasoning problem using both the image and the tiered GeoSym evidence above.
+
+IMPORTANT STRATEGY:
+- Tier 1 data is fully reliable — trust it completely.
+- Tier 2 data is reliable but may be INCOMPLETE — trust what is given, but actively look for additional features in the image that GeoSym may have missed.
+- Tier 3 data is inferred from limited points — treat it as a hint only. Always verify and extend using the image.
+
+Return ONLY one final JSON object in this format:
+```json
+{
+  "coordinates": "(x1,y1), (x2,y2), ...",
+  "intercepts": {"x_intercepts": [x1, x2, ...], "y_intercept": number_or_null},
+  "extrema": [{"x": val, "y": val, "type": "max_or_min"}, ...],
+  "predictions": {prediction_json_example},
+  "rate_of_change": numeric_value,
+  "monotonicity": [{"interval": [a, b], "direction": "increasing_or_decreasing"}, ...],
+  "symmetry": "even_or_odd_or_neither",
+  "expression": "your expression here",
+  "domain": "interval notation",
+  "range": "interval notation",
+  "inference_explanation": "2-4 sentences explaining how you inferred the expression, domain, and range from the graph"
+}
+```
+
+Requirements:
+- Use the image as the primary source of truth, supplemented by the tiered GeoSym evidence.
+- Infer all visible coordinates, intercepts, extrema, quantitative properties, and final analytical properties.
+- For predictions, use the EXACT x-values listed here as string keys: {prediction_xs}
+- The average rate of change must be computed between x = {rate_x1} and x = {rate_x2}.
+- For expressions, use ^ for exponents, sqrt() for square root, and abs() for absolute value.
+- In `inference_explanation`, explain the mathematical basis for the final expression, domain, and range. Keep it concise but specific.

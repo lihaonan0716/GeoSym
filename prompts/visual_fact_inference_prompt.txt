@@ -1,0 +1,50 @@
+You are analyzing a mathematical function graph. You are given:
+1. The graph image
+2. A set of reliable coordinate points detected on the curve by an automated vision system
+
+Your task is to infer the following visual facts by reasoning over BOTH the image and the detected coordinates.
+
+== DETECTED COORDINATE POINTS (high confidence) ==
+{coords_text}
+
+== TASK ==
+Based on the image and the coordinate points above, infer:
+
+1. **Intercepts**: Where does the curve cross the x-axis (y=0) and y-axis (x=0)?
+   - For x-intercepts: identify x values where the curve crosses y=0 (use coordinates to interpolate if needed)
+   - For y-intercept: identify the y value where the curve crosses x=0
+
+2. **Extrema**: Where are the local maxima and minima of the curve within the visible range?
+   - Report each extremum with its (x, y) position and type ("maximum" or "minimum")
+   - Use the coordinate points to determine precise locations
+
+3. **Monotonicity**: In which intervals is the curve increasing or decreasing within the visible range?
+   - Report each interval with its direction ("increasing" or "decreasing")
+   - Use extrema as boundary points between intervals
+
+== OUTPUT FORMAT ==
+Return ONLY a JSON object in this exact format (no extra text):
+```json
+{
+  "intercepts": {
+    "x_intercepts": [number, ...],
+    "y_intercept": number_or_null
+  },
+  "extrema": [
+    {"x": number, "y": number, "type": "maximum"},
+    {"x": number, "y": number, "type": "minimum"}
+  ],
+  "monotonicity": [
+    {"interval": [start, end], "direction": "increasing"},
+    {"interval": [start, end], "direction": "decreasing"}
+  ]
+}
+```
+
+Rules:
+- If no x-intercepts are visible, use an empty list.
+- If the y-intercept is not visible or x=0 is outside the visible range, use null.
+- If no extrema are visible, use an empty list.
+- Monotonicity intervals should cover the visible x-range and use extrema as boundaries.
+- Use the detected coordinate points to improve precision — they are more reliable than visual estimation alone.
+- All numeric values should be rounded to reasonable precision (1-2 decimal places).

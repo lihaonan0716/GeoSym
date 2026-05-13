@@ -1,0 +1,42 @@
+You are a math expert performing high-level reasoning about a function graph.
+
+== DATA FROM PREVIOUS STEPS ==
+Step 1 (Reading the Graph):
+{L1_results}
+
+Step 2 (Quantitative Analysis):
+{L2_results}
+
+== YOUR TASK (Step 3: Reasoning) ==
+Using ALL the data from Steps 1 and 2, plus the image, determine the function's analytical properties.
+
+(h) Write the analytical expression of the function.
+    - Use the coordinate points from Step 1 to constrain the expression.
+    - Verify your expression against the known points: substitute each point to check consistency.
+    - Use the monotonicity and symmetry information from Step 2 as additional constraints.
+
+(i) Determine the MATHEMATICAL domain of the function.
+    CRITICAL: The domain is NOT the visible x-axis range on the graph!
+    The domain is the set of ALL x-values for which the function is mathematically defined.
+    - If the curve reaches both left and right edges of the visible window and shows no sign of stopping, the domain is likely (-inf, +inf).
+    - Only use a finite domain if there is a clear mathematical reason (e.g., square root requires x >= 0, logarithm requires x > 0, rational function has vertical asymptotes).
+    - Determine the domain based on the EXPRESSION you found in (h), not from the image boundaries.
+
+(j) Determine the MATHEMATICAL range of the function.
+    CRITICAL: The range is NOT the visible y-axis range on the graph!
+    The range is the set of ALL possible output y-values of the function.
+    - If the curve extends toward the top or bottom edges without leveling off, the range likely extends to +inf or -inf.
+    - Use the extrema from Step 1: if there is a local maximum at y=k and the curve goes to -inf on both sides, the range is (-inf, k].
+    - Determine the range based on the EXPRESSION and EXTREMA, not from the image boundaries.
+
+Provide step-by-step reasoning, then output your final answers in this JSON format:
+```json
+{
+  "expression": "your expression here, e.g. x^2 - 4",
+  "domain": "interval notation, e.g. (-inf, +inf)",
+  "range": "interval notation, e.g. [-4, +inf)",
+  "inference_explanation": "2-4 sentences explaining how the expression, domain, and range were inferred from previous evidence"
+}
+```
+
+For expressions, use ^ for exponents (e.g. x^2), sqrt() for square root, abs() for absolute value.

@@ -1,0 +1,51 @@
+{
+  "sample_id": "engisphere_004",
+  "title": "Stress-Strain Curve - Glass (Soda-lime) (T=25.0)",
+  "source_family": "ENGISPHERE",
+  "source_url": "https://engisphere.com/calculators/stress-strain-curve-generator/",
+  "image_path": "assets/real_charts/engisphere/engisphere_004/image.png",
+  "question": "At approximately what strain does the curve reach its peak stress, and by about how much does the stress drop by the fracture point?",
+  "gold_answer": {
+    "short_answer": "About 23.4%; the stress drops by about 44 MPa",
+    "long_answer": "The curve reaches its peak stress at about 23.4%, where the stress is about 220 MPa. By the fracture point at about 45%, the stress has fallen to about 176 MPa, a drop of about 44 MPa."
+  },
+  "answer_validation": {
+    "required_numeric_targets": [
+      {
+        "value": 23.4,
+        "tolerance": 2.808
+      },
+      {
+        "value": 44.0,
+        "tolerance": 20.0
+      }
+    ]
+  },
+  "engisphere_state": {
+    "sample_id": "engisphere_004",
+    "material": "Titanium Alloy (Ti-6Al-4V)",
+    "rendered_material_label": "Custom Material",
+    "temperature_c": 100.0,
+    "strain_rate": 0.01,
+    "mode": "single",
+    "display": {
+      "selected_material": "Custom Material",
+      "display_modulus": "110.00 GPa",
+      "display_yield": "70 MPa",
+      "display_tensile": "220 MPa",
+      "display_elongation": "45.0%",
+      "display_ductility": "3.14",
+      "display_yield_strain": "0.064%",
+      "energy_value": "64.11 MJ/m³"
+    },
+    "mechanics": {
+      "youngs_modulus_mpa": 110000.0,
+      "yield_strength_mpa": 70.0,
+      "tensile_strength_mpa": 220.0,
+      "elongation_pct": 45.0,
+      "ductility_ratio": 3.14,
+      "yield_strain_pct": 0.064,
+      "energy_mj_per_m3": 64.11
+    }
+  }
+}

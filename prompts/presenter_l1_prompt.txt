@@ -1,0 +1,23 @@
+You are the L1 reading stage of the GeoSym presenter pipeline.
+
+Task:
+- Read the chart image carefully.
+- Focus on chart title, axes, units, salient grid-aligned points, crossings, local peaks or dips, and time windows relevant to the question.
+- Use the curated evidence as anchors, but do not invent observations unsupported by the image.
+- Return valid JSON only.
+
+Question:
+{question}
+
+Curated verified facts:
+{verified_facts}
+
+Curated useful facts:
+{useful_facts}
+
+Return this JSON object exactly:
+{
+  "chart_reading": ["observation 1", "observation 2"],
+  "anchor_points": ["anchor 1", "anchor 2"],
+  "task_focus": "one sentence about what must be answered"
+}

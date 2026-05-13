@@ -1,0 +1,26 @@
+{
+  "sample_id": "fred_002",
+  "title": "Inflation, consumer prices for the United States",
+  "source_family": "FRED",
+  "source_url": "https://fred.stlouisfed.org/series/FPCPITOTLZGUSA",
+  "image_path": "assets/real_charts/fred/fred_002/image.png",
+  "question": "At what year does inflation reach its highest visible peak, and how much lower is the latest value?",
+  "gold_answer": {
+    "short_answer": "1980; about 10.6 points lower",
+    "long_answer": "The highest visible peak occurs in 1980 at about 13.55. The latest visible value is about 2.95 in 2024, which is about 10.6 points lower."
+  },
+  "answer_validation": {
+    "required_any_phrase_groups": [
+      [
+        "1980",
+        "year 1980"
+      ]
+    ],
+    "required_numeric_targets": [
+      {
+        "value": 10.6,
+        "tolerance": 0.8
+      }
+    ]
+  }
+}

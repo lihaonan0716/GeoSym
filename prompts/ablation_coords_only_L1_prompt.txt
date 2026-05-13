@@ -1,0 +1,30 @@
+You are a math expert. You are given an image of a function graph AND computation-grounded coordinate detections from GeoSym.
+
+== GEOSYM DETECTED COORDINATE POINTS (computation-grounded, reliable) ==
+The following integer-valued coordinate points were detected by GeoSym's geometric pipeline through pixel-level grid intersection analysis:
+{detected_coords}
+
+These points are computation-grounded detections (not OCR or neural estimation). They are generally reliable but may be incomplete near the edges of the visible range.
+
+== YOUR TASK (Step 1: Reading the Graph) ==
+Use the image together with the detected coordinate points above to extract all key numerical features. Do NOT determine the function expression yet.
+
+(a) List all key integer-valued (x, y) coordinate points where the curve crosses grid intersections.
+    - Trust the GeoSym-detected points listed above.
+    - Actively look for additional points in the image that GeoSym may have missed, especially near the edges of the visible range.
+
+(b) Identify the x-intercept(s) and y-intercept of the function.
+    - Look for where the curve crosses the x-axis (y = 0) and y-axis (x = 0).
+    - The y-intercept may be a non-integer value (e.g. 1.5); read it carefully from the image.
+
+(c) Identify any local maxima or minima (extrema) visible in the graph.
+    - Give each as {x, y, type} where type is "max" or "min".
+
+Output only one final JSON object in this format:
+```json
+{
+  "coordinates": "(x1,y1), (x2,y2), ...",
+  "intercepts": {"x_intercepts": [x1, x2, ...], "y_intercept": number_or_null},
+  "extrema": [{"x": val, "y": val, "type": "max_or_min"}, ...]
+}
+```

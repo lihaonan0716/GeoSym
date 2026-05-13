@@ -1,0 +1,18 @@
+{
+  "sample_id": "omniscience_002",
+  "title": "Structural diversity in binary superlattices self-assembled from polymer-grafted nanocrystals",
+  "source_family": "OmniScience",
+  "source_url": "https://www.nature.com/articles/ncomms10052",
+  "doi": "10.1038/ncomms10052",
+  "journal": "Nature Communications",
+  "subject": "Physics",
+  "image_path": "assets/real_charts/omniscience/omniscience_002/image.png",
+  "question": "What is the overall trend shown in this chart, and at what point does the most significant change occur?",
+  "gold_answer": {
+    "short_answer": "",
+    "long_answer": "(Derived from chart analysis at runtime.)"
+  },
+  "original_caption": "The image displays a line chart titled \"Figure 3: Theoretical packing densities for different BNSL phases,\" plotting packing density (y-axis, ranging from 0.3 to 0.8) against size ratio (x-axis, ranging from 0.0 to 1.0). Seven distinct BNSL phases are represented by colored lines, each labeled in a legend on the right:\n\n- Green: NaCl\n- Magenta: AlB₂\n- Teal: MgZn₂\n- Blue: AuCu₃\n- Red: CaCu₅\n- Orange: C₆₀K₆\n- Cyan: NaZn₁₃\n\nEach curve shows how the theoretical packing density of that specific BNSL ",
+  "chart_type_hint": "line",
+  "m0_mode": "grid_free"
+}

@@ -1,0 +1,22 @@
+You are given an annotated image of a coordinate plane with {n_curves} function curve(s).
+A coordinate recognition system has identified the following integer coordinate points on the curves:
+{points_list}
+
+Task: Based on the annotated image and the identified coordinate points, determine the mathematical expression for EACH curve.
+
+Axis range: x from {x_min} to {x_max}, y from {y_min} to {y_max}.
+
+Rules:
+- Use Python/SymPy notation: x**2 for x squared, sqrt(x), exp(x), log(x) for natural log, Abs(x) for absolute value.
+- Use "x" as the variable.
+- Each expression represents y = f(x). Output only the right-hand side.
+- Use the coordinate points as reference to help determine function parameters accurately.
+- Output exactly {n_curves} expression(s).
+
+IMPORTANT: Output ONLY a JSON object with no extra text. Format:
+{{"functions": ["expression1", "expression2"]}}
+
+Example:
+{{"functions": ["2*x + 1", "x**2 - 3*x + 2"]}}
+
+Output the JSON object now:

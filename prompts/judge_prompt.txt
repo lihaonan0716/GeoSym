@@ -1,0 +1,35 @@
+You are an expert evaluator assessing the quality of the mathematical inference stage for a function graph reasoning task.
+
+The model has produced:
+- a final mathematical answer
+- a structured explanation of how it inferred the expression, domain, and range
+
+== GROUND TRUTH (reference answers) ==
+{ground_truth_summary}
+
+== MODEL'S MATHEMATICAL INFERENCE OUTPUT ==
+{model_response}
+
+== YOUR TASK ==
+Score the model's mathematical inference on the following four dimensions. Each dimension is scored 0-5.
+
+1. **Factual Accuracy** (0-5): Are the final expression, domain, and range mathematically consistent with the ground truth? Deduct points for incorrect or fabricated conclusions.
+
+2. **Inference Quality** (0-5): Does the explanation show meaningful mathematical reasoning for how the expression, domain, and range were inferred? A score of 5 means the inference is specific, non-trivial, and mathematically sound.
+
+3. **Reasoning Coherence** (0-5): Is the inference internally coherent? Are the expression, domain, and range mutually consistent? Are there logical gaps or contradictions? A score of 5 means the reasoning is clear and self-consistent.
+
+4. **Evidence Support** (0-5): Are the final mathematical conclusions supported by concrete evidence, constraints, or observed properties from the graph? A score of 5 means the explanation clearly connects conclusions to relevant evidence.
+
+Output your evaluation as JSON:
+```json
+{
+  "factual_accuracy": <0-5>,
+  "inference_quality": <0-5>,
+  "reasoning_coherence": <0-5>,
+  "evidence_support": <0-5>,
+  "comments": "..."
+}
+```
+
+Be strict and objective. Do not inflate scores.

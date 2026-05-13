@@ -1,0 +1,18 @@
+{
+  "sample_id": "omniscience_005",
+  "title": "Experimental investigation of classical and quantum correlations under decoherence",
+  "source_family": "OmniScience",
+  "source_url": "https://www.nature.com/articles/ncomms1005",
+  "doi": "10.1038/ncomms1005",
+  "journal": "Nature Communications",
+  "subject": "Physics",
+  "image_path": "assets/real_charts/omniscience/omniscience_005/image.png",
+  "question": "According to the main plot, what is the approximate value of the 'Total correlation (I)' (green upward-pointing triangles) when the 'Total thickness of quartz plates' is 100 λ₀?",
+  "gold_answer": {
+    "short_answer": "Approximately 0.7",
+    "long_answer": "Locating 100 λ₀ on the x-axis of the main plot and tracing vertically to the green upward-pointing triangles (Total correlation (I)), then horizontally to the y-axis, the value is approximately 0.7."
+  },
+  "original_caption": "The main plot displays the decay of various correlation measures as a function of the total thickness of quartz plates, expressed in units of λ₀ (ranging from 0 to 300). The y-axis represents “Correlations,” scaled from 0.0 to 1.2.\n\nFive distinct correlation measures are plotted with corresponding symbols and theoretical curves:\n\n- **Total correlation (I)**: Represented by green upward-pointing triangles with error bars. The data points follow a smooth exponential decay, starting near 1.05 at 0 ",
+  "chart_type_hint": "line",
+  "m0_mode": "grid_free"
+}

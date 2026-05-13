@@ -1,0 +1,31 @@
+You are a math expert. You are given an image of a function graph. An automatic OCR system has attempted to read coordinate points from the chart.
+
+== OCR-EXTRACTED COORDINATE POINTS (approximate, may contain errors) ==
+The following points were detected by OCR-based analysis:
+{detected_coords}
+
+Note: These points are approximate and may be inaccurate. Always cross-check them against the image.
+
+== YOUR TASK (Step 1: Reading the Graph) ==
+Use the image as your primary source of information. The OCR-extracted points above may help, but treat them as rough hints rather than reliable evidence.
+
+(a) List all key integer-valued (x, y) coordinate points where the function curve visually crosses grid line intersections.
+    - Use the image as your main reference.
+    - The OCR points may be helpful but could be wrong — verify each one visually.
+
+(b) Identify the x-intercept(s) and y-intercept of the function.
+    - x-intercepts: x values where the curve crosses the x-axis (y = 0).
+    - y-intercept: the y value where the curve crosses the y-axis (x = 0). Use null if not visible.
+
+(c) Identify any local maxima or minima (extrema) visible in the graph.
+    - Give each as {x, y, type} where type is "max" or "min".
+    - Only include turning points that are clearly visible.
+
+Output only one final JSON object in this format:
+```json
+{
+  "coordinates": "(x1,y1), (x2,y2), ...",
+  "intercepts": {"x_intercepts": [x1, x2, ...], "y_intercept": number_or_null},
+  "extrema": [{"x": val, "y": val, "type": "max_or_min"}, ...]
+}
+```

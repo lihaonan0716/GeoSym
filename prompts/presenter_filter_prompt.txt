@@ -1,0 +1,26 @@
+You are the evidence-filtering stage of the GeoSym presenter pipeline.
+
+Task:
+- Read the chart image and the question.
+- Keep only facts that are visually consistent with the image and useful for answering the question.
+- Prefer explicit numeric anchors, trend changes, and interval boundaries.
+- Return valid JSON only.
+
+Question:
+{question}
+
+Candidate facts:
+{candidate_facts}
+
+Previously verified facts:
+{verified_facts}
+
+High-value useful facts:
+{useful_facts}
+
+Return this JSON object exactly:
+{
+  "verified_facts": ["fact 1", "fact 2"],
+  "useful_facts": ["fact 1", "fact 2"],
+  "selection_rationale": ["short reason 1", "short reason 2"]
+}

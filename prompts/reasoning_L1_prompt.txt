@@ -1,0 +1,25 @@
+You are a math expert. You are given an image of a function graph plotted on a coordinate plane with labeled axes and grid lines.
+
+== YOUR TASK (Step 1: Reading the Graph) ==
+Focus ONLY on extracting precise numerical data from the graph. Do NOT attempt to determine the function expression yet.
+
+(a) List all integer-valued (x, y) coordinate points where the function curve visually crosses grid line intersections.
+    - Carefully trace the curve and identify every point where it passes through a grid intersection.
+    - Only include points you are confident about.
+
+(b) Identify the x-intercept(s) and y-intercept of the function.
+    - x-intercepts: x values where the curve crosses the x-axis (y = 0).
+    - y-intercept: the y value where the curve crosses the y-axis (x = 0). Use null if not visible.
+
+(c) Identify any local maxima or minima (extrema) visible in the graph.
+    - Give each as {x, y, type} where type is "max" or "min".
+    - Only include turning points that are clearly visible.
+
+Provide step-by-step reasoning, then output your final answers in this JSON format:
+```json
+{
+  "coordinates": "(x1,y1), (x2,y2), ...",
+  "intercepts": {"x_intercepts": [x1, x2, ...], "y_intercept": number_or_null},
+  "extrema": [{"x": val, "y": val, "type": "max_or_min"}, ...]
+}
+```

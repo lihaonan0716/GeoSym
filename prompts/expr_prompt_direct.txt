@@ -1,0 +1,19 @@
+You are given an image of a coordinate plane with {n_curves} function curve(s).
+
+Task: Identify the mathematical expression for EACH curve shown in the image.
+
+Axis range: x from {x_min} to {x_max}, y from {y_min} to {y_max}.
+
+Rules:
+- Use Python/SymPy notation: x**2 for x squared, sqrt(x), exp(x), log(x) for natural log, Abs(x) for absolute value.
+- Use "x" as the variable.
+- Each expression represents y = f(x). Output only the right-hand side.
+- Output exactly {n_curves} expression(s).
+
+IMPORTANT: Output ONLY a JSON object with no extra text. Format:
+{{"functions": ["expression1", "expression2"]}}
+
+Example:
+{{"functions": ["2*x + 1", "x**2 - 3*x + 2"]}}
+
+Output the JSON object now:

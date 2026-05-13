@@ -1,0 +1,51 @@
+{
+  "sample_id": "engisphere_009",
+  "title": "Stress-Strain Curve - Structural Steel (A36)",
+  "source_family": "ENGISPHERE",
+  "source_url": "https://engisphere.com/calculators/stress-strain-curve-generator/",
+  "image_path": "assets/real_charts/engisphere/engisphere_009/image.png",
+  "question": "At approximately what strain does the curve reach its peak stress, and by about how much does the stress drop by the fracture point?",
+  "gold_answer": {
+    "short_answer": "About 8.4%; the stress drops by about 96 MPa",
+    "long_answer": "The curve reaches its peak stress at about 8.4%, where the stress is about 400 MPa. By the fracture point at about 20%, the stress has fallen to about 304 MPa, a drop of about 96 MPa."
+  },
+  "answer_validation": {
+    "required_numeric_targets": [
+      {
+        "value": 8.4,
+        "tolerance": 1.008
+      },
+      {
+        "value": 96.0,
+        "tolerance": 20.0
+      }
+    ]
+  },
+  "engisphere_state": {
+    "sample_id": "engisphere_009",
+    "material": "Structural Steel (A36)",
+    "rendered_material_label": "Custom Material",
+    "temperature_c": 300.0,
+    "strain_rate": 0.1,
+    "mode": "single",
+    "display": {
+      "selected_material": "Custom Material",
+      "display_modulus": "200.00 GPa",
+      "display_yield": "250 MPa",
+      "display_tensile": "400 MPa",
+      "display_elongation": "20.0%",
+      "display_ductility": "1.60",
+      "display_yield_strain": "0.125%",
+      "energy_value": "59.27 MJ/m³"
+    },
+    "mechanics": {
+      "youngs_modulus_mpa": 200000.0,
+      "yield_strength_mpa": 250.0,
+      "tensile_strength_mpa": 400.0,
+      "elongation_pct": 20.0,
+      "ductility_ratio": 1.6,
+      "yield_strain_pct": 0.125,
+      "energy_mj_per_m3": 59.27
+    }
+  }
+}

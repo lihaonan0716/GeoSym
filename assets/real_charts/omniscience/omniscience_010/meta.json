@@ -1,0 +1,18 @@
+{
+  "sample_id": "omniscience_010",
+  "title": "Large microwave generation from current-driven magnetic vortex oscillators in magnetic tunnel junctions",
+  "source_family": "OmniScience",
+  "source_url": "https://www.nature.com/articles/ncomms1006",
+  "doi": "10.1038/ncomms1006",
+  "journal": "Nature Communications",
+  "subject": "Physics",
+  "image_path": "assets/real_charts/omniscience/omniscience_010/image.png",
+  "question": "What are the key quantitative findings visible in this chart?",
+  "gold_answer": {
+    "short_answer": "",
+    "long_answer": "(Derived from chart analysis at runtime.)"
+  },
+  "original_caption": "The plot displays the integrated microwave power (in nW) as a function of the out-of-plane magnetic field (in kOe) for a direct current of -5 mA. The magnetic field is swept from -8 kOe to +8 kOe. The integrated power remains near zero across most of the field range, except for a sharp, narrow peak occurring between approximately 3.7 kOe and 4.3 kOe. This peak is labeled with two critical field markers: Hc (critical field for microwave oscillation onset) at ~3.7 kOe, and HSW (field for vortex co",
+  "chart_type_hint": "other",
+  "m0_mode": "grid_free"
+}

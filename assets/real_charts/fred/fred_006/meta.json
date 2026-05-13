@@ -1,0 +1,28 @@
+{
+  "sample_id": "fred_006",
+  "title": "All Employees, Manufacturing",
+  "source_family": "FRED",
+  "source_url": "https://fred.stlouisfed.org/series/MANEMP",
+  "image_path": "assets/real_charts/fred/fred_006/image.png",
+  "question": "At what period does all employees, manufacturing reach its highest visible peak, and how much lower is the latest value?",
+  "gold_answer": {
+    "short_answer": "June 1979; about 6980 points lower",
+    "long_answer": "The highest visible peak occurs in June 1979 at about 19553. The latest visible value is about 12573 in February 2026, which is about 6980 points lower."
+  },
+  "answer_validation": {
+    "required_any_phrase_groups": [
+      [
+        "june 1979",
+        "1979-06",
+        "1979/06",
+        "1979-06-01"
+      ]
+    ],
+    "required_numeric_targets": [
+      {
+        "value": 6980.0,
+        "tolerance": 10.0
+      }
+    ]
+  }
+}

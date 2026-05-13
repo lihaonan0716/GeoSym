@@ -1,0 +1,18 @@
+{
+  "sample_id": "omniscience_003",
+  "title": "Tracing the fate of carbon and the atmospheric evolution of Mars",
+  "source_family": "OmniScience",
+  "source_url": "https://www.nature.com/articles/ncomms10003",
+  "doi": "10.1038/ncomms10003",
+  "journal": "Nature Communications",
+  "subject": "Ecology",
+  "image_path": "assets/real_charts/omniscience/omniscience_003/image.png",
+  "question": "According to the 'Mantle Plume Scenario' (solid red line), what was the approximate outgassing rate at 3.0 Ga before present?",
+  "gold_answer": {
+    "short_answer": "Approximately 0.25 bar Gyr⁻¹",
+    "long_answer": "Following the solid red line (Mantle Plume Scenario) from the x-axis value of 3.0 Ga upwards, the line intersects the y-axis at approximately 0.25 bar Gyr⁻¹."
+  },
+  "original_caption": "The image displays a line graph titled \"Figure 7: Volcanic outgassing rates,\" plotting \"Outgassing rate (bar Gyr⁻¹)\" on the y-axis against \"Time before present (Ga)\" on the x-axis. The x-axis spans from 3.8 Ga to 0 Ga, with major tick marks at 0.5 Ga intervals. The y-axis ranges from 0 to 0.6 bar Gyr⁻¹, with major tick marks at 0.1 bar Gyr⁻¹ intervals.\n\nTwo distinct scenarios are plotted:\n\n1. **Global Melt Scenario** (solid black line): This curve begins at approximately 0.55 bar Gyr⁻¹ at 3.8 Ga",
+  "chart_type_hint": "line",
+  "m0_mode": "grid_free"
+}

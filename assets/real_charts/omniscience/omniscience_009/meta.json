@@ -1,0 +1,18 @@
+{
+  "sample_id": "omniscience_009",
+  "title": "High-efficiency polymer solar cells with small photon energy loss",
+  "source_family": "OmniScience",
+  "source_url": "https://www.nature.com/articles/ncomms10085",
+  "doi": "10.1038/ncomms10085",
+  "journal": "Nature Communications",
+  "subject": "Physics",
+  "image_path": "assets/real_charts/omniscience/omniscience_009/image.png",
+  "question": "What is the approximate open-circuit voltage (eVoc) for the PNOz4T/PC71BM cell (red data) at a temperature of 250 K?",
+  "gold_answer": {
+    "short_answer": "Approximately 1.0 eV",
+    "long_answer": "To find the eVoc for the PNOz4T/PC71BM cell at 250 K, locate 250 K on the x-axis. Move vertically up to the red data points/line. Then, move horizontally to the left to read the corresponding value on the y-axis (eVoc). The value is approximately 1.0 eV."
+  },
+  "original_caption": "The plot displays the temperature dependence of the open-circuit voltage (eVoc, in eV) for two organic photovoltaic cells: PNOz4T/PC71BM (red data points and line) and PNTz4T/PC71BM (blue data points and line). The x-axis represents temperature in Kelvin (K), ranging from 0 to 300 K. The y-axis represents eVoc, ranging from 0.6 to 1.6 eV.\n\nFor the PNOz4T/PC71BM cell (red), eVoc decreases linearly with increasing temperature, starting from approximately 1.38 eV at 0 K and decreasing to about 0.95",
+  "chart_type_hint": "scatter",
+  "m0_mode": "grid_free"
+}

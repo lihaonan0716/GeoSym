@@ -1,0 +1,30 @@
+cff-version: 1.2.0
+title: "GeoSym: Structured Evidence Fusion for Reliable Quantitative Chart Reasoning"
+message: "If you use this software, please cite it using the metadata from this file."
+type: software
+date-released: "2026-05-12"
+version: "1.0.0"
+authors:
+  - family-names: Wang
+    given-names: Yongqing
+    affiliation: China University of Geosciences, Beijing
+  - family-names: Zhang
+    given-names: Qisheng
+    affiliation: China University of Geosciences, Beijing
+  - family-names: Li
+    given-names: Haonan
+    affiliation: China University of Geosciences, Beijing
+  - family-names: Sun
+    given-names: Tianjun
+    affiliation: China University of Geosciences, Beijing
+  - family-names: Yu
+    given-names: Samson S.
+    affiliation: Deakin University
+repository-code: "https://github.com/lihaonan0716/GeoSym"
+license: MIT
+keywords:
+  - evidence fusion
+  - multimodal reasoning
+  - quantitative chart reasoning
+  - vision-language models
+  - evidence reliability

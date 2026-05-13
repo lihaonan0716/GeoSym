@@ -1,0 +1,23 @@
+opencv-python>=4.8.0
+numpy>=1.24.0
+Pillow>=10.0.0
+PyYAML>=6.0
+gradio>=4.0.0
+sympy>=1.12
+openai>=1.0.0
+anthropic>=0.40.0
+
+# OCR/rule baseline — pure Python, no external binary needed
+easyocr>=1.7.0
+
+# Dependencies required by recognizer (local import, no pip package needed)
+requests>=2.31.0
+playwright>=1.58.0
+scikit-image>=0.21.0
+pandas>=2.0.0
+pydantic>=2.0.0
+google-generativeai>=0.3.0
+google-auth>=2.23.0
+google-genai==1.20.0
+scipy>=1.10.0
+matplotlib>=3.7.0

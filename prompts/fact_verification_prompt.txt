@@ -1,0 +1,26 @@
+You are reviewing visual analysis results from an automated system (GeoSym) against the actual graph image.
+
+Your task is to identify any facts that are CLEARLY INCORRECT based on what you see in the image. You should be CONSERVATIVE: only reject facts that obviously contradict the image. When uncertain, keep the fact.
+
+== RELIABLE COORDINATES (high confidence) ==
+{coords_text}
+
+== VISUAL FACTS TO VERIFY ==
+{candidate_facts}
+
+For each fact category below, determine if it is CONSISTENT with what you see in the image.
+
+Rules:
+- Only mark "incorrect" if the fact CLEARLY contradicts the image.
+- When uncertain or partially correct, mark as "correct".
+- Do NOT invent new values — only judge existing ones.
+- False rejection is WORSE than keeping a slightly imprecise fact.
+
+Return ONLY JSON in this exact format:
+{
+  "intercepts": {"status": "correct", "reason": "consistent with visible curve"},
+  "extrema": {"status": "correct", "reason": "matches visible turning point"},
+  "monotonicity": {"status": "correct", "reason": "direction matches curve shape"}
+}
+
+Use "correct" to keep or "incorrect" to remove. Provide a brief reason for each.

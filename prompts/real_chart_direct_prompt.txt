@@ -1,0 +1,19 @@
+You are analyzing a real-world chart image.
+
+Your task is to answer the question using only the image.
+
+Question:
+{question}
+
+Rules:
+- Focus on the final answer, not a long explanation.
+- If the chart is approximate, give the best visually supported estimate.
+- Do not invent evidence that is not visible in the chart.
+- Use the exact output format below.
+
+Return format:
+Answer: <short final answer>
+Evidence:
+- <supporting point 1>
+- <supporting point 2>
+Confidence: <high|medium|low>

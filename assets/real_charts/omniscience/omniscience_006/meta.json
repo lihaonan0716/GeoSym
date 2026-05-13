@@ -1,0 +1,18 @@
+{
+  "sample_id": "omniscience_006",
+  "title": "A small-gap electrostatic micro-actuator for large deflections",
+  "source_family": "OmniScience",
+  "source_url": "https://www.nature.com/articles/ncomms10078",
+  "doi": "10.1038/ncomms10078",
+  "journal": "Nature Communications",
+  "subject": "Physics",
+  "image_path": "assets/real_charts/omniscience/omniscience_006/image.png",
+  "question": "What is the approximate normalized strain energy density for the V-shaped NED actuator at an angle of -60 degrees?",
+  "gold_answer": {
+    "short_answer": "Approximately 0.07 m⁻²",
+    "long_answer": "For the V-shaped NED actuator, at an angle of -60 degrees on the horizontal axis, the corresponding normalized strain energy density on the vertical axis is approximately 0.07 m⁻²."
+  },
+  "original_caption": "The image displays a scatter plot graph titled \"Figure 3\" (as per raw caption), illustrating the normalized strain energy density, denoted as \\( U_{\\text{strain}} \\) (in units of m⁻²), as a function of the angle \\( \\alpha \\) (in degrees). The horizontal axis spans from -80° to +80°, and the vertical axis ranges from 0.00 to 0.12 m⁻².\n\nThe data points, plotted as solid black circles, form two distinct U-shaped curves symmetric about the vertical axis at \\( \\alpha = 0^\\circ \\). The left curve, cor",
+  "chart_type_hint": "scatter",
+  "m0_mode": "grid_free"
+}

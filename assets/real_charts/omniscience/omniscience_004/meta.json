@@ -1,0 +1,18 @@
+{
+  "sample_id": "omniscience_004",
+  "title": "The effect of soil-borne pathogens depends on the abundance of host tree species",
+  "source_family": "OmniScience",
+  "source_url": "https://www.nature.com/articles/ncomms10017",
+  "doi": "10.1038/ncomms10017",
+  "journal": "Nature Communications",
+  "subject": "Biology",
+  "image_path": "assets/real_charts/omniscience/omniscience_004/image.png",
+  "question": "What is the approximate seedling survival rate for O. glaberrima when 50% of the soil is untreated and no fungicide is applied?",
+  "gold_answer": {
+    "short_answer": "0.33",
+    "long_answer": "For the 'No fungicide' series (solid black line with filled circles), locate the point corresponding to 50% on the x-axis (proportion of untreated soil). Reading across to the y-axis (seedling survival rate), the value is approximately 0.33."
+  },
+  "original_caption": "The chart displays the relationship between the proportion of untreated soil (%) on the x-axis and the seedling survival rate on the y-axis for O. glaberrima. The x-axis ranges from 100% to 0% untreated soil, decreasing from left to right. The y-axis ranges from 0.0 to 1.0, representing the seedling survival rate.\n\nTwo distinct data series are plotted:\n\n1. **“No fungicide” (solid black line with filled circles)**:  \n   - At 100% untreated soil, seedling survival rate is approximately 0.23 (with ",
+  "chart_type_hint": "Line chart",
+  "m0_mode": "grid_free"
+}

@@ -1,0 +1,108 @@
+# AI模型配置文件示例
+# 复制此文件为 models_config.yaml 并填入实际的 API keys
+
+models:
+  # ============================================
+  # Google Gemini
+  # ============================================
+  - id: gemini
+    name: "Google Gemini"
+    provider: google
+    enabled: true
+    config:
+      api_key: "your_gemini_api_key_here"  # 替换为你的 Gemini API key
+      timeout: 30
+    default_prompt: |
+      请进行以下更改：
+      
+      1. 提高图像清晰度，背景改成纯白色；
+      2. 将所有函数线的颜色改为红色；
+      3. 将网格线、X轴、Y轴和刻度标签加粗；
+      4. 确保网格线、X轴、Y轴和刻度标签都是黑灰色；
+      5. 去除坐标系最外侧的黑框。
+      
+      重要提示：请勿更改图像中的任何其他元素。特别是，请勿修改任何现有数字或字符，也不要添加任何新内容。
+
+  # ============================================
+  # Replicate - Flux-Kontext-Max
+  # ============================================
+  - id: flux-kontext-max
+    name: "Flux-Kontext-Max (Replicate)"
+    provider: replicate
+    enabled: true
+    config:
+      api_token: "your_replicate_api_token_here"  # 替换为你的 Replicate API token
+      model_path: "black-forest-labs/flux-kontext-max"
+      timeout: 120
+      params:
+        aspect_ratio: "match_input_image"
+        output_format: "jpg"
+        safety_tolerance: 2
+        prompt_upsampling: false
+    default_prompt: |
+      Please make the following changes:
+      
+      1. Improve image clarity and change the background to pure white.
+      2. Change the color of all function lines, hollow points, and filled points to red or another vibrant color.
+      3. Ensure the grid lines, X-axis, Y-axis, and tick labels are dark gray.
+      4. Increase the line thickness of the grid lines, X-axis and Y-axis.
+      5. Make the tick labels bold.
+      
+      Important Note: Do not modify any other elements in the image. Specifically, do not alter any existing numbers or characters, and do not add any new content.
+
+  # ============================================
+  # Replicate - Flux-Kontext-Pro
+  # ============================================
+  - id: flux-kontext-pro
+    name: "Flux-Kontext-Pro (Replicate)"
+    provider: replicate
+    enabled: true
+    config:
+      api_token: "your_replicate_api_token_here"  # 替换为你的 Replicate API token
+      model_path: "black-forest-labs/flux-kontext-pro"
+      timeout: 120
+      params:
+        aspect_ratio: "match_input_image"
+        output_format: "jpg"
+        safety_tolerance: 2
+        prompt_upsampling: false
+    default_prompt: |
+      Please make the following changes:
+      
+      1. Improve image clarity and change the background to pure white.
+      2. Change the color of all function lines, hollow points, and filled points to red or another vibrant color.
+      3. Ensure the grid lines, X-axis, Y-axis, and tick labels are dark gray.
+      4. Increase the line thickness of the grid lines, X-axis and Y-axis.
+      5. Make the tick labels bold.
+      
+      Important Note: Do not modify any other elements in the image. Specifically, do not alter any existing numbers or characters, and do not add any new content.
+
+  # ============================================
+  # Azure OpenAI - Flux-Kontext-Pro
+  # ============================================
+  - id: flux-kontext-pro-azure
+    name: "Flux-Kontext-Pro (Azure)"
+    provider: azure
+    enabled: true
+    config:
+      endpoint: "https://your-endpoint.azure.com"  # 替换为你的 Azure endpoint
+      deployment: "flux.1-kontext-pro"
+      api_version: "2025-04-01-preview"
+      api_key: "your_azure_api_key_here"  # 替换为你的 Azure API key
+      timeout: 120
+      params:
+        n: 1
+        aspect_ratio: "match_input_image"
+        model: "flux.1-kontext-pro"
+        output_format: "jpg"
+    default_prompt: |
+      Please make the following changes:
+      
+      1. Improve image clarity and change the background to pure white.
+      2. Change the color of all function lines, hollow points, and filled points to red or another vibrant color.
+      3. Ensure the grid lines, X-axis, Y-axis, and tick labels are dark gray.
+      4. Increase the line thickness of the grid lines, X-axis and Y-axis.
+      5. Make the tick labels bold.
+      
+      Important Note: Do not modify any other elements in the image. Specifically, do not alter any existing numbers or characters, and do not add any new content.
+
