@@ -317,7 +317,7 @@ If you use GeoSym in your research, please cite:
 ```bibtex
 @misc{wang2026geosym,
   title     = {GeoSym: Structured Evidence Fusion for Reliable Quantitative Chart Reasoning},
-  author    = {Wang, Yongqing and Zhang, Qisheng and Li, Haonan and Sun, Tianjun and Yu, Samson S.},
+  author    = {Wang, Yongqing and Zhang, Qisheng and Guo, Linyan and Li, Haonan and Sun, Tianjun and Yu, Samson S.},
   year      = {2026},
   note      = {Manuscript in preparation. Software and dataset available online},
   url       = {https://github.com/lihaonan0716/GeoSym}
