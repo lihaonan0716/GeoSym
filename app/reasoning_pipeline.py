@@ -119,11 +119,48 @@ def extract_geosym_coords(
 _VF_INFERENCE_PROMPT_PATH = _root / "prompts" / "visual_fact_inference_prompt.txt"
 
 
+# ── Extrema channel feature flag ──────────────────────────────────────
+#
+# The extrema slot of `compute_visual_facts_from_coords` has always been
+# hard-coded to `[]`, so no extrema evidence ever reached the prompts even
+# though `evaluator.reasoning.intervention` contains a working candidate
+# generator.  This flag wires that generator in *without* changing any
+# recorded behaviour by default.
+#
+# Default OFF, deliberately: the candidates are unfiltered, and the discrete
+# three-point test underneath cannot distinguish a genuine turning point from a
+# jump across a discontinuity.  Turning the flag on is therefore an experiment,
+# not a fix.  Every historical number was produced with it off, and keeping it
+# off keeps the pipeline output structurally identical to those runs.
+EXTREMA_CHANNEL_ENV_VAR = "GEOSYM_ENABLE_EXTREMA_CHANNEL"
+
+
+def extrema_channel_enabled() -> bool:
+    """Whether the extrema evidence channel is enabled (env-var flag, default off)."""
+    import os
+
+    return os.environ.get(EXTREMA_CHANNEL_ENV_VAR, "false").strip().lower() in {
+        "1", "true", "yes", "on",
+    }
+
+
+# Conditions whose prompt content depends on the flag.  E5 (`full_geosym`) is the
+# only one, because it is the sole condition that receives `visual_facts`:
+# E5_raw passes `visual_facts=None` and E0-E4 never see GeoSym output at all.
+# A flag change therefore invalidates E5 and nothing else — paying to re-run the
+# other six would buy no information.
+EXTREMA_CHANNEL_CONDITIONS: frozenset = frozenset({"E5"})
+
+
 def compute_visual_facts_from_coords(coords: list) -> Optional[Dict[str, Any]]:
     """Compute visual facts deterministically from M0 coordinate points.
 
     Replaces LLM-based inference with computation-grounded derivation,
     ensuring that M1 facts are as reliable as M0 coordinates themselves.
+
+    The extrema slot is populated only when :func:`extrema_channel_enabled`
+    returns True; otherwise it stays ``[]`` as it always has.  The returned
+    field set, field order, and every other category are identical either way.
     """
     if not coords or len(coords) < 2:
         return None
@@ -146,8 +183,15 @@ def compute_visual_facts_from_coords(coords: list) -> Optional[Dict[str, Any]]:
             y_intercept = round(y, 2)
             break
 
-    # --- Extrema: omitted — LLM infers from coordinates + image ---
-    extrema = []
+    # --- Extrema: gated on the feature flag (see above) ---
+    # Flag off  -> `[]`, matching every run recorded so far.
+    # Flag on   -> unfiltered candidates from the single shared implementation.
+    if extrema_channel_enabled():
+        from evaluator.reasoning.intervention import infer_extrema_candidates
+
+        extrema = infer_extrema_candidates(coords)
+    else:
+        extrema = []
 
     # --- Monotonicity: group consecutive slopes into intervals ---
     monotonicity = []

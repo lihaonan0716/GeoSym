@@ -37,8 +37,13 @@ assets/geosym_bench.zip
 # but keep the public dataset-generation entry point referenced by README.
 scripts/*
 !scripts/run_generate.py
-tests/
-requirements-dev.txt
+
+# Tests are part of the public artifact — reviewers need to be able to run them.
+# The whole tree is tracked, at any depth: an exception limited to `tests/*.py`
+# would silently ignore `tests/unit/test_x.py` the day someone adds it.
+# Generated artifacts are already excluded by the `__pycache__/` and `*.pyc`
+# rules above, which apply here too.
+!tests/
 assets/real_charts/engisphere/*/state.json
 assets/real_charts/fred/fred_sampling_manifest.csv
 assets/real_charts/engisphere/engisphere_sampling_manifest.csv

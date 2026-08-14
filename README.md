@@ -188,6 +188,7 @@ GeoSym/
 ├── app/             # Gradio UI and backend modules
 ├── config/          # Configuration files and API key template
 ├── scripts/         # CLI tools
+├── tests/           # Test suite
 ├── docs/            # Technical documentation
 ├── i18n.py          # Bilingual internationalization (EN/ZH)
 ├── run.py           # Application entry point
@@ -203,6 +204,7 @@ GeoSym/
 | `app/` | Gradio application: UI construction, reasoning pipeline, experiment runners, caching |
 | `prompts/` | Prompt templates for reasoning layers, judge evaluation, M0 locate, visual fact inference |
 | `scripts/` | CLI tools for dataset generation and related utilities |
+| `tests/` | Pytest suite covering the public surface and the evidence-channel contracts |
 
 ## Setup
 

@@ -530,11 +530,20 @@ def format_tiered_facts_for_prompt(
     *,
     fact_keys: Optional[List[str]] = None,
 ) -> str:
-    """Format GeoSym output as a 3-tier structured text block.
+    """Format GeoSym output as a tiered structured text block.
 
     Tier 1 — Verified Anchors: coordinates (fully reliable)
-    Tier 2 — Detected Features: intercepts, extrema (reliable but possibly incomplete)
+    Tier 2 — Detected Features: intercepts (exact grid observations)
     Tier 3 — Inferred Patterns: monotonicity (reference only, verify from image)
+    Experimental — extrema candidates, unfiltered and unverified
+
+    Extrema are deliberately *not* in Tier 2.  Tier 2 states exact observations
+    the model may lean on; extrema come from a discrete three-point test whose
+    measured candidate precision is far below that, so presenting them as
+    detected features would overstate what the pipeline knows.  They are emitted
+    as an explicitly experimental, hypothesis-only block instead, and only when
+    the extrema list is non-empty — so a run with the extrema channel off
+    produces character-identical output to every run recorded before it.
     """
     keys = fact_keys if fact_keys is not None else list(_VISUAL_FACT_KEYS)
     points = normalize_coords(coords)
@@ -592,6 +601,29 @@ def format_tiered_facts_for_prompt(
         else:
             lines.append("  - Insufficient data to infer monotonicity.")
             lines.append("    Please determine monotonicity directly from the image.")
+
+    # ── Experimental: unfiltered extrema candidates ──
+    # Rendered only when the extrema channel produced something, which keeps the
+    # output byte-identical to historical runs whenever the list is empty.  The
+    # wording must stay hypothesis-only: these candidates carry no reliability
+    # guarantee, they cannot be told apart from jumps across a discontinuity, and
+    # they must never override what the model reads off the image.
+    if "extrema" in keys:
+        raw_extrema = facts.get("extrema")
+        if isinstance(raw_extrema, list) and raw_extrema:
+            lines.append("")
+            lines.append(
+                "== UNFILTERED EXTREMA CANDIDATES "
+                "(experimental — verify against the image) =="
+            )
+            for e in raw_extrema:
+                lines.append(f"  - candidate {e.get('type', '?')} at ({e.get('x')}, {e.get('y')})")
+            lines.append("    These are candidates from a discrete three-point test, not")
+            lines.append("    detected features. A jump across a discontinuity (for example a")
+            lines.append("    vertical asymptote) produces the same signature as a turning")
+            lines.append("    point, so some candidates are expected to be spurious. Treat")
+            lines.append("    each one as a hypothesis to check against the image, and do not")
+            lines.append("    let it override your own reading of the curve.")
 
     return "\n".join(lines)
 
@@ -955,6 +987,28 @@ def _infer_monotonicity(points: List[Tuple[int, int]]) -> List[Dict[str, Any]]:
         elif hi > lo:
             cleaned.append(seg)
     return cleaned
+
+
+def infer_extrema_candidates(coords: Iterable[Any]) -> List[Dict[str, Any]]:
+    """Derive extrema *candidates* from raw M0 coordinates.
+
+    Narrow public entry point for the single extrema implementation in this
+    module, so callers outside this file do not have to reach for a private
+    helper.  Responsibilities are deliberately limited to (1) normalising and
+    sorting the input via :func:`normalize_coords` and (2) delegating to that
+    one implementation.
+
+    Returns the existing candidate schema — a list of
+    ``{"x": int, "y": int, "type": "max" | "min"}`` — and nothing else: no
+    symmetry, no reliability tier, no other fact category.
+
+    These are *candidates*, not verified facts.  The three-point discrete test
+    used underneath cannot tell a genuine turning point from a jump across a
+    discontinuity (e.g. a vertical asymptote sampled on both sides), so a
+    candidate may be spurious.  Filtering that out is a separate concern and is
+    not implemented here.
+    """
+    return _infer_extrema(normalize_coords(coords))
 
 
 def _infer_extrema(points: List[Tuple[int, int]]) -> List[Dict[str, Any]]:

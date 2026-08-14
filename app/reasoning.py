@@ -25,6 +25,7 @@ from app.reasoning_pipeline import (
     resolve_image_path,
     extract_geosym_coords,
     compute_visual_facts_from_coords,
+    extrema_channel_enabled,
     infer_visual_facts_with_llm,
     run_single_condition,
     load_layer_config,
@@ -32,7 +33,12 @@ from app.reasoning_pipeline import (
     ensure_judge_adapter,
     run_judge,
 )
-from app.reasoning_schema import build_condition_record, build_reasoning_record
+from app.reasoning_schema import (
+    build_condition_record,
+    build_reasoning_record,
+    condition_extrema_flag,
+    stale_extrema_conditions,
+)
 from i18n import t, LANG_EN, LANG_ZH
 from generator.config_loader import load_config
 from evaluator.reasoning.intervention import (
@@ -912,6 +918,11 @@ def run_reasoning_all_conditions(
     cached = None
     skip_conds: set = set()
     loaded_from_cache: set = set()
+    current_extrema_flag = extrema_channel_enabled()
+    # Conditions cached under the opposite extrema-channel state.  Held apart from
+    # `skip_conds` so a flag flip forces a re-run of exactly the affected
+    # conditions instead of discarding the whole file.
+    stale_conds: set = set()
     should_load_cache = (not force_rerun) or bool(target_set)
     if should_load_cache:
         cached = load_reasoning_cache(image_name, model_name)
@@ -925,9 +936,18 @@ def run_reasoning_all_conditions(
                 )
                 cached = None
             else:
+                stale_conds = stale_extrema_conditions(cached, current_extrema_flag)
+                if stale_conds:
+                    logger.info(
+                        "Extrema channel state changed (now %s) — invalidating cached "
+                        "conditions: %s",
+                        current_extrema_flag, ", ".join(sorted(stale_conds)),
+                    )
                 cached_conds = cached.get("conditions", {})
                 if not force_rerun:
                     for ck in requested_conditions:
+                        if ck in stale_conds:
+                            continue
                         if cached_conds.get(ck, {}).get("status") == "success":
                             skip_conds.add(ck)
                     if skip_conds:
@@ -942,6 +962,9 @@ def run_reasoning_all_conditions(
     condition_elapsed_ms: dict = {}
     condition_retry_counts: dict = {}
     condition_cached_flags: dict = {}
+    # Per-condition extrema-channel state.  Cached conditions keep whatever they
+    # were produced under; freshly run ones take this process's setting.
+    condition_extrema_flags: dict = {}
     judge_failed_conds: set = set()
     geosym_failed_conds: set = set()
     completed_conds: set = set()
@@ -956,6 +979,11 @@ def run_reasoning_all_conditions(
                 continue
             if ck in target_set:
                 continue
+            # Stale-flag conditions are deliberately still carried over here.
+            # Dropping them would throw away a paid result whenever this run does
+            # not target them, and it is unnecessary: each condition records the
+            # flag it was actually produced under, so a mixed record stays honest.
+            # What the flag change does force is a re-run — see `skip_conds`.
             results_eval[ck] = cond_data.get("eval")
             results_md[ck] = cond_data.get("md", "")
             results_pipeline[ck] = cond_data.get("pipeline")
@@ -965,6 +993,7 @@ def run_reasoning_all_conditions(
             condition_elapsed_ms[ck] = cond_data.get("elapsed_ms", 0)
             condition_retry_counts[ck] = cond_data.get("retry_count", 0)
             condition_cached_flags[ck] = True
+            condition_extrema_flags[ck] = condition_extrema_flag(cond_data)
             loaded_from_cache.add(ck)
             if cond_data.get("status") == "success":
                 completed_conds.add(ck)
@@ -1052,6 +1081,12 @@ def run_reasoning_all_conditions(
             cond_statuses[cond_key] = "success"
             continue
 
+        # About to run for real, so any prepopulated cache entry for this
+        # condition is superseded.  Matters for stale-flag conditions, which are
+        # prepopulated *and* re-run — without this they would still be reported
+        # under `summary.cached_conditions`.
+        loaded_from_cache.discard(cond_key)
+
         progress_md = _build_progress_bar(
             condition_order,
             condition_labels,
@@ -1088,6 +1123,7 @@ def run_reasoning_all_conditions(
             condition_elapsed_ms[cond_key] = round((time.perf_counter() - started_cond_perf) * 1000, 2)
             condition_retry_counts[cond_key] = 0
             condition_cached_flags[cond_key] = False
+            condition_extrema_flags[cond_key] = current_extrema_flag
             results_md[cond_key] = _format_path_result(
                 path_label=condition_labels[cond_key],
                 eval_result=ev,
@@ -1105,6 +1141,7 @@ def run_reasoning_all_conditions(
             condition_elapsed_ms[cond_key] = round((time.perf_counter() - started_cond_perf) * 1000, 2)
             condition_retry_counts[cond_key] = 0
             condition_cached_flags[cond_key] = False
+            condition_extrema_flags[cond_key] = current_extrema_flag
             results_errors[cond_key] = {
                 "type": exc.__class__.__name__,
                 "message": str(exc),
@@ -1215,6 +1252,7 @@ def run_reasoning_all_conditions(
             judge=results_judge.get(ck),
             pipeline=results_pipeline.get(ck),
             md=results_md.get(ck, ""),
+            extrema_channel_enabled=condition_extrema_flags.get(ck, current_extrema_flag),
         )
 
     cache_record = build_reasoning_record(
@@ -1230,6 +1268,13 @@ def run_reasoning_all_conditions(
             "gemini_enabled": gemini_enabled,
             "force_rerun": force_rerun,
             "target_conditions": requested_conditions,
+            # Resolved boolean, not the raw env-var string: without it a stored
+            # record cannot be told apart from one produced with the extrema
+            # channel in the opposite state.  This is the *process* setting; a
+            # condition reused from an earlier run keeps its own flag in
+            # `conditions[ck].extrema_channel_enabled`, which is the field to
+            # trust when the two disagree.
+            "extrema_channel_enabled": current_extrema_flag,
         },
         ground_truth_snapshot=gt_data,
         score_table_markdown=summary_md,
