@@ -17,6 +17,64 @@ from recognizer.core.chart_extractor import ChartExtractor
 from i18n import t, get_lang
 
 
+# Stage configuration for the function-specialized M0 pipeline.  Mirrors the
+# interactive M0 demo defaults so the M0 Test tab and the step-by-step
+# recognizer tab stay aligned.
+#
+# Exposed as a module constant rather than built inline so that any offline
+# diagnostic replaying M0 can import the exact configuration the evaluation
+# ran under.  A diagnostic holding its own copy would silently drift and end
+# up describing a pipeline that was never evaluated.
+M0_STAGE_CONFIG: Dict[str, Dict[str, Any]] = {
+    "stage0": {
+        "horizontal_tolerance": 1.5,
+        "vertical_tolerance": 1.5,
+        "interval_percentile": 50,
+    },
+    "stage05": {"enabled": False},
+    "stage1": {
+        "enable_curve_erase": True,
+        "enable_dashed_line_connection": True,
+        "enable_perspective_correction": True,
+        "enable_rotation_correction": True,
+        "rotation_hough_threshold": 60,
+        "rotation_min_line_length": 60,
+        "rotation_max_line_gap": 10,
+        "rotation_angle_threshold": 5,
+        "grid_hough_threshold": 65,
+        "grid_min_line_length": 45,
+        "grid_max_line_gap": 10,
+        "grid_angle_threshold": 5,
+        "merge_distance_threshold": 20,
+        "dashed_gap_threshold": 10,
+        "dashed_collinear_threshold": 3,
+        "curve_saturation_threshold": 90,
+        "curve_value_threshold": 60,
+        "curve_feather_size": 3,
+    },
+    "stage2": {
+        "tolerance": 3,
+        "enable_morph_connect": True,
+        "morph_kernel_size": 7,
+        "morph_iterations": 2,
+        "color_saturation_threshold": 90,
+        "color_value_threshold": 60,
+        "integer_approximation_threshold": 0.1,
+    },
+}
+
+
+def build_m0_stage_config(*, skip_enhancement: bool = True) -> Dict[str, Any]:
+    """Return a deep-enough copy of :data:`M0_STAGE_CONFIG` for one run.
+
+    Copied per call so a caller mutating its config cannot alter the pipeline
+    every subsequent caller sees.
+    """
+    config = {stage: dict(params) for stage, params in M0_STAGE_CONFIG.items()}
+    config["stage05"]["enabled"] = not skip_enhancement
+    return config
+
+
 class RecognizerAdapter:
     """
     Adapter to call recognizer for intersection detection.
@@ -68,45 +126,7 @@ class RecognizerAdapter:
         _, buffer = cv2.imencode(".png", image)
         image_b64 = f"data:image/png;base64,{base64.b64encode(buffer.tobytes()).decode()}"
 
-        # Config: mirror the interactive function-specialized M0 demo defaults
-        # so the M0 Test tab and the step-by-step recognizer tab stay aligned.
-        config = {
-            "stage0": {
-                "horizontal_tolerance": 1.5,
-                "vertical_tolerance": 1.5,
-                "interval_percentile": 50,
-            },
-            "stage05": {"enabled": not skip_enhancement},
-            "stage1": {
-                "enable_curve_erase": True,
-                "enable_dashed_line_connection": True,
-                "enable_perspective_correction": True,
-                "enable_rotation_correction": True,
-                "rotation_hough_threshold": 60,
-                "rotation_min_line_length": 60,
-                "rotation_max_line_gap": 10,
-                "rotation_angle_threshold": 5,
-                "grid_hough_threshold": 65,
-                "grid_min_line_length": 45,
-                "grid_max_line_gap": 10,
-                "grid_angle_threshold": 5,
-                "merge_distance_threshold": 20,
-                "dashed_gap_threshold": 10,
-                "dashed_collinear_threshold": 3,
-                "curve_saturation_threshold": 90,
-                "curve_value_threshold": 60,
-                "curve_feather_size": 3,
-            },
-            "stage2": {
-                "tolerance": 3,
-                "enable_morph_connect": True,
-                "morph_kernel_size": 7,
-                "morph_iterations": 2,
-                "color_saturation_threshold": 90,
-                "color_value_threshold": 60,
-                "integer_approximation_threshold": 0.1,
-            },
-        }
+        config = build_m0_stage_config(skip_enhancement=skip_enhancement)
 
         # Run recognizer's complete pipeline with real OCR OCR result
         result = self._processor.process_full(

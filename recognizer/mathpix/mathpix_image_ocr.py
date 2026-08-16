@@ -1,3 +1,4 @@
+import copy
 import logging
 import random
 import time
@@ -18,6 +19,34 @@ _MAX_RETRIES = 3
 _BASE_DELAY = 3.0
 _MAX_DELAY = 30.0
 _TIMEOUT = 60
+
+MATHPIX_ENDPOINT = "https://api.mathpix.com/v3/text"
+
+# Request options for every M0 Stage 0 OCR call. Exposed as a module constant,
+# with `build_request_body` as the single place the body is assembled, so a
+# diagnostic that needs to record "what do we actually send" can import it
+# instead of keeping a transcribed second copy that drifts when this is edited.
+MATHPIX_REQUEST_OPTIONS = {
+    "formats": ["text", "data", "html"],
+    "data_options": {
+        "include_asciimath": True,
+        "include_latex": True,
+    },
+    "include_line_data": True,
+    "include_smiles": False,
+    "include_inchi": False,
+    "include_diagram_text": True,
+    "include_geometry_data": False,
+}
+
+
+def build_request_body(src: str) -> dict:
+    """Return the exact JSON body posted to Mathpix for `src`.
+
+    Deep-copied so a caller inspecting or mutating the result cannot alter the
+    options every subsequent request sends.
+    """
+    return {"src": src, **copy.deepcopy(MATHPIX_REQUEST_OPTIONS)}
 
 
 def _load_mathpix_credentials() -> tuple:
@@ -57,26 +86,14 @@ class MathpixImageOCRTool:
         if not src:
             return "请提供图像URL或base64编码的图像数据"
 
-        base_url = 'https://api.mathpix.com/v3/text'
+        base_url = MATHPIX_ENDPOINT
         headers = {
             'app_id': mathpix_app_id,
             'app_key': mathpix_app_key,
             'Content-Type': 'application/json'
         }
 
-        request_data = {
-            "src": src,
-            "formats": ["text", "data", "html"],
-            "data_options": {
-                "include_asciimath": True,
-                "include_latex": True,
-            },
-            "include_line_data": True,
-            "include_smiles": False,
-            "include_inchi": False,
-            "include_diagram_text": True,
-            "include_geometry_data": False
-        }
+        request_data = build_request_body(src)
 
         last_err = None
         for attempt in range(1, _MAX_RETRIES + 1):
