@@ -7,8 +7,11 @@ sympy>=1.12
 openai>=1.0.0
 anthropic>=0.40.0
 
-# OCR/rule baseline — pure Python, no external binary needed
-easyocr>=1.7.0
+# OCR/rule baseline — pure Python, no external binary needed.
+# Detector output shifts between EasyOCR releases and between the Torch
+# versions it pulls in, so any OCR accuracy figure must state both; the
+# combination the reported numbers were produced under is 1.7.2 / 2.10.0+cpu.
+easyocr>=1.7.2
 
 # Dependencies required by recognizer (local import, no pip package needed)
 requests>=2.31.0
