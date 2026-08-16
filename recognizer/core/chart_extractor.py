@@ -491,28 +491,35 @@ class ChartExtractor:
                 'original_type': label.get('original_type', 'unknown')
             }
             x_labels_converted.append(converted_label)
-            
-            y_labels_converted = []
-            for label in y_labels_raw:
-                converted_label = {
-                    'text': label['text'],
-                    'value': label['value'],
-                    'bbox': {
-                        'left': label['bbox']['left'] - x1,
-                        'top': label['bbox']['top'] - y1,
-                        'right': label['bbox']['right'] - x1,
-                        'bottom': label['bbox']['bottom'] - y1
-                    },
-                    'center_x': label['center_x'] - x1,
-                    'center_y': label['center_y'] - y1,
-                    'raw_center_x': label['center_x'],
-                    'raw_center_y': label['center_y'],
-                    'original_type': label.get('original_type', 'unknown')
-                }
-                y_labels_converted.append(converted_label)
-            
-            print(f"[Chart提取] 转换后X轴标签: {len(x_labels_converted)}个, Y轴标签: {len(y_labels_converted)}个")
-            
+
+        # NOTE: this loop and the print below used to sit INSIDE the x-label
+        # loop above.  The y list was therefore rebuilt from scratch once per
+        # x label -- correct output, wasted work -- and with no x labels at
+        # all, `y_labels_converted` was never bound and the return raised
+        # UnboundLocalError instead of returning two empty lists.  Upstream
+        # gating currently makes that unreachable, but the binding must not
+        # depend on an unrelated caller's precondition.
+        y_labels_converted = []
+        for label in y_labels_raw:
+            converted_label = {
+                'text': label['text'],
+                'value': label['value'],
+                'bbox': {
+                    'left': label['bbox']['left'] - x1,
+                    'top': label['bbox']['top'] - y1,
+                    'right': label['bbox']['right'] - x1,
+                    'bottom': label['bbox']['bottom'] - y1
+                },
+                'center_x': label['center_x'] - x1,
+                'center_y': label['center_y'] - y1,
+                'raw_center_x': label['center_x'],
+                'raw_center_y': label['center_y'],
+                'original_type': label.get('original_type', 'unknown')
+            }
+            y_labels_converted.append(converted_label)
+
+        print(f"[Chart提取] 转换后X轴标签: {len(x_labels_converted)}个, Y轴标签: {len(y_labels_converted)}个")
+
         chart_bbox_tuple = (x1, y1, x2-x1, y2-y1)
         return chart_image, chart_bbox_tuple, x_labels_converted, y_labels_converted
     
