@@ -84,6 +84,7 @@ scripts/*
 !scripts/project_evidence_selection_selective_propagation_zero_cost.py
 !scripts/rescore_plotqa_measured_flat_deterministic.py
 !scripts/rescore_plotqa_signed_difference_normalization.py
+!scripts/rescore_reasoning_outputs_offline.py
 !scripts/run_geosym_bench_post_remediation_subset.py
 !scripts/run_evidence_selection_candidate_guided_confirmation.py
 !scripts/run_evidence_selection_pilot.py

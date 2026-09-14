@@ -126,11 +126,35 @@ def parse_expression_answer(answer_str: str) -> str:
 
 
 def _loads_json_with_numeric_fraction_repair(candidate: str) -> Optional[Dict]:
-    """Load JSON, repairing bare numeric fractions only after strict parsing fails."""
+    """Load JSON, repairing common LLM JSON slips only after strict parsing fails."""
     try:
         return json.loads(candidate)
     except json.JSONDecodeError:
         pass
+
+    def repair_non_json_infinity(text: str) -> str:
+        return re.sub(
+            r'(?P<prefix>[\[:,]\s*)(?P<value>[+-]?(?:inf|infinity|Infinity|INF))(?=\s*[\],}])',
+            lambda m: (
+                m.group("prefix")
+                + json.dumps(
+                    {
+                        "inf": "Infinity",
+                        "+inf": "Infinity",
+                        "infinity": "Infinity",
+                        "+infinity": "Infinity",
+                        "-inf": "-Infinity",
+                        "-infinity": "-Infinity",
+                    }.get(m.group("value").lower(), m.group("value"))
+                )
+            ),
+            text,
+        )
+
+    def repair_invalid_json_escapes(text: str) -> str:
+        # LLMs often emit LaTeX in JSON strings, e.g. "\infty".  JSON only
+        # allows a small escape alphabet; preserve the literal backslash.
+        return re.sub(r'\\(?!["\\/bfnrtu])', r'\\\\', text)
 
     def repl(match: re.Match) -> str:
         numerator = float(match.group(1))
@@ -139,17 +163,20 @@ def _loads_json_with_numeric_fraction_repair(candidate: str) -> Optional[Dict]:
             return match.group(0)
         return str(numerator / denominator)
 
+    repaired = candidate
+    for repair in (repair_non_json_infinity, repair_invalid_json_escapes):
+        repaired = repair(repaired)
     repaired = re.sub(
         r'(?<!["\w])([+-]?\d+(?:\.\d+)?)\s*/\s*([+-]?\d+(?:\.\d+)?)(?!["\w])',
         repl,
-        candidate,
+        repaired,
     )
-    if repaired == candidate:
-        return None
-    try:
-        return json.loads(repaired)
-    except json.JSONDecodeError:
-        return None
+    if repaired != candidate:
+        try:
+            return json.loads(repaired)
+        except json.JSONDecodeError:
+            pass
+    return None
 
 
 def _extract_json_block(text: str) -> Optional[Dict]:
@@ -341,6 +368,10 @@ def _parse_monotonicity(raw) -> List[Dict[str, Any]]:
             continue
         interval = item.get("interval", [])
         direction = str(item.get("direction", "")).lower()
+        if isinstance(interval, str):
+            bounds = [part.strip() for part in re.sub(r'^[\(\[]|[\)\]]$', '', interval).split(",", 1)]
+            if len(bounds) == 2:
+                interval = bounds
         if isinstance(interval, list) and len(interval) == 2 and direction:
             try:
                 result.append({

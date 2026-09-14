@@ -605,6 +605,14 @@ def evaluate_intercepts(
     y-intercept: absolute error scoring.
     Combined 50/50.
     """
+    def _is_absent_intercept(value: Any) -> bool:
+        if value is None:
+            return True
+        if isinstance(value, (list, tuple, set, dict)):
+            return len(value) == 0
+        text = str(value).strip().lower()
+        return text in {"", "none", "null", "n/a", "na", "undetermined", "not visible", "not applicable"}
+
     if not isinstance(gt_intercepts, dict):
         return {"correct": True, "score": 100.0,
                 "pred_display": "N/A", "gt_display": "N/A",
@@ -642,7 +650,7 @@ def evaluate_intercepts(
     # y-intercept: error scoring
     yi_score = 100.0
     if gt_yi is not None:
-        if pred_yi is None:
+        if _is_absent_intercept(pred_yi):
             yi_score = 0.0
         else:
             try:
@@ -650,17 +658,14 @@ def evaluate_intercepts(
                 yi_score = max(0.0, 100.0 - 20.0 * err)
             except (TypeError, ValueError):
                 yi_score = 0.0
+    elif not _is_absent_intercept(pred_yi):
+        yi_score = 0.0
 
     has_xi = bool(gt_xi)
-    has_yi = gt_yi is not None
-    if has_xi and has_yi:
+    if has_xi:
         score = 0.5 * xi_score + 0.5 * yi_score
-    elif has_xi:
-        score = xi_score
-    elif has_yi:
-        score = yi_score
     else:
-        score = 100.0
+        score = yi_score
 
     pred_disp = f"x:{pred_xi[:5]} y:{pred_yi}"
     gt_disp = f"x:{gt_xi[:5]} y:{gt_yi}"
@@ -1252,6 +1257,14 @@ def evaluate_comprehensive(
 
         if key == "predictions":
             gt_val = gt.get("predictions") or gt.get("prediction_targets", {})
+        elif key == "intercepts":
+            visible_facts = gt.get("visible_facts")
+            visible_intercepts = (
+                visible_facts.get("intercepts")
+                if isinstance(visible_facts, dict)
+                else None
+            )
+            gt_val = visible_intercepts if isinstance(visible_intercepts, dict) else gt.get("intercepts", {})
         elif key in _LIST_KEYS:
             gt_val = gt.get(key, [])
         elif key in _DICT_KEYS:
