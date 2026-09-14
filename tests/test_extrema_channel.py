@@ -38,9 +38,17 @@ from app.reasoning_schema import (
 )
 from evaluator.reasoning.intervention import (
     INTERVENTION_PROFILES,
+    classify_extrema_candidates,
     format_tiered_facts_for_prompt,
     infer_extrema_candidates,
 )
+
+
+class _FakeRecognizer:
+    result = {"success": False, "error": "tick labels missing"}
+
+    def recognize_intersections(self, *_args, **_kwargs):
+        return [], self.result, None
 
 
 # A downward parabola sampled on the integer grid: y = 4 - x^2, one true max.
@@ -53,6 +61,11 @@ LINE = [(-2, -2), (-1, -1), (0, 0), (1, 1), (2, 2)]
 # point mathematically -- the branches are each monotone -- but the discrete
 # three-point test sees the sign flip as one.
 HYPERBOLA_ACROSS_POLE = [(-2, -1), (-1, -2), (1, 2), (2, 1)]
+
+# A true maximum with wider regular sampling and large but smooth endpoint
+# changes. This is a negative control against over-dropping genuine extrema
+# merely because the chart is steep or coarsely sampled.
+STEEP_PARABOLA_REGULAR_GAPS = [(-4, -12), (-2, 0), (0, 4), (2, 0), (4, -12)]
 
 
 @pytest.fixture
@@ -70,6 +83,46 @@ def extrema_flag(monkeypatch):
 def test_flag_defaults_to_off(monkeypatch):
     monkeypatch.delenv(EXTREMA_CHANNEL_ENV_VAR, raising=False)
     assert extrema_channel_enabled() is False
+
+
+def test_geosym_extraction_surfaces_structured_failure_reason(monkeypatch, tmp_path):
+    import app.reasoning_pipeline as pipeline
+
+    monkeypatch.setattr(
+        "evaluator.adapters.recognizer.RecognizerAdapter",
+        lambda: _FakeRecognizer(),
+    )
+
+    coords, facts, success, reason = pipeline.extract_geosym_coords(
+        "model", "key", tmp_path / "chart.png", {}, gemini_enabled=False
+    )
+
+    assert coords == []
+    assert facts is None
+    assert success is False
+    assert reason == "tick labels missing"
+
+
+def test_geosym_extraction_surfaces_exception_reason(monkeypatch, tmp_path):
+    import app.reasoning_pipeline as pipeline
+
+    class RaisingRecognizer:
+        def recognize_intersections(self, *_args, **_kwargs):
+            raise RuntimeError("chart channel unavailable")
+
+    monkeypatch.setattr(
+        "evaluator.adapters.recognizer.RecognizerAdapter",
+        lambda: RaisingRecognizer(),
+    )
+
+    coords, facts, success, reason = pipeline.extract_geosym_coords(
+        "model", "key", tmp_path / "chart.png", {}, gemini_enabled=False
+    )
+
+    assert coords == []
+    assert facts is None
+    assert success is False
+    assert reason == "RuntimeError: chart channel unavailable"
 
 
 def test_flag_off_yields_empty_extrema_even_when_candidates_exist(extrema_flag):
@@ -135,7 +188,7 @@ def test_too_few_points_returns_none_regardless_of_flag(extrema_flag):
         assert compute_visual_facts_from_coords([]) is None
 
 
-# ── Case 4: discontinuity crossing (CHARACTERIZATION, not a contract) ──
+# ── Case 4: discontinuity crossing (P0-2 filter contract) ─────────────
 
 def test_flag_off_suppresses_the_spurious_discontinuity_candidate(extrema_flag):
     """The contract half: whatever the generator thinks, flag off emits `[]`."""
@@ -144,22 +197,39 @@ def test_flag_off_suppresses_the_spurious_discontinuity_candidate(extrema_flag):
     assert compute_visual_facts_from_coords(HYPERBOLA_ACROSS_POLE)["extrema"] == []
 
 
-def test_flag_on_currently_reports_spurious_extrema_across_a_pole(extrema_flag):
-    """KNOWN LIMITATION, locked in on purpose.
-
-    y = 1/x has no extremum, yet the discrete three-point test flags both
-    points adjacent to the pole. This is the mechanism behind the 0% candidate
-    precision measured on the rational family, and it is why the flag ships
-    off. Filtering it is P0-2; this test asserts only what happens today, so
-    that P0-2's effect is visible as a deliberate change to this expectation.
-    """
+def test_flag_on_drops_spurious_extrema_across_a_pole(extrema_flag):
     extrema_flag(True)
 
     facts = compute_visual_facts_from_coords(HYPERBOLA_ACROSS_POLE)
 
-    assert facts["extrema"] == [
-        {"x": -1, "y": -2, "type": "min"},
-        {"x": 1, "y": 2, "type": "max"},
+    assert facts["extrema"] == []
+
+
+def test_extrema_filter_records_drop_reasons_for_discontinuity_bridge():
+    decisions = classify_extrema_candidates(HYPERBOLA_ACROSS_POLE)
+
+    assert [decision["decision"] for decision in decisions] == ["DROP", "DROP"]
+    assert all("discontinuity_bridge" in decision["reason"] for decision in decisions)
+
+
+def test_extrema_filter_keeps_true_extrema_with_regular_large_gaps():
+    decisions = classify_extrema_candidates(STEEP_PARABOLA_REGULAR_GAPS)
+
+    assert decisions == [
+        {
+            "candidate": {"x": 0, "y": 4, "type": "max"},
+            "decision": "KEEP",
+            "rule": "p0-2-discontinuity-bridge-v1",
+            "reason": "local_turn_without_discontinuity_bridge",
+            "metrics": {
+                "typical_x_gap": 2.0,
+                "typical_y_jump": 8.0,
+                "left_x_gap": 2,
+                "left_y_jump": 4,
+                "right_x_gap": 2,
+                "right_y_jump": 4,
+            },
+        }
     ]
 
 
@@ -179,18 +249,21 @@ def test_flag_on_handles_unordered_input_with_duplicates(extrema_flag):
     assert facts["extrema"] == [{"x": 0, "y": 4, "type": "max"}]
 
 
-# ── P0-1b: the two extrema implementations are now one ────────────────
+# ── P0-2: the public interface returns filtered candidates ────────────
 
-def test_public_interface_matches_the_private_helper():
-    """`infer_extrema_candidates` must be a thin wrapper, not a second impl."""
+def test_public_interface_returns_kept_candidates_from_classifier():
     from evaluator.reasoning.intervention import _infer_extrema, normalize_coords
 
-    for coords in (PARABOLA, LINE, HYPERBOLA_ACROSS_POLE, []):
-        assert infer_extrema_candidates(coords) == _infer_extrema(normalize_coords(coords))
+    assert _infer_extrema(normalize_coords(HYPERBOLA_ACROSS_POLE)) != []
+    assert infer_extrema_candidates(HYPERBOLA_ACROSS_POLE) == []
+    assert infer_extrema_candidates(PARABOLA) == [
+        decision["candidate"]
+        for decision in classify_extrema_candidates(PARABOLA)
+        if decision["decision"] == "KEEP"
+    ]
 
 
 def test_public_interface_returns_only_the_candidate_schema():
-    """No symmetry, no tier, no extra keys — that is P0-2's territory."""
     for candidate in infer_extrema_candidates(PARABOLA):
         assert set(candidate.keys()) == {"x", "y", "type"}
         assert candidate["type"] in {"max", "min"}

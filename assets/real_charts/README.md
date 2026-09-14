@@ -7,14 +7,12 @@ assets/real_charts/
 ├── fred/                     # Financial time-series (grid_aware)
 │   ├── fred_001/
 │   │   ├── meta.json        # Sample metadata, question, curated facts
-│   │   ├── image.png        # Chart screenshot
-│   │   └── reference.csv    # CSV-backed ground truth (visible window)
+│   │   └── image.png        # Chart screenshot
 │   └── ...
 ├── engisphere/               # Engineering charts (grid_aware)
 │   ├── engisphere_001/
 │   │   ├── meta.json
 │   │   ├── image.png
-│   │   ├── reference.csv
 │   │   └── state.json       # Generator state (engisphere only)
 │   └── ...
 └── omniscience/              # Scientific charts (grid_free)
@@ -38,7 +36,7 @@ Each sample's `meta.json` specifies an `m0_mode` field:
 ## Adding a new sample
 
 1. Create `{source_family}/{sample_id}/` directory
-2. Place `image.png` and `meta.json` (required), `reference.csv` (optional)
+2. Place `image.png` and `meta.json` (required)
 3. Set `m0_mode` in meta.json (`grid_aware` or `grid_free`)
 4. The presenter auto-discovers all samples via directory scan
 
@@ -48,7 +46,16 @@ Each sample's `meta.json` specifies an `m0_mode` field:
 - Crop to the chart region only
 - Keep axes, tick labels, and grid lines visible
 - Close tooltips before taking the screenshot
-- Store the matching visible-window CSV as `reference.csv`
+- Store curated visible-window facts in `meta.json`
+
+## Ground Truth Format
+
+The current committed asset set does not include per-sample `reference.csv`
+files. Ground truth for these samples is stored in `meta.json`, including the
+question, gold answer, answer validation rule, and any curated facts used by the
+presenter path. These assets are therefore suitable for task-level presenter
+diagnostics, not for point-level extrema validation unless additional
+coordinate-level annotations are created in a separate, provenance-tracked pass.
 
 ## Data Sources and Attribution
 

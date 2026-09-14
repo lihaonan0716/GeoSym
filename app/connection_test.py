@@ -30,10 +30,6 @@ def _make_test_image_b64() -> str:
 
 def _has_key(display_name: str) -> bool:
     """Check whether an API key is configured for a model."""
-    if "Claude" in display_name:
-        from pathlib import Path
-        cred = Path(__file__).resolve().parent.parent / "config" / "claude_credentials.json"
-        return cred.exists()
     return bool(_get_saved_key(display_name))
 
 

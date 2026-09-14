@@ -16,13 +16,19 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import re
+import statistics
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 logger = logging.getLogger(__name__)
 
 
 DEFAULT_INTERVENTION_MODE = "visual_facts_flat"
+
+EXTREMA_FILTER_RULE_VERSION = "p0-2-discontinuity-bridge-v1"
+EXTREMA_FILTER_X_GAP_FACTOR = 1.5
+EXTREMA_FILTER_Y_JUMP_FACTOR = 2.5
 
 INTERVENTION_PROFILES: Dict[str, Dict[str, Any]] = {
     # Active GeoSym fusion modes used by the current six-condition matrix.
@@ -532,14 +538,14 @@ def format_tiered_facts_for_prompt(
 ) -> str:
     """Format GeoSym output as a tiered structured text block.
 
-    Tier 1 — Verified Anchors: coordinates (fully reliable)
+    Tier 1 — Coordinate Anchors: high-priority coordinate evidence
     Tier 2 — Detected Features: intercepts (exact grid observations)
     Tier 3 — Inferred Patterns: monotonicity (reference only, verify from image)
     Experimental — extrema candidates, unfiltered and unverified
 
     Extrema are deliberately *not* in Tier 2.  Tier 2 states exact observations
     the model may lean on; extrema come from a discrete three-point test whose
-    measured candidate precision is far below that, so presenting them as
+    measured candidate precision is weaker, so presenting them as
     detected features would overstate what the pipeline knows.  They are emitted
     as an explicitly experimental, hypothesis-only block instead, and only when
     the extrema list is non-empty — so a run with the extrema channel off
@@ -549,13 +555,13 @@ def format_tiered_facts_for_prompt(
     points = normalize_coords(coords)
     lines: List[str] = []
 
-    # ── Tier 1: Verified Anchors ──
-    lines.append("== TIER 1: VERIFIED COORDINATE ANCHORS (fully reliable) ==")
+    # ── Tier 1: Coordinate Anchors ──
+    lines.append("== TIER 1: COORDINATE ANCHORS (high priority) ==")
     if points:
         coord_str = ", ".join(f"({x}, {y})" for x, y in points)
         lines.append(f"GeoSym detected {len(points)} integer-valued points on the curve:")
         lines.append(coord_str)
-        lines.append("These are pixel-level detections. You may rely on them fully.")
+        lines.append("These are pixel-level detections. Keep them unless the image clearly contradicts them.")
     else:
         lines.append("No coordinate points detected.")
     lines.append("")
@@ -647,7 +653,6 @@ def verify_facts_with_llm(
     *useful* facts (aggressive filtering), this is a conservative error
     detector that only removes facts clearly contradicted by the image.
     """
-    import os
     keys = fact_keys if fact_keys is not None else list(_VISUAL_FACT_KEYS)
     coords_text = format_coords(coords)
     candidates = _build_filter_candidates(facts, fact_keys=keys)
@@ -704,7 +709,7 @@ def verify_facts_with_llm(
                     filtered["monotonicity"] = []
 
         metadata["removed_categories"] = removed
-        metadata["notes"] = [f"Removed: {c}" for c in removed] if removed else ["All facts verified"]
+        metadata["notes"] = [f"Removed: {c}" for c in removed] if removed else ["All checked facts retained"]
         return filtered, metadata
 
     except Exception as exc:
@@ -990,25 +995,137 @@ def _infer_monotonicity(points: List[Tuple[int, int]]) -> List[Dict[str, Any]]:
 
 
 def infer_extrema_candidates(coords: Iterable[Any]) -> List[Dict[str, Any]]:
-    """Derive extrema *candidates* from raw M0 coordinates.
+    """Derive filtered extrema candidates from raw M0 coordinates.
 
     Narrow public entry point for the single extrema implementation in this
-    module, so callers outside this file do not have to reach for a private
-    helper.  Responsibilities are deliberately limited to (1) normalising and
-    sorting the input via :func:`normalize_coords` and (2) delegating to that
-    one implementation.
+    module, so callers outside this file do not have to reach for private
+    helpers. P0-2 applies a deterministic, family-agnostic filter before
+    returning candidates.
 
     Returns the existing candidate schema — a list of
     ``{"x": int, "y": int, "type": "max" | "min"}`` — and nothing else: no
     symmetry, no reliability tier, no other fact category.
 
-    These are *candidates*, not verified facts.  The three-point discrete test
-    used underneath cannot tell a genuine turning point from a jump across a
-    discontinuity (e.g. a vertical asymptote sampled on both sides), so a
-    candidate may be spurious.  Filtering that out is a separate concern and is
-    not implemented here.
+    These are *candidates*, not confirmed facts.  The three-point discrete test
+    used underneath can confuse a genuine turning point with a jump across a
+    discontinuity. The filter drops only candidates adjacent to an anomalous
+    bridge segment: a wider-than-typical x gap together with a larger-than-
+    typical y jump. This is a generic sampling-continuity rule, not a function
+    family rule.
     """
-    return _infer_extrema(normalize_coords(coords))
+    decisions = classify_extrema_candidates(coords)
+    return [
+        decision["candidate"]
+        for decision in decisions
+        if decision["decision"] == "KEEP"
+    ]
+
+
+def classify_extrema_candidates(coords: Iterable[Any]) -> List[Dict[str, Any]]:
+    """Classify raw extrema candidates as KEEP or DROP.
+
+    The classification is deterministic and uses only local coordinate geometry:
+    it never reads function family, ground truth, expression labels, scores, or
+    sample identifiers. It is intended for P0-2/P0-3 auditability, where the
+    same frozen rule must be applied to discovery and unseen validation data.
+    """
+    points = normalize_coords(coords)
+    raw_candidates = _infer_extrema(points)
+    if not raw_candidates:
+        return []
+
+    candidates_by_point = {
+        (candidate["x"], candidate["y"], candidate["type"]): candidate
+        for candidate in raw_candidates
+    }
+    typical_x_gap = _median_positive(
+        abs(points[index + 1][0] - points[index][0])
+        for index in range(len(points) - 1)
+    )
+    typical_y_jump = _median_positive(
+        abs(points[index + 1][1] - points[index][1])
+        for index in range(len(points) - 1)
+    )
+
+    decisions: List[Dict[str, Any]] = []
+    for point_index in range(1, len(points) - 1):
+        previous_x, previous_y = points[point_index - 1]
+        current_x, current_y = points[point_index]
+        next_x, next_y = points[point_index + 1]
+        matching_candidate = candidates_by_point.get(
+            (current_x, current_y, "max")
+        ) or candidates_by_point.get((current_x, current_y, "min"))
+        if not matching_candidate:
+            continue
+
+        left_x_gap = abs(current_x - previous_x)
+        left_y_jump = abs(current_y - previous_y)
+        right_x_gap = abs(next_x - current_x)
+        right_y_jump = abs(next_y - current_y)
+        left_bridge = _is_discontinuity_bridge(
+            x_gap=left_x_gap,
+            y_jump=left_y_jump,
+            typical_x_gap=typical_x_gap,
+            typical_y_jump=typical_y_jump,
+        )
+        right_bridge = _is_discontinuity_bridge(
+            x_gap=right_x_gap,
+            y_jump=right_y_jump,
+            typical_x_gap=typical_x_gap,
+            typical_y_jump=typical_y_jump,
+        )
+        metrics = {
+            "typical_x_gap": typical_x_gap,
+            "typical_y_jump": typical_y_jump,
+            "left_x_gap": left_x_gap,
+            "left_y_jump": left_y_jump,
+            "right_x_gap": right_x_gap,
+            "right_y_jump": right_y_jump,
+        }
+        if left_bridge or right_bridge:
+            bridge_side = "left" if left_bridge else "right"
+            decisions.append(
+                {
+                    "candidate": matching_candidate,
+                    "decision": "DROP",
+                    "rule": EXTREMA_FILTER_RULE_VERSION,
+                    "reason": f"adjacent_{bridge_side}_discontinuity_bridge",
+                    "metrics": metrics,
+                }
+            )
+        else:
+            decisions.append(
+                {
+                    "candidate": matching_candidate,
+                    "decision": "KEEP",
+                    "rule": EXTREMA_FILTER_RULE_VERSION,
+                    "reason": "local_turn_without_discontinuity_bridge",
+                    "metrics": metrics,
+                }
+            )
+    return decisions
+
+
+def _median_positive(values: Iterable[float]) -> float:
+    positive_values = [float(value) for value in values if float(value) > 0]
+    if not positive_values:
+        return 0.0
+    return float(statistics.median(positive_values))
+
+
+def _is_discontinuity_bridge(
+    *,
+    x_gap: float,
+    y_jump: float,
+    typical_x_gap: float,
+    typical_y_jump: float,
+) -> bool:
+    if typical_x_gap <= 0 or typical_y_jump <= 0:
+        return False
+    return (
+        x_gap > EXTREMA_FILTER_X_GAP_FACTOR * typical_x_gap
+        and y_jump > EXTREMA_FILTER_Y_JUMP_FACTOR * typical_y_jump
+    )
 
 
 def _infer_extrema(points: List[Tuple[int, int]]) -> List[Dict[str, Any]]:

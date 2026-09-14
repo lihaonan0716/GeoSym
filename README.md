@@ -4,12 +4,12 @@
 
 Multimodal large language models have demonstrated remarkable capabilities in visual understanding, yet they remain prone to hallucination and imprecise numerical reasoning when confronted with tasks demanding quantitative accuracy. Existing enhancement strategies — including chain-of-thought prompting, self-consistency decoding, and tool-augmented reasoning — improve general reasoning but lack explicit mechanisms to assess the correctness and task-relevance of externally injected evidence; information, once obtained, is treated as uniformly reliable.
 
-GeoSym is an evidence fusion framework for quantitative chart reasoning that manages how visual evidence is generated, verified, selected, and propagated through an LLM reasoning chain. The framework operates through four modules:
+GeoSym is an evidence fusion framework for quantitative chart reasoning that manages how visual evidence is generated, scored, selected, and propagated through an LLM reasoning chain. The framework operates through four modules:
 
 1. **M0 — Candidate Evidence Generation**: Computation-grounded visual extraction through geometric pixel-level analysis, producing coordinates, intercepts, extrema, and monotonicity intervals.
-2. **M1 — Confidence-Scored Fact Construction**: Source reliability assessment transforming raw candidates into verified facts with explicit confidence scores across three tiers.
+2. **M1 — Confidence-Scored Fact Construction**: Source reliability assessment transforming raw candidates into structured facts with heuristic confidence tiers.
 3. **M2 — Utility-Aware Evidence Selection**: Utility-driven curation selecting a compact high-value evidence subset based on relevance, complementarity, and conflict risk — without performing numerical computation.
-4. **M3 — Hierarchical Fusion Reasoning**: Conflict-aware layered combination injecting evidence as structured constraints across reading, analysis, and inference layers aligned with Curcio's graph comprehension taxonomy.
+4. **M3 — Hierarchical Fusion Reasoning**: Layered reasoning that presents structured evidence as high-priority anchors or hypotheses across reading, analysis, and inference layers aligned with Curcio's graph comprehension taxonomy.
 
 **Keywords:** Evidence fusion · Multimodal reasoning · Quantitative chart reasoning · Vision-language models · Evidence reliability
 
@@ -49,7 +49,7 @@ Each annotated image shows detected intersection points (green/yellow circles) w
 
 ## Framework Architecture
 
-GeoSym enforces a clear separation of concerns: computation-grounded modules (M0, M1) produce and verify evidence; a language model (M2) performs semantic curation; and the reasoning module (M3) synthesizes across abstraction layers. Each module operates within its domain of competence.
+GeoSym enforces a clear separation of concerns: computation-grounded modules (M0, M1) produce and score evidence; a language model (M2) performs semantic curation; and the reasoning module (M3) synthesizes across abstraction layers. Each module operates within its domain of competence.
 
 ### M0: Candidate Evidence Generation
 
@@ -58,12 +58,12 @@ M0 produces a candidate evidence set through deterministic, pixel-grounded visua
 Two complementary implementations share a common ruler infrastructure:
 
 - **Function-Specialized M0** (`recognizer/`): A deterministic geometric pipeline for charts with integer coordinate grids. Detects grid lines via Hough transform, establishes pixel-to-coordinate mapping, and identifies curve-grid intersection points. Stage 2.5 adds least-squares regression cross-validation using the shared ruler module.
-- **Enhanced M0** (`presenter/`): A four-phase pipeline for real-world charts without integer grids. Phase 1 builds a coordinate ruler from OCR tick labels via least-squares regression. Phase 2 uses an LLM to locate semantically important points at the pixel level. Phase 3 converts pixel coordinates to real values through the calibrated ruler. Phase 4 verifies measurements and fuses evidence into a standardized format.
+- **Enhanced M0** (`presenter/`): A four-phase pipeline for real-world charts without integer grids. Phase 1 builds a coordinate ruler from OCR tick labels via least-squares regression. Phase 2 uses an LLM to locate semantically important points at the pixel level. Phase 3 converts pixel coordinates to chart units through the ruler. Phase 4 checks measurements against axis bounds and fuses evidence into a standardized format.
 - **Shared Ruler** (`presenter/ruler.py`): OCR-based coordinate system construction used by both implementations. Supports linear, logarithmic, datetime, and categorical axis scales.
 
 ### M1: Confidence-Scored Fact Construction
 
-M1 transforms raw candidates into verified facts with explicit confidence scores. Confidence is computed based on:
+M1 transforms raw candidates into structured facts with heuristic confidence tiers. Confidence is computed based on:
 
 - Density of supporting pixel evidence
 - Precision of grid alignment (exact grid-coincident vs. interpolated)
@@ -73,12 +73,12 @@ Facts are assigned to three confidence tiers — **high**, **medium**, and **low
 
 ### M2: Utility-Aware Evidence Selection
 
-M2 curates a compact subset of verified facts for injection into the reasoning pipeline. A language model serves as the selection operator, assessing facts on three dimensions: **relevance**, **complementarity**, and **contradiction risk**. Critically, M2 performs no numerical computation — it operates purely in the semantic domain, deciding which facts are worth presenting to the reasoner.
+M2 curates a compact subset of scored facts for injection into the reasoning pipeline. A language model serves as the selection operator, assessing facts on three dimensions: **relevance**, **complementarity**, and **contradiction risk**. Critically, M2 performs no numerical computation — it operates purely in the semantic domain, deciding which facts are worth presenting to the reasoner.
 
 Two injection strategies are supported:
 
 - **Flat injection**: All retained facts as a single JSON block with confidence-gated values.
-- **Tiered injection**: Facts organized into three epistemic tiers (verified anchors, detected features, inferred patterns).
+- **Tiered injection**: Facts organized into three epistemic tiers (high-priority coordinate evidence, detected features, inferred patterns).
 
 ### M3: Hierarchical Fusion Reasoning
 
@@ -88,11 +88,11 @@ M3 consumes the curated evidence through a three-layer reasoning hierarchy:
 - **L2 (Analysis)**: Perform quantitative analysis — function value predictions, rate of change, monotonicity, and symmetry.
 - **L3 (Inference)**: Derive higher-order mathematical conclusions — closed-form expression, domain, and range.
 
-Evidence injection at L1 ensures that stronger visual grounding propagates upward into L2 and L3, where abstract reasoning benefits most from verified constraints.
+Evidence injection at L1 ensures that stronger visual grounding propagates upward into L2 and L3, where abstract reasoning benefits from explicit, auditable anchors rather than implicit visual impressions alone.
 
 ## GeoSym-Bench
 
-GeoSym-Bench is a controlled evaluation benchmark with complete ground-truth annotations across **8 function families** and **460 clean-rendered samples**.
+GeoSym-Bench is a controlled evaluation benchmark with complete ground-truth annotations across **8 function families**. The generated cohort contains **480 samples**; historical experiments are reported on a **460-sample complete-case subset** where all compared conditions completed successfully.
 
 The dataset is hosted on HuggingFace: [lihaonan0716/GeoSym-Bench](https://huggingface.co/datasets/lihaonan0716/GeoSym-Bench)
 
@@ -171,10 +171,10 @@ Across 460 evaluated samples with GPT-5.4 as the backbone MLLM:
 | E4 (OCRRules-CoT) | 79.25 | -0.22 |
 | **E5 (FullGeoSym)** | **93.67** | **+14.21** |
 
-- FullGeoSym outperforms the strongest baseline condition (E0) by 14.21 points and the sample-wise oracle baseline (per-sample maximum over E0–E4) by 10.67 points.
-- 86% of samples (394/460) achieve positive improvement over the sample-wise oracle baseline; 93.3% of samples (429/460) improve over E0.
-- Ablation (E5_raw: M0+M3 only) scores 93.48, confirming that evidence architecture is the primary driver (+14.02 over E0).
-- M1–M2 curation provides conditional robustness: marginal at aggregate (+0.19), but +2.42 on the 18% of samples where extraction quality degrades (*p* = 0.007).
+- FullGeoSym outperforms the strongest baseline condition (E0) by 14.21 points and the sample-wise best-of-baselines reference (per-sample maximum over E0–E4) by 10.67 points.
+- 86% of samples (394/460) achieve positive improvement over the sample-wise best-of-baselines reference; 93.3% of samples (429/460) improve over E0.
+- Ablation (E5_raw: M0+M3 only) scores 93.48, estimating a large aggregate incremental effect from adding generated visual evidence and hierarchical reasoning (+14.02 over E0).
+- M1–M2 curation is marginal at aggregate (+0.19, not a significant main effect). The larger +2.42 effect on the 18% of samples where extraction quality degrades is reported only as a post-hoc diagnostic, not as confirmatory robustness evidence.
 
 ## Repository Structure
 
@@ -214,7 +214,7 @@ python -m pip install -r requirements.txt
 
 Core dependencies include OpenCV, NumPy, Pillow, PyYAML, Gradio, and SymPy. The experiments reported in the paper use Mathpix OCR for E3/E4 and for OCR-derived axis/tick extraction; configure Mathpix credentials in `config/api_keys.yaml`. EasyOCR remains available in the codebase for local OCR workflows, but it is not the reported OCR/rule baseline.
 
-Copy `config/api_keys.yaml.example` to `config/api_keys.yaml` and fill in your API keys.
+Copy `config/api_keys.yaml.example` to `config/api_keys.yaml` and fill in your API keys. GPT and Claude adapters use an API-compatible gateway base URL from `ninerouter_base_url`, `NINEROUTER_BASE_URL`, `GEOSYM_OPENAI_BASE_URL`, or `GEOSYM_CLAUDE_BASE_URL`; the public repository does not hardcode a private gateway URL.
 
 ## Testing
 
@@ -231,9 +231,9 @@ Using `python -m pytest` avoids accidentally invoking a globally installed `pyte
 
 | Provider | Models | Adapter |
 |----------|--------|---------|
-| OpenAI | GPT-5.4, GPT-5.2 | `evaluator/adapters/openai.py` |
+| OpenAI-compatible gateway | GPT-5.5 | `evaluator/adapters/openai.py` |
 | Google | Gemini-3.1-Pro, Gemini-3-Pro | `evaluator/adapters/gemini.py` |
-| Anthropic | Claude-Opus-4.6, Claude-Sonnet-4.6 | `evaluator/adapters/claude.py` |
+| Anthropic-compatible gateway | Claude-Opus-4.8, Claude-Opus-5 | `evaluator/adapters/claude.py` |
 | Alibaba | Qwen3.5-Plus, Qwen3-VL-Plus | `evaluator/adapters/qwen.py` |
 | Moonshot | Kimi-K2.5, Moonshot-V1 | `evaluator/adapters/kimi.py` |
 | ZhipuAI | GLM-4.6V | `evaluator/adapters/glm.py` |

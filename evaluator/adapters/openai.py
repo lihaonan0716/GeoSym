@@ -1,47 +1,50 @@
 """
-OpenAI GPT Vision adapter for intersection recognition.
-
-API docs: https://platform.openai.com/docs/quickstart
-Get API key: https://platform.openai.com/api-keys
+OpenAI-compatible GPT Vision adapter for intersection recognition.
 
 Usage:
-    adapter = OpenAIAdapter(api_key="sk-xxx", model="gpt-5.2")
+    adapter = OpenAIAdapter(api_key="...", model="gpt-5.5")
     coords, raw_response = adapter.recognize_intersections(image_path, prompt)
 """
+
+import os
 
 from openai import OpenAI
 
 from .base import BaseLLMAdapter
 from i18n import t, get_lang
 
-
 class OpenAIAdapter(BaseLLMAdapter):
     """
-    OpenAI GPT Vision adapter.
+    OpenAI-compatible GPT Vision adapter routed through 9router by default.
 
     Supported models (latest first):
-        - gpt-5.2          : GPT-5.2 (latest, recommended)
-        - gpt-4.1           : GPT-4.1
-        - gpt-4o           : GPT-4o
+        - gpt-5.5          : GPT-5.5 via 9router
     """
 
-    def __init__(self, api_key: str = "", model: str = "gpt-5.2"):
+    def __init__(self, api_key: str = "", model: str = "gpt-5.5", base_url: str = ""):
         super().__init__(model_name=model)
         self.api_key = api_key
         self.model = model
+        self.base_url = base_url
         self._client = None
 
     def _get_client(self) -> OpenAI:
         if self._client is None:
             if not self.api_key:
                 raise ValueError(t("eval_openai_key_missing", get_lang()))
-            self._client = OpenAI(api_key=self.api_key, timeout=180.0)
+            base_url = self.base_url or os.environ.get("GEOSYM_OPENAI_BASE_URL", "")
+            if not base_url:
+                raise ValueError("OpenAI-compatible base URL not configured for GPT model")
+            timeout = float(os.environ.get("GEOSYM_OPENAI_TIMEOUT_SECONDS", "180.0"))
+            max_retries = int(os.environ.get("GEOSYM_OPENAI_MAX_RETRIES", "2"))
+            self._client = OpenAI(api_key=self.api_key, base_url=base_url, timeout=timeout, max_retries=max_retries)
         return self._client
 
     def _call_api(self, image_base64: str, prompt: str) -> str:
         """Call OpenAI API with image and prompt."""
         client = self._get_client()
 
+        max_completion_tokens = int(os.environ.get("GEOSYM_OPENAI_MAX_COMPLETION_TOKENS", "4096"))
         response = client.chat.completions.create(
             model=self.model,
             messages=[
@@ -58,7 +61,7 @@ class OpenAIAdapter(BaseLLMAdapter):
                     ],
                 }
             ],
-            max_completion_tokens=4096,
+            max_completion_tokens=max_completion_tokens,
             temperature=0.0,
             seed=42,
         )

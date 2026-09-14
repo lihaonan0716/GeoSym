@@ -88,10 +88,10 @@ def extract_geosym_coords(
     gt: dict,
     *,
     gemini_enabled: bool = False,
-) -> Tuple[list, Optional[dict], bool]:
+) -> Tuple[list, Optional[dict], bool, Optional[str]]:
     """Run GeoSym coordinate extraction via RecognizerAdapter.
 
-    Returns ``(coords_list, visual_facts_or_None, success_flag)``.
+    Returns ``(coords_list, visual_facts_or_None, success_flag, failure_reason)``.
 
     Visual facts are no longer computed by the CV pipeline.  Use
     :func:`infer_visual_facts_with_llm` to obtain them from an LLM.
@@ -104,14 +104,24 @@ def extract_geosym_coords(
             str(img_path), gt, gemini_enabled=gemini_enabled,
         )
         success = result.get("success", False) if isinstance(result, dict) else bool(detected)
+        reason = None
+        if not success and isinstance(result, dict):
+            error = result.get("error")
+            if isinstance(error, str) and error.strip():
+                reason = error.strip()
+            elif error:
+                reason = repr(error)
+            else:
+                reason = "recognizer_returned_success_false_without_error"
 
-        return detected or [], None, bool(success)
+        return detected or [], None, bool(success), reason
     except Exception as exc:
+        reason = f"{type(exc).__name__}: {exc}"
         logger.warning(
             "GeoSym extraction failed for %s: %s",
             getattr(img_path, "name", img_path), exc,
         )
-        return [], None, False
+        return [], None, False, reason
 
 
 # ── LLM-based visual fact inference ──────────────────────────────────
@@ -127,11 +137,10 @@ _VF_INFERENCE_PROMPT_PATH = _root / "prompts" / "visual_fact_inference_prompt.tx
 # generator.  This flag wires that generator in *without* changing any
 # recorded behaviour by default.
 #
-# Default OFF, deliberately: the candidates are unfiltered, and the discrete
-# three-point test underneath cannot distinguish a genuine turning point from a
-# jump across a discontinuity.  Turning the flag on is therefore an experiment,
-# not a fix.  Every historical number was produced with it off, and keeping it
-# off keeps the pipeline output structurally identical to those runs.
+# Default OFF, deliberately: the channel was absent from every historical
+# reported run, and turning it on is therefore a new experiment rather than a
+# retroactive fix.  Every historical number was produced with it off, and
+# keeping it off keeps the pipeline output structurally identical to those runs.
 EXTREMA_CHANNEL_ENV_VAR = "GEOSYM_ENABLE_EXTREMA_CHANNEL"
 
 
@@ -185,7 +194,7 @@ def compute_visual_facts_from_coords(coords: list) -> Optional[Dict[str, Any]]:
 
     # --- Extrema: gated on the feature flag (see above) ---
     # Flag off  -> `[]`, matching every run recorded so far.
-    # Flag on   -> unfiltered candidates from the single shared implementation.
+    # Flag on   -> filtered candidates from the single shared implementation.
     if extrema_channel_enabled():
         from evaluator.reasoning.intervention import infer_extrema_candidates
 
@@ -638,10 +647,8 @@ def ensure_judge_adapter(
     if not j_key:
         j_key = fallback_api_key
 
-    is_claude = "claude" in j_name.lower() if j_name else False
-
-    if j_name and (j_key or is_claude):
-        adapter = _create_llm_adapter(j_name, j_key or "")
+    if j_name and j_key:
+        adapter = _create_llm_adapter(j_name, j_key)
         if adapter is not None:
             logger.info("Judge adapter ready: %s", j_name)
             return adapter
@@ -668,6 +675,7 @@ def run_judge(
     """
     from evaluator.reasoning.parser import parse_judge_response
     from evaluator.metrics.reasoning import evaluate_judge_response
+    from evaluator.adapters.base import is_transient_error
 
     gt_summary = build_gt_summary(gt_data)
     chain_text = build_chain_text(pipeline_result)
@@ -696,7 +704,7 @@ def run_judge(
             return result
         except Exception as exc:
             last_exc = exc
-            if attempt < max_retries:
+            if attempt < max_retries and is_transient_error(exc):
                 delay = min(3.0 * (2 ** (attempt - 1)), 30.0)
                 delay *= 0.5 + random.random()
                 logger.warning(
@@ -710,5 +718,6 @@ def run_judge(
                     "Judge attempt %d/%d final failure: %s",
                     attempt, max_retries, exc,
                 )
+                break
 
-    raise RuntimeError(f"Judge failed after {max_retries} attempts: {last_exc}")
+    raise RuntimeError(f"Judge failed after {attempt} attempts: {last_exc}")

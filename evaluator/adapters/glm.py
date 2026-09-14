@@ -11,6 +11,8 @@ Usage:
     coords, raw_response = adapter.recognize_intersections(image_path, prompt)
 """
 
+import os
+
 from openai import OpenAI
 
 from .base import BaseLLMAdapter
@@ -42,10 +44,13 @@ class GLMAdapter(BaseLLMAdapter):
         if self._client is None:
             if not self.api_key:
                 raise ValueError(t("eval_glm_key_missing", get_lang()))
+            timeout = float(os.environ.get("GEOSYM_GLM_TIMEOUT_SECONDS", "180.0"))
+            max_retries = int(os.environ.get("GEOSYM_GLM_MAX_RETRIES", "2"))
             self._client = OpenAI(
                 api_key=self.api_key,
                 base_url=ZHIPUAI_BASE_URL,
-                timeout=180.0,
+                timeout=timeout,
+                max_retries=max_retries,
             )
         return self._client
 
@@ -53,6 +58,7 @@ class GLMAdapter(BaseLLMAdapter):
         """Call GLM Vision API with image and prompt."""
         client = self._get_client()
 
+        max_tokens = int(os.environ.get("GEOSYM_GLM_MAX_TOKENS", "4096"))
         response = client.chat.completions.create(
             model=self.model,
             messages=[
@@ -69,7 +75,7 @@ class GLMAdapter(BaseLLMAdapter):
                     ],
                 }
             ],
-            max_tokens=4096,
+            max_tokens=max_tokens,
             temperature=0.0,
         )
 

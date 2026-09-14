@@ -14,11 +14,14 @@ those two properties are asserted here rather than assumed:
 import copy
 from unittest.mock import patch
 
+import cv2
+import numpy as np
 import pytest
 
 from evaluator.adapters.recognizer import (
-    M0_STAGE_CONFIG, build_m0_stage_config,
+    M0_STAGE_CONFIG, RecognizerAdapter, build_m0_stage_config,
 )
+from recognizer.core.clean_grid_fallback import extract_clean_cartesian_grid
 from recognizer.mathpix import mathpix_image_ocr as mx
 
 
@@ -147,3 +150,60 @@ def test_stage_config_callers_cannot_mutate_the_module_constant():
 
     assert M0_STAGE_CONFIG == pristine
     assert build_m0_stage_config()["stage1"]["grid_hough_threshold"] == 65
+
+
+def test_clean_grid_fallback_extracts_visible_integer_intersections():
+    image = np.full((420, 420, 3), 255, dtype=np.uint8)
+    grid_x = [90 + i * 40 for i in range(7)]
+    grid_y = [130 + i * 40 for i in range(7)]
+    for x in grid_x:
+        cv2.line(image, (x, grid_y[0]), (x, grid_y[-1]), (160, 160, 160), 1)
+    for y in grid_y:
+        cv2.line(image, (grid_x[0], y), (grid_x[-1], y), (160, 160, 160), 1)
+    axis_x = grid_x[3]
+    axis_y = grid_y[3]
+    cv2.line(image, (axis_x, grid_y[0]), (axis_x, grid_y[-1]), (0, 0, 0), 3)
+    cv2.line(image, (grid_x[0], axis_y), (grid_x[-1], axis_y), (0, 0, 0), 3)
+    for x_value in range(-3, 4):
+        y_value = x_value
+        px = axis_x + x_value * 40
+        py = axis_y - y_value * 40
+        cv2.circle(image, (px, py), 5, (180, 0, 0), -1)
+
+    result = extract_clean_cartesian_grid(image)
+
+    assert result.success is True
+    assert result.coords == [(-3, -3), (-2, -2), (-1, -1), (0, 0), (1, 1), (2, 2), (3, 3)]
+    assert result.result["result"]["m0_fallback"] == "clean_cartesian_grid_fallback_v1"
+
+
+def test_recognizer_adapter_fallback_first_bypasses_chart_extractor(monkeypatch):
+    image = np.full((420, 420, 3), 255, dtype=np.uint8)
+    grid_x = [90 + i * 40 for i in range(7)]
+    grid_y = [130 + i * 40 for i in range(7)]
+    for x in grid_x:
+        cv2.line(image, (x, grid_y[0]), (x, grid_y[-1]), (160, 160, 160), 1)
+    for y in grid_y:
+        cv2.line(image, (grid_x[0], y), (grid_x[-1], y), (160, 160, 160), 1)
+    axis_x = grid_x[3]
+    axis_y = grid_y[3]
+    cv2.line(image, (axis_x, grid_y[0]), (axis_x, grid_y[-1]), (0, 0, 0), 3)
+    cv2.line(image, (grid_x[0], axis_y), (grid_x[-1], axis_y), (0, 0, 0), 3)
+    for x_value in range(-3, 4):
+        px = axis_x + x_value * 40
+        py = axis_y - x_value * 40
+        cv2.circle(image, (px, py), 5, (180, 0, 0), -1)
+
+    adapter = RecognizerAdapter()
+
+    def _raise_if_called(*args, **kwargs):
+        raise AssertionError("ChartExtractor should not run in fallback-first mode")
+
+    monkeypatch.setenv("GEOSYM_CLEAN_GRID_FALLBACK_FIRST", "1")
+    monkeypatch.setattr(adapter._chart_extractor, "extract_chart_from_image", _raise_if_called)
+
+    coords, result, annotated = adapter.recognize_intersections(image)
+
+    assert annotated is None
+    assert coords == [(-3, -3), (-2, -2), (-1, -1), (0, 0), (1, 1), (2, 2), (3, 3)]
+    assert result["fallback_first"] is True

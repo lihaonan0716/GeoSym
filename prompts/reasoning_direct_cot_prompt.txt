@@ -32,4 +32,9 @@ Requirements:
 - For predictions, use the EXACT x-values listed here as string keys: {prediction_xs}
 - The average rate of change must be computed between x = {rate_x1} and x = {rate_x2}.
 - Before finalizing, check that the coordinates, extrema, expression, domain, and range are mutually consistent.
+- Determine the MATHEMATICAL domain, not the visible x-axis range on the graph. The domain is the set of all x-values for which the inferred function is mathematically defined.
+- Use a finite domain only when the inferred expression or a clear mathematical feature requires it, such as sqrt(), logarithms, endpoints, or vertical asymptotes. Otherwise, if the curve continues through the visible window with no sign of stopping, the domain is likely (-inf, +inf).
+- Determine the domain based on the inferred expression, not from the image boundaries.
+- Determine the MATHEMATICAL range, not the visible y-axis range on the graph. The range is the set of all possible output y-values of the inferred function.
+- Determine the range from the inferred expression and extrema, not from image boundaries. If the graph suggests unbounded behavior beyond the visible window, allow +inf or -inf as appropriate.
 - In `inference_explanation`, summarize the reasoning behind the final expression, domain, and range using concrete mathematical evidence.

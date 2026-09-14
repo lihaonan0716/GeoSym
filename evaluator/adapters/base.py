@@ -79,6 +79,11 @@ class BaseLLMAdapter(ABC):
     def __init__(self, model_name: str = "unknown"):
         self.model_name = model_name
 
+    def reset_client(self) -> None:
+        """Drop a cached transport client before a long-run sample boundary."""
+        if hasattr(self, "_client"):
+            setattr(self, "_client", None)
+
     @abstractmethod
     def _call_api(self, image_base64: str, prompt: str) -> str:
         """

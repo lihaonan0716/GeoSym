@@ -8,7 +8,7 @@ These OCR-derived clues may be incomplete or wrong. Use them only as auxiliary h
 
 Solve the problem in three internal stages:
 1. Read the graph and check which OCR clues are visually reliable.
-2. Perform quantitative analysis using the verified evidence.
+2. Perform quantitative analysis using the visually checked OCR hints.
 3. Infer the final mathematical properties.
 
 You may reason step by step, but your FINAL output must be ONLY one JSON object.
@@ -26,7 +26,7 @@ Return ONLY one final JSON object in this format:
   "expression": "your expression here",
   "domain": "interval notation",
   "range": "interval notation",
-  "inference_explanation": "2-4 sentences explaining how you inferred the expression, domain, and range from the image and verified OCR hints"
+  "inference_explanation": "2-4 sentences explaining how you inferred the expression, domain, and range from the image and visually checked OCR hints"
 }
 ```
 
@@ -35,4 +35,9 @@ Requirements:
 - For predictions, use the EXACT x-values listed here as string keys: {prediction_xs}
 - The average rate of change must be computed between x = {rate_x1} and x = {rate_x2}.
 - Before finalizing, check that the coordinates, extrema, and final expression are consistent with the graph.
+- Determine the MATHEMATICAL domain, not the visible x-axis range on the graph. The domain is the set of all x-values for which the inferred function is mathematically defined.
+- Use a finite domain only when the inferred expression or a clear mathematical feature requires it, such as sqrt(), logarithms, endpoints, or vertical asymptotes. Otherwise, if the curve continues through the visible window with no sign of stopping, the domain is likely (-inf, +inf).
+- Determine the domain based on the inferred expression, not from the image boundaries.
+- Determine the MATHEMATICAL range, not the visible y-axis range on the graph. The range is the set of all possible output y-values of the inferred function.
+- Determine the range from the inferred expression and extrema, not from image boundaries. If the graph suggests unbounded behavior beyond the visible window, allow +inf or -inf as appropriate.
 - In `inference_explanation`, explain the reasoning behind the final mathematical inference and explicitly mention whether OCR evidence was trusted or corrected.

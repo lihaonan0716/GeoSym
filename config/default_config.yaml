@@ -161,16 +161,19 @@ reasoning:
 
 # ---------------------------------------------------------------------------
 # LLM model providers — edit this section to add/remove models.
-# Each provider shares one API key (looked up from api_keys.yaml by api_key_name).
-# Claude is special: it auto-detects config/claude_credentials.json for Vertex AI.
+# Paid GPT and Claude traffic is routed through an OpenAI/Anthropic-compatible
+# gateway configured in gitignored config/api_keys.yaml or environment variables.
+# The shared key is read from config/api_keys.yaml:ninerouter or NINEROUTER_KEY.
+# The gateway URL is read from config/api_keys.yaml:ninerouter_base_url or
+# NINEROUTER_BASE_URL.
 # ---------------------------------------------------------------------------
 models:
   OpenAI:
     adapter: "evaluator.adapters.openai.OpenAIAdapter"
-    api_key_name: "openai"
+    api_key_name: "ninerouter"
+    base_url_key: "ninerouter_base_url"
     models:
-      "GPT-5.4": "gpt-5.4"
-      "GPT-5.2": "gpt-5.2"
+      "GPT-5.5": "gpt-5.5"
   Google:
     adapter: "evaluator.adapters.gemini.GeminiAdapter"
     api_key_name: "gemini"
@@ -196,10 +199,11 @@ models:
       "GLM-4.6V": "glm-4.6v"
   Claude:
     adapter: "evaluator.adapters.claude.ClaudeAdapter"
-    api_key_name: "claude"
+    api_key_name: "ninerouter"
+    base_url_key: "ninerouter_base_url"
     models:
-      "Claude-Opus-4.6": "claude-opus-4-6"
-      "Claude-Sonnet-4.6": "claude-sonnet-4-6"
+      "Claude-Opus-4.8": "cc/claude-opus-4-8"
+      "Claude-Opus-5": "cc/claude-opus-5"
 
 output:
   image_dir: "dataset/images"

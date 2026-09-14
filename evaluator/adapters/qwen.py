@@ -10,6 +10,8 @@ Usage:
     coords, raw_response = adapter.recognize_intersections(image_path, prompt)
 """
 
+import os
+
 from openai import OpenAI
 
 from .base import BaseLLMAdapter
@@ -44,7 +46,8 @@ class QwenVLAdapter(BaseLLMAdapter):
             self._client = OpenAI(
                 api_key=self.api_key,
                 base_url=DASHSCOPE_BASE_URL,
-                timeout=180.0,
+                timeout=float(os.environ.get("GEOSYM_QWEN_TIMEOUT_SECONDS", "180.0")),
+                max_retries=int(os.environ.get("GEOSYM_QWEN_MAX_RETRIES", "2")),
             )
         return self._client
 
@@ -52,6 +55,7 @@ class QwenVLAdapter(BaseLLMAdapter):
         """Call Qwen-VL via DashScope OpenAI-compatible API."""
         client = self._get_client()
 
+        max_tokens = int(os.environ.get("GEOSYM_QWEN_MAX_TOKENS", "4096"))
         response = client.chat.completions.create(
             model=self.model,
             messages=[
@@ -68,7 +72,7 @@ class QwenVLAdapter(BaseLLMAdapter):
                     ],
                 }
             ],
-            max_tokens=4096,
+            max_tokens=max_tokens,
             temperature=0.0,
             extra_body={
                 "enable_thinking": False,

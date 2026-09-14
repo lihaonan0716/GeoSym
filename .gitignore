@@ -34,9 +34,78 @@ assets/geosym_bench_hf/
 assets/geosym_bench.zip
 
 # Hide local automation scripts (batch fetching, data curation, one-off tools),
-# but keep the public dataset-generation entry point referenced by README.
+# but keep scripts that are imported by the public test suite. Tests are part
+# of the public artifact, so a clean clone must be able to collect them.
 scripts/*
+!scripts/analyze_m1_tier_discriminative_validity.py
+!scripts/analyze_m1m2_paid_pilot.py
+!scripts/analyze_m1m2_selective_confirmation.py
+!scripts/analyze_m1m2_selective_paid_pilot.py
+!scripts/analyze_m1m2_stress_paid_pilot.py
+!scripts/analyze_plotqa_measured_flat_parseability.py
+!scripts/analyze_plotqa_remaining_bottlenecks.py
+!scripts/analyze_plotqa_stage5_projection.py
+!scripts/analyze_public_benchmark_pilot.py
+!scripts/audit_m1m2_candidate_guided_postrun_governance.py
+!scripts/audit_m1m2_plotqa_guardrail.py
+!scripts/audit_m1m2_recovery_progress.py
+!scripts/audit_m1m2_selective_confirmation_pre_execution.py
+!scripts/audit_m1m2_stress_128_source_pool.py
+!scripts/audit_plotqa_public_benchmark_plan.py
+!scripts/analyze_track_b_m1m2_identifiability.py
+!scripts/batch_experiment.py
+!scripts/build_m1m2_answerability_preserving_roster.py
+!scripts/build_m1m2_candidate_guided_roster.py
+!scripts/build_m1m2_schema_outputs.py
+!scripts/build_m1m2_selective_stress_roster.py
+!scripts/build_m1m2_stress_benchmark.py
+!scripts/export_chartqa_manifest.py
+!scripts/finalize_full_paper_evidence_package.py
+!scripts/finalize_plotqa_measured_geosym_evidence.py
+!scripts/freeze_m1m2_candidate_guided_confirmation_manifest.py
+!scripts/freeze_m1m2_paid_pilot_manifest.py
+!scripts/freeze_m1m2_selective_confirmation_manifest.py
+!scripts/freeze_m1m2_selective_paid_pilot_manifest.py
+!scripts/freeze_m1m2_stress_128_manifest.py
+!scripts/freeze_m1m2_stress_paid_pilot_manifest.py
+!scripts/m1m2_recovery_quality_gradient.py
+!scripts/prepare_m1m2_recovery_phase_b.py
+!scripts/prepare_plotqa_public_benchmark_pilot.py
+!scripts/prepare_m1m2_recovery_round3.py
+!scripts/prepare_m1m2_recovery_round4.py
+!scripts/project_m1m2_answerability_preserving_zero_cost.py
+!scripts/project_m1m2_guarded_zero_cost.py
+!scripts/project_m1m2_selective_zero_cost.py
+!scripts/rescore_plotqa_measured_flat_deterministic.py
+!scripts/rescore_plotqa_signed_difference_normalization.py
+!scripts/run_geosym_bench_post_remediation_subset.py
+!scripts/run_m1m2_candidate_guided_confirmation.py
+!scripts/run_m1m2_paid_pilot.py
+!scripts/run_m1m2_recovery_phase_a.py
+!scripts/run_m1m2_recovery_phase_c_pilot.py
+!scripts/run_m1m2_selective_confirmation.py
+!scripts/run_m1m2_selective_paid_pilot.py
+!scripts/run_m1m2_stress_128_confirmation.py
+!scripts/run_m1m2_stress_paid_pilot.py
+!scripts/run_plotqa_direct_public_500_baselines.py
+!scripts/run_plotqa_measured_geosym_stage3.py
+!scripts/run_plotqa_measured_geosym_stage4.py
+!scripts/run_plotqa_measured_geosym_stage5_repair_smoke.py
+!scripts/run_plotqa_measured_locate_smoke.py
+!scripts/run_plotqa_measured_m0.py
+!scripts/run_plotqa_measured_public_500_confirmation.py
+!scripts/run_plotqa_openocr_survey.py
+!scripts/selective_propagation.py
+!scripts/survey_public_benchmark_metadata.py
 !scripts/run_generate.py
+!scripts/audit_extrema_filter.py
+!scripts/audit_prompt_fairness.py
+!scripts/analyze_p0_4_extrema_validation.py
+!scripts/estimate_p1_4_rerun_budget.py
+!scripts/prepare_public_benchmark_pilot.py
+!scripts/run_public_benchmark_pilot.py
+!scripts/run_p0_3_extrema_validation.py
+!scripts/run_p1_3_prompt_pilot.py
 
 # Tests are part of the public artifact — reviewers need to be able to run them.
 # The whole tree is tracked, at any depth: an exception limited to `tests/*.py`

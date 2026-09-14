@@ -12,7 +12,7 @@ Extract the following categories of evidence:
 
 1. **candidate_facts**: Raw data points you can read from the chart. Use the format "x_label -> value" (e.g., "2020-04 -> 14.8" or "Group A -> 35.2"). Extract as many clearly readable points as possible.
 
-2. **verified_facts**: Declarative statements about what you observe with high confidence. Include axis ranges, units, peak/valley positions, trend directions, and notable features.
+2. **verified_facts**: Compatibility field for scored visual observations. Include only statements strongly supported by the chart, such as axis ranges, units, peak/valley positions, trend directions, and notable features.
 
 3. **useful_facts**: The most task-relevant summary facts, labeled by role. Use labels like "peak:", "latest:", "minimum:", "trend:", "comparison:", "baseline:" as appropriate.
 
@@ -26,7 +26,7 @@ Rules:
 Return this JSON object exactly:
 {
   "candidate_facts": ["x_label -> value", "..."],
-  "verified_facts": ["observation 1", "observation 2", "..."],
+  "verified_facts": ["scored observation 1", "scored observation 2", "..."],
   "useful_facts": ["peak: x_label -> value", "trend: description", "..."],
   "chart_metadata": {
     "chart_type": "line|bar|scatter|area|pie|other",

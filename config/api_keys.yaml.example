@@ -10,10 +10,12 @@
 mathpix_app_id: "your-mathpix-app-id"
 mathpix_app_key: "your-mathpix-app-key"
 
-# ── LLM providers (one key per provider) ──
-openai: "YOUR_OPENAI_API_KEY"
+# ── 9router LLM gateway (used by GPT and Claude paid paths) ──
+ninerouter: "YOUR_NINEROUTER_API_KEY"
+ninerouter_base_url: "https://your-openai-compatible-gateway.example/v1"
+
+# ── Other LLM providers (one key per provider) ──
 gemini: "YOUR_GOOGLE_GEMINI_API_KEY"
 qwen: "YOUR_BAILIAN_DASHSCOPE_API_KEY"
 kimi: "YOUR_MOONSHOT_KIMI_API_KEY"
 glm: "YOUR_ZHIPUAI_API_KEY"
-claude: "YOUR_ANTHROPIC_API_KEY"

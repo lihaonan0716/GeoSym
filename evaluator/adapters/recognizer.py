@@ -6,6 +6,7 @@ Uses the complete pipeline including OCR OCR - identical to recognizer's own flo
 """
 
 import base64
+import os
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
@@ -14,6 +15,7 @@ import numpy as np
 
 from recognizer import CoordinateProcessor
 from recognizer.core.chart_extractor import ChartExtractor
+from recognizer.core.clean_grid_fallback import extract_clean_cartesian_grid
 from i18n import t, get_lang
 
 
@@ -64,6 +66,13 @@ M0_STAGE_CONFIG: Dict[str, Dict[str, Any]] = {
 }
 
 
+def clean_grid_fallback_first_enabled() -> bool:
+    """Return whether the clean-grid fallback should run before Mathpix OCR."""
+    return os.environ.get("GEOSYM_CLEAN_GRID_FALLBACK_FIRST", "").strip().lower() in {
+        "1", "true", "yes", "on",
+    }
+
+
 def build_m0_stage_config(*, skip_enhancement: bool = True) -> Dict[str, Any]:
     """Return a deep-enough copy of :data:`M0_STAGE_CONFIG` for one run.
 
@@ -111,12 +120,22 @@ class RecognizerAdapter:
             if image is None:
                 raise ValueError(t("eval_recognizer_load_failed", get_lang()).format(path=image))
 
+        if clean_grid_fallback_first_enabled():
+            fallback = extract_clean_cartesian_grid(image)
+            if fallback.success:
+                fallback.result["fallback_first"] = True
+                return fallback.coords, fallback.result, None
+
         # Stage 0: Extract chart using OCR OCR (same as recognizer)
         extract_result = self._chart_extractor.extract_chart_from_image(
             image, gemini_enabled=gemini_enabled)
         
         if not extract_result.get('success'):
             error_msg = extract_result.get('error', t("eval_recognizer_extract_failed", get_lang()))
+            fallback = extract_clean_cartesian_grid(image)
+            if fallback.success:
+                fallback.result["fallback_from_error"] = error_msg
+                return fallback.coords, fallback.result, None
             return [], {'success': False, 'error': error_msg}, None
 
         # Get OCR result from chart extractor

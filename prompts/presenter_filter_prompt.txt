@@ -12,7 +12,7 @@ Question:
 Candidate facts:
 {candidate_facts}
 
-Previously verified facts:
+Previously retained scored observations:
 {verified_facts}
 
 High-value useful facts:
@@ -20,7 +20,7 @@ High-value useful facts:
 
 Return this JSON object exactly:
 {
-  "verified_facts": ["fact 1", "fact 2"],
+  "verified_facts": ["retained scored observation 1", "retained scored observation 2"],
   "useful_facts": ["fact 1", "fact 2"],
   "selection_rationale": ["short reason 1", "short reason 2"]
 }

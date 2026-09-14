@@ -3,13 +3,17 @@ from pathlib import Path
 
 from scripts.run_geosym_bench_post_remediation_subset import (
     AttemptCounter,
+    M0_EXECUTION_MODE_FALLBACK_FIRST,
     OcrAttemptCounter,
     build_dry_run,
     checkpoint_requires_reauthorization,
+    condition_row,
     count_mathpix_http_attempts,
     count_llm_http_attempts,
+    parse_args,
     sample_image_name,
 )
+from scripts.prepare_public_benchmark_pilot import canonical_json_bytes, sha256_hex_bytes
 from evaluator.adapters.base import BaseLLMAdapter
 
 
@@ -79,6 +83,74 @@ def test_track_b_dry_run_blocks_zero_ocr_cap_for_current_ocr_conditions(tmp_path
     assert any(finding.startswith("ocr_zero_cap_conflicts") for finding in dry_run["blocking_findings"])
 
 
+def test_track_b_dry_run_scopes_caps_to_selected_conditions(tmp_path: Path) -> None:
+    audit_path = tmp_path / "metadata_dedup_audit.json"
+    samples = [
+        {"sample_id": f"absolute-clean_render_{i:04d}", "family": "absolute", "dedup_key": f"k{i}"}
+        for i in range(3)
+    ]
+    audit_path.write_text(json.dumps({"selected_subset": samples}), encoding="utf-8")
+    manifest = {
+        "stage_status": "geosym_bench_rerun_manifest_frozen_pending_paid_execution",
+        "source_artifacts": {"metadata_dedup_audit": {"path": str(audit_path)}},
+        "N_paper_subset": 3,
+        "conditions": ["E5", "E5_raw"],
+        "sample_condition_job_cap": 6,
+        "reasoning_llm_call_cap": 21,
+        "judge_llm_call_cap": 6,
+        "ocr_http_attempt_cap": 6,
+    }
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    dry_run = build_dry_run(manifest, manifest_path)
+
+    assert dry_run["stage_status"] == "ready_for_paid_execution"
+    assert dry_run["conditions"] == ["E5", "E5_raw"]
+    assert dry_run["output_conditions"] == ["E0", "E1", "E2", "E3", "E4", "E5", "E5_raw"]
+    assert dry_run["sample_condition_job_cap"] == 6
+    assert dry_run["reasoning_llm_call_cap"] == 21
+    assert dry_run["judge_llm_call_cap"] == 6
+    assert dry_run["ocr_http_attempt_cap"] == 6
+    assert dry_run["ocr_dependent_conditions"] == ["E5", "E5_raw"]
+
+
+def test_track_b_dry_run_allows_zero_ocr_cap_for_fallback_first_mode(tmp_path: Path) -> None:
+    audit_path = tmp_path / "metadata_dedup_audit.json"
+    samples = [
+        {"sample_id": f"absolute-clean_render_{i:04d}", "family": "absolute", "dedup_key": f"k{i}"}
+        for i in range(2)
+    ]
+    audit_path.write_text(json.dumps({"selected_subset": samples}), encoding="utf-8")
+    manifest = {
+        "stage_status": "geosym_bench_rerun_manifest_frozen_pending_paid_execution",
+        "source_artifacts": {"metadata_dedup_audit": {"path": str(audit_path)}},
+        "N_paper_subset": 2,
+        "conditions": ["E5", "E5_raw"],
+        "m0_execution_mode": M0_EXECUTION_MODE_FALLBACK_FIRST,
+        "sample_condition_job_cap": 4,
+        "reasoning_llm_call_cap": 14,
+        "judge_llm_call_cap": 4,
+        "ocr_http_attempt_cap": 0,
+    }
+    manifest_path = tmp_path / "manifest.json"
+    manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+
+    dry_run = build_dry_run(manifest, manifest_path)
+
+    assert dry_run["stage_status"] == "ready_for_paid_execution"
+    assert dry_run["m0_execution_mode"] == M0_EXECUTION_MODE_FALLBACK_FIRST
+    assert dry_run["ocr_http_attempt_cap"] == 0
+    assert dry_run["ocr_dependent_conditions"] == []
+
+
+def test_track_b_parse_args_rejects_unknown_condition() -> None:
+    import pytest
+
+    with pytest.raises(SystemExit):
+        parse_args(["--conditions", "E9"])
+
+
 def test_attempt_counter_counts_transport_attempts_and_restores_wrapper() -> None:
     class FlakyAdapter(BaseLLMAdapter):
         def __init__(self) -> None:
@@ -141,3 +213,44 @@ def test_track_b_checkpoint_requires_reauthorization_for_unknown_attempts() -> N
 
     assert checkpoint_requires_reauthorization(checkpoint) is True
     assert checkpoint_requires_reauthorization({"stage_status": "partial_paid_run", "blocking_findings": []}) is False
+
+
+def test_condition_row_hashes_staged_pipeline_chain_text() -> None:
+    sample = {"sample_id": "absolute-clean_render_0000", "family": "absolute", "dedup_key": "k0"}
+    cache = {
+        "conditions": {
+            "E5": {
+                "status": "success",
+                "cached": False,
+                "eval": {"total_score": 90.0, "dimension_scores": {}, "sub_scores": {}},
+                "judge": {"raw_judge_response": "{}"},
+                "pipeline": {
+                    "steps": {"L3": {"raw": "{\"expression\":\"x+1\"}", "parsed": {"expression": "x+1"}}},
+                    "final_parsed": {
+                        "expression": "x+1",
+                        "domain": "all real numbers",
+                        "range": "all real numbers",
+                        "inference_explanation": "The plotted line has slope 1.",
+                    },
+                },
+            },
+        },
+    }
+
+    row = condition_row(sample, cache, "E5")
+
+    empty_hash = sha256_hex_bytes(canonical_json_bytes(""))
+    expected_hash = sha256_hex_bytes(
+        canonical_json_bytes(
+            "\n".join(
+                [
+                    "Expression: x+1",
+                    "Domain: all real numbers",
+                    "Range: all real numbers",
+                    "Inference explanation: The plotted line has slope 1.",
+                ]
+            )
+        )
+    )
+    assert row["chain_text_sha256"] == expected_hash
+    assert row["chain_text_sha256"] != empty_hash

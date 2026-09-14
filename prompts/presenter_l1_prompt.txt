@@ -9,7 +9,7 @@ Task:
 Question:
 {question}
 
-Curated verified facts:
+Curated scored facts:
 {verified_facts}
 
 Curated useful facts:

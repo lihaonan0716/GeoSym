@@ -684,8 +684,7 @@ def run_reasoning_comparison(
     key = api_key.strip() if api_key else ""
     if not key:
         key = _get_saved_key(model_name)
-    is_claude = "Claude" in model_name
-    if not key and not is_claude:
+    if not key:
         msg = "请输入 API Key" if is_zh else "Please enter API Key"
         yield (gt_md, msg) + blank_outputs
         return
@@ -716,11 +715,11 @@ def run_reasoning_comparison(
         return pipeline, parsed, judge, None
 
     def _run_e5():
-        detected, vf, success = extract_geosym_coords(
+        detected, vf, success, reason = extract_geosym_coords(
             model_name, key, img_path, gt, gemini_enabled=gemini_enabled,
         )
         if not success:
-            raise RuntimeError("GeoSym extraction failed")
+            raise RuntimeError(f"GeoSym extraction failed: {reason or 'unknown reason'}")
         pipeline = run_single_condition(
             adapter, img_path, gt_data, CONDITION_MAP["E5"],
             geosym_coords=detected or [],
@@ -886,8 +885,7 @@ def run_reasoning_all_conditions(
     key = api_key.strip() if api_key else ""
     if not key:
         key = _get_saved_key(model_name)
-    is_claude = "Claude" in model_name
-    if not key and not is_claude:
+    if not key:
         msg = "请输入 API Key" if is_zh else "Please enter API Key"
         yield (gt_md, msg) + ("",) * 7
         return
@@ -1027,6 +1025,7 @@ def run_reasoning_all_conditions(
     cached_geosym = cached.get("geosym_artifacts", {}) if cached else {}
     geosym_coords: list = cached_geosym.get("coords", [])
     geosym_success = cached_geosym.get("success", False)
+    geosym_failure_reason = cached_geosym.get("error")
     geosym_attempted = geosym_success
     # Always recompute visual facts from coords using the current algorithm,
     # so that code improvements to fact derivation take effect immediately.
@@ -1050,11 +1049,11 @@ def run_reasoning_all_conditions(
         return pipeline, parsed, judge_result
 
     def _ensure_geosym():
-        nonlocal geosym_coords, geosym_vf, geosym_success, geosym_attempted
+        nonlocal geosym_coords, geosym_vf, geosym_success, geosym_failure_reason, geosym_attempted
         if geosym_attempted:
             return geosym_success
         geosym_attempted = True
-        geosym_coords, _, geosym_success = extract_geosym_coords(
+        geosym_coords, _, geosym_success, geosym_failure_reason = extract_geosym_coords(
             model_name,
             key,
             img_path,
@@ -1105,12 +1104,12 @@ def run_reasoning_all_conditions(
                 kwargs["ocr_baseline"] = ocr_bl
             if cond_key == "E5":
                 if not _ensure_geosym():
-                    raise RuntimeError("GeoSym extraction failed")
+                    raise RuntimeError(f"GeoSym extraction failed: {geosym_failure_reason or 'unknown reason'}")
                 kwargs["geosym_coords"] = geosym_coords
                 kwargs["visual_facts"] = geosym_vf
             if cond_key == "E5_raw":
                 if not _ensure_geosym():
-                    raise RuntimeError("GeoSym extraction failed")
+                    raise RuntimeError(f"GeoSym extraction failed: {geosym_failure_reason or 'unknown reason'}")
                 kwargs["geosym_coords"] = geosym_coords
 
             pipeline, parsed, j_result = _run_pipeline(cond_key, **kwargs)

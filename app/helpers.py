@@ -56,7 +56,26 @@ def _get_saved_key(method: str) -> str:
     """
     keys = _load_api_keys()
     key_name = _MODEL_KEY_MAP.get(method, method.lower().replace("-", "_").replace(" ", "_"))
-    return keys.get(key_name, "")
+    if key_name in keys:
+        return keys[key_name]
+    env_name = f"{key_name.upper()}_KEY"
+    return os.environ.get(env_name, "")
+
+
+def _get_saved_base_url(method: str) -> str:
+    """Get the configured API base URL for a given display-name model."""
+    keys = _load_api_keys()
+    key_name = _MODEL_BASE_URL_MAP.get(method, "")
+    if key_name:
+        if key_name in keys:
+            return keys[key_name]
+        env_name = f"{key_name.upper()}".replace("_BASE_URL", "") + "_BASE_URL"
+        if env_name in os.environ:
+            return os.environ[env_name]
+        direct_env_name = key_name.upper()
+        if direct_env_name in os.environ:
+            return os.environ[direct_env_name]
+    return ""
 
 
 # ==================== Theme ====================
@@ -272,28 +291,33 @@ def _build_model_registry(cfg: dict):
     * MODEL_REGISTRY  – {display_name: (module_path, class_name, api_model_id)}
     * PROVIDER_MAP    – OrderedDict {provider: [display_name, ...]}
     * _MODEL_KEY_MAP  – {display_name: api_key_name}  (for key lookup)
+    * _MODEL_BASE_URL_MAP – {display_name: base_url_key}  (optional gateway URL)
     """
     from collections import OrderedDict
     registry: Dict[str, Tuple[str, str, str]] = {}
     provider_map: OrderedDict = OrderedDict()
     key_map: Dict[str, str] = {}
+    base_url_map: Dict[str, str] = {}
 
     models_cfg = cfg.get("models", {})
     for provider, pdata in models_cfg.items():
         adapter_full = pdata.get("adapter", "")
         api_key_name = pdata.get("api_key_name", provider.lower())
+        base_url_key = pdata.get("base_url_key", "")
         module_path, class_name = adapter_full.rsplit(".", 1)
         display_names = []
         for display_name, api_model_id in pdata.get("models", {}).items():
             registry[display_name] = (module_path, class_name, api_model_id)
             key_map[display_name] = api_key_name
+            if base_url_key:
+                base_url_map[display_name] = base_url_key
             display_names.append(display_name)
         if display_names:
             provider_map[provider] = display_names
-    return registry, provider_map, key_map
+    return registry, provider_map, key_map, base_url_map
 
 
-MODEL_REGISTRY, PROVIDER_MAP, _MODEL_KEY_MAP = _build_model_registry(_config)
+MODEL_REGISTRY, PROVIDER_MAP, _MODEL_KEY_MAP, _MODEL_BASE_URL_MAP = _build_model_registry(_config)
 
 
 def _create_llm_adapter(method: str, api_key: str):
@@ -305,7 +329,11 @@ def _create_llm_adapter(method: str, api_key: str):
     module_path, class_name, api_model_id = entry
     mod = importlib.import_module(module_path)
     cls = getattr(mod, class_name)
-    return cls(api_key=api_key, model=api_model_id)
+    base_url = _get_saved_base_url(method)
+    try:
+        return cls(api_key=api_key, model=api_model_id, base_url=base_url)
+    except TypeError:
+        return cls(api_key=api_key, model=api_model_id)
 
 
 LLM_METHODS = list(MODEL_REGISTRY.keys())

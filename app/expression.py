@@ -96,8 +96,7 @@ def _run_expr_direct(method: str, api_key: str, image_path: str, gt: dict) -> Tu
     key = api_key.strip() if api_key else ""
     if not key:
         key = _get_saved_key(method)
-    is_claude = "Claude" in method
-    if not key and not is_claude:
+    if not key:
         return [], "API key is empty."
 
     adapter = _create_llm_adapter(method, key)
@@ -125,8 +124,7 @@ def _run_expr_geosym(method: str, api_key: str, image_path: str, gt: dict,
     key = api_key.strip() if api_key else ""
     if not key:
         key = _get_saved_key(method)
-    is_claude = "Claude" in method
-    if not key and not is_claude:
+    if not key:
         return [], "API key is empty.", [], None, False
 
     # Step 1: Run GeoSym
@@ -436,8 +434,7 @@ def run_expr_multi_model(
 
     for method in selected_methods:
         api_key = _get_saved_key(method)
-        is_claude = "Claude" in method
-        if not api_key and not is_claude:
+        if not api_key:
             lines.append(f"| {method} | - | - | - | - | - |")
             continue
 
@@ -480,8 +477,7 @@ def run_expr_batch(
         return msg, ""
 
     api_key = _get_saved_key(method)
-    is_claude = "Claude" in method
-    if not api_key and not is_claude:
+    if not api_key:
         return "No API Key", ""
 
     direct_results = []
@@ -599,8 +595,7 @@ def run_expr_pk(
 
     for method in selected_methods:
         api_key = _get_saved_key(method)
-        is_claude = "Claude" in method
-        if not api_key and not is_claude:
+        if not api_key:
             method_mode_map[method] = {"direct": {}, "geosym": {}}
             empty_agg = _aggregate_expr_metrics([])
             all_method_agg.append((method, empty_agg, empty_agg, "No API Key", []))

@@ -125,14 +125,40 @@ def parse_expression_answer(answer_str: str) -> str:
     return s.strip()
 
 
+def _loads_json_with_numeric_fraction_repair(candidate: str) -> Optional[Dict]:
+    """Load JSON, repairing bare numeric fractions only after strict parsing fails."""
+    try:
+        return json.loads(candidate)
+    except json.JSONDecodeError:
+        pass
+
+    def repl(match: re.Match) -> str:
+        numerator = float(match.group(1))
+        denominator = float(match.group(2))
+        if denominator == 0:
+            return match.group(0)
+        return str(numerator / denominator)
+
+    repaired = re.sub(
+        r'(?<!["\w])([+-]?\d+(?:\.\d+)?)\s*/\s*([+-]?\d+(?:\.\d+)?)(?!["\w])',
+        repl,
+        candidate,
+    )
+    if repaired == candidate:
+        return None
+    try:
+        return json.loads(repaired)
+    except json.JSONDecodeError:
+        return None
+
+
 def _extract_json_block(text: str) -> Optional[Dict]:
     """Extract the first valid JSON object from text (between { and })."""
     # Try ```json ... ``` blocks first
     for m in re.finditer(r'```(?:json)?\s*\n?(.*?)```', text, re.DOTALL):
-        try:
-            return json.loads(m.group(1).strip())
-        except json.JSONDecodeError:
-            continue
+        loaded = _loads_json_with_numeric_fraction_repair(m.group(1).strip())
+        if loaded is not None:
+            return loaded
 
     # Try raw { ... } blocks
     depth = 0
@@ -145,9 +171,10 @@ def _extract_json_block(text: str) -> Optional[Dict]:
         elif ch == '}':
             depth -= 1
             if depth == 0 and start is not None:
-                try:
-                    return json.loads(text[start:i + 1])
-                except json.JSONDecodeError:
+                loaded = _loads_json_with_numeric_fraction_repair(text[start:i + 1])
+                if loaded is not None:
+                    return loaded
+                else:
                     start = None
     return None
 
