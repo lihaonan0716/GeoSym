@@ -12,6 +12,7 @@ those two properties are asserted here rather than assumed:
 """
 
 import copy
+from pathlib import Path
 from unittest.mock import patch
 
 import cv2
@@ -177,6 +178,10 @@ def test_clean_grid_fallback_extracts_visible_integer_intersections():
     assert result.result["result"]["m0_fallback"] == "clean_cartesian_grid_fallback_v1"
 
 
+@pytest.mark.skipif(
+    not Path("recognizer/models/config/models_config.yaml").exists(),
+    reason="requires dev-local recognizer model config; see README",
+)
 def test_recognizer_adapter_fallback_first_bypasses_chart_extractor(monkeypatch):
     image = np.full((420, 420, 3), 255, dtype=np.uint8)
     grid_x = [90 + i * 40 for i in range(7)]

@@ -78,58 +78,6 @@ def _get_saved_base_url(method: str) -> str:
     return ""
 
 
-# ==================== Theme ====================
-NAVY_BLUE = "#1a237e"
-DARK_NAVY = "#0d1421"
-ACCENT_BLUE = "#3949ab"
-TEXT_COLOR = "#e0e0e0"
-
-custom_css = f"""
-.gradio-container {{
-    background-color: {DARK_NAVY} !important;
-}}
-.dark {{
-    background-color: {DARK_NAVY} !important;
-}}
-.block {{
-    background-color: #1e2433 !important;
-    border-color: {NAVY_BLUE} !important;
-}}
-.label-wrap {{
-    color: {TEXT_COLOR} !important;
-}}
-button.primary {{
-    background-color: {ACCENT_BLUE} !important;
-    border-color: {NAVY_BLUE} !important;
-}}
-button.secondary {{
-    background-color: #2c3e50 !important;
-    border-color: {NAVY_BLUE} !important;
-}}
-.tabs > .tab-nav > button {{
-    background-color: #1e2433 !important;
-    color: {TEXT_COLOR} !important;
-}}
-.tabs > .tab-nav > button.selected {{
-    background-color: {NAVY_BLUE} !important;
-    color: white !important;
-}}
-h1, h2, h3, h4, p, span, label {{
-    color: {TEXT_COLOR} !important;
-}}
-.markdown-text {{
-    color: {TEXT_COLOR} !important;
-}}
-input, textarea, select {{
-    background-color: #2c3e50 !important;
-    color: {TEXT_COLOR} !important;
-    border-color: {NAVY_BLUE} !important;
-}}
-.dataframe {{
-    background-color: #1e2433 !important;
-}}
-"""
-
 # ==================== Helper Functions ====================
 
 def list_dataset_images() -> List[str]:

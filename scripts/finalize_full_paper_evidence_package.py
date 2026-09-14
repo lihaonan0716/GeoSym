@@ -692,7 +692,7 @@ def build_track_c_zero_cost_audit(output_root: Path) -> dict[str, Any]:
     openocr_500_summary_path = track_c_dir / "openocr_survey" / "summary.json"
     measured_500_path = track_c_dir / "m0_measurement_records.json"
     measured_500_stage1_path = track_c_dir / "stage1_status.json"
-    executable_runner_path = ROOT / "scripts" / "run_plotqa_measured_public_500_confirmation.py"
+    executable_runner_path = ROOT / "scripts" / "run_plotqa_measured_public_confirmation.py"
     measured_confirmation_dir = track_c_dir / "measured_confirmation"
     measured_confirmation_plan_path = measured_confirmation_dir / "frozen_plan.json"
     measured_confirmation_dry_run_path = measured_confirmation_dir / "dry_run.json"

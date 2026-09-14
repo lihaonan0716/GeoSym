@@ -1,6 +1,17 @@
 import json
 from pathlib import Path
 
+import pytest
+
+_DEV_LOCAL_ARTIFACTS = [
+    Path("docs/PAPER_LEVEL_EVIDENCE_PACKAGE_PLAN.md"),
+    Path("outputs/paper_level_evidence_package"),
+]
+REQUIRES_PAPER_PACKAGE_ARTIFACTS = pytest.mark.skipif(
+    any(not path.exists() for path in _DEV_LOCAL_ARTIFACTS),
+    reason="requires dev-local outputs/ and docs/ artifacts; see README",
+)
+
 from scripts.finalize_full_paper_evidence_package import (
     build_submission_audit,
     build_track_c_artifacts,
@@ -435,6 +446,7 @@ def test_track_b_full_seven_condition_final_result_is_complete(tmp_path: Path, m
     assert manifest["completed_paid_result_condition_gate_findings"] == []
 
 
+@REQUIRES_PAPER_PACKAGE_ARTIFACTS
 def test_track_d_reauthorized_result_supersedes_default_failed_smoke(tmp_path: Path, monkeypatch) -> None:
     import scripts.finalize_full_paper_evidence_package as finalizer
 

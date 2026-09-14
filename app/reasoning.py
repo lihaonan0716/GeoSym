@@ -11,7 +11,6 @@ from typing import Dict, List, Tuple, Any
 
 logger = logging.getLogger(__name__)
 
-import gradio as gr
 import numpy as np
 
 from app.helpers import (

@@ -185,13 +185,12 @@ GeoSym/
 ├── presenter/       # Enhanced M0 (ruler + LLM locate) + real-world chart showcase
 ├── evaluator/       # LLM adapters, metrics, reasoning (M1/M2/M3)
 ├── prompts/         # Prompt templates for all pipeline stages
-├── app/             # Gradio UI and backend modules
+├── app/             # Backend orchestration modules for reasoning, cache, and schemas
 ├── config/          # Configuration files and API key template
 ├── scripts/         # CLI tools
 ├── tests/           # Test suite
 ├── docs/            # Technical documentation
 ├── i18n.py          # Bilingual internationalization (EN/ZH)
-├── run.py           # Application entry point
 └── requirements.txt
 ```
 
@@ -201,9 +200,9 @@ GeoSym/
 | `recognizer/` | GeoSym's visual extraction backbone for coordinate evidence on controlled benchmarks |
 | `presenter/` | Enhanced M0 pipeline (ruler, measure, verify) and real-world chart showcase flows |
 | `evaluator/` | Structured fusion logic, LLM adapters, reasoning scoring, judge scoring, baselines, and response parsing |
-| `app/` | Gradio application: UI construction, reasoning pipeline, experiment runners, caching |
+| `app/` | Backend orchestration for reasoning pipelines, cache records, schemas, and connection checks |
 | `prompts/` | Prompt templates for reasoning layers, judge evaluation, M0 locate, visual fact inference |
-| `scripts/` | CLI tools for dataset generation and related utilities |
+| `scripts/` | CLI tools for dataset generation, benchmark execution, analysis, audits, and paper evidence packaging |
 | `tests/` | Pytest suite covering the public surface and the evidence-channel contracts |
 
 ## Setup
@@ -212,7 +211,7 @@ GeoSym/
 python -m pip install -r requirements.txt
 ```
 
-Core dependencies include OpenCV, NumPy, Pillow, PyYAML, Gradio, and SymPy. The experiments reported in the paper use Mathpix OCR for E3/E4 and for OCR-derived axis/tick extraction; configure Mathpix credentials in `config/api_keys.yaml`. EasyOCR remains available in the codebase for local OCR workflows, but it is not the reported OCR/rule baseline.
+Core dependencies include OpenCV, NumPy, Pillow, PyYAML, and SymPy. The experiments reported in the paper use Mathpix OCR for E3/E4 and for OCR-derived axis/tick extraction; configure Mathpix credentials in `config/api_keys.yaml`. EasyOCR remains available in the codebase for local OCR workflows, but it is not the reported OCR/rule baseline.
 
 Copy `config/api_keys.yaml.example` to `config/api_keys.yaml` and fill in your API keys. GPT and Claude adapters use an API-compatible gateway base URL from `ninerouter_base_url`, `NINEROUTER_BASE_URL`, `GEOSYM_OPENAI_BASE_URL`, or `GEOSYM_CLAUDE_BASE_URL`; the public repository does not hardcode a private gateway URL.
 
@@ -283,20 +282,6 @@ Each generated image has a paired JSON file containing:
 - `question.ground_truth` (all 10 evaluation dimensions)
 - `extended_properties` (intercepts, extrema, monotonicity, symmetry)
 - `benchmark_meta` (function family, noise profile, seed)
-
-## Web UI
-
-```bash
-python run.py
-```
-
-| Tab | Features |
-|-----|----------|
-| **GeoSym Function-Specialized M0 Demo** | Interactive coordinate extraction with stage-by-stage visualization |
-| **Benchmark Generation** | Generate images by function family and noise profile, with full ground truth preview |
-| **GeoSym Full Function Reasoning** | Single-image six-condition reasoning, rerun controls, and cache management |
-| **Real-World Showcase** | Qualitative demonstrations on real scientific charts using Enhanced M0 |
-| **Connection Test** | Verify LLM API connectivity for configured providers |
 
 ## Minimal Programmatic Use
 

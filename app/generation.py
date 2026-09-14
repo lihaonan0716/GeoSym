@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Tuple, List, Dict
 
 import cv2
-import gradio as gr
 import numpy as np
 
 from app.helpers import (
@@ -39,6 +38,14 @@ DEFAULT_FUNC_TYPE_LABELS: list[str] = list(FUNCTION_TYPE_LABELS)
 FUNCTION_TYPE_COUNT = len(ALL_FUNCTION_TYPES)
 PROFILE_COUNT = len(BENCHMARK_PROFILES)
 TOTAL_SUBSET_COUNT = FUNCTION_TYPE_COUNT * PROFILE_COUNT
+
+
+class _NoOpProgress:
+    def __call__(self, *args, **kwargs):
+        return None
+
+    def tqdm(self, iterable, **kwargs):
+        return iterable
 
 _LABEL_TO_FTYPE: dict[str, str] = {
     label: ft for ft, label in zip(ALL_FUNCTION_TYPES, FUNCTION_TYPE_LABELS)
@@ -251,9 +258,10 @@ def generate_images(
     noise_enabled: bool,
     min_intersections: int,
     lang: str,
-    progress=gr.Progress(),
+    progress=None,
 ) -> Tuple[str, str]:
     """Generate images — selected subsets or all benchmark subsets depending on mode."""
+    progress = progress or _NoOpProgress()
     # Guard against None values from Gradio slider state sync issues
     count = int(count or 10)
     seed = int(seed or 42)
@@ -635,11 +643,9 @@ def preview_image(image_name: str, lang: str) -> Tuple[
 
 
 def refresh_dataset():
-    """Refresh all image-selection dropdowns across all tabs."""
+    """Refresh image-selection state without depending on a UI framework."""
     images = list_dataset_images()
     first = images[0] if images else None
-    dd = gr.Dropdown(choices=images, value=first, allow_custom_value=True)
-    dd_none = gr.Dropdown(choices=images, value=None, allow_custom_value=True)
-    # Current UI has three image pickers:
-    # 1) dataset preview, 2) reasoning single-image, 3) facts diagnosis.
-    return dd, dd_none, dd_none
+    selected = {"choices": images, "value": first, "allow_custom_value": True}
+    empty = {"choices": images, "value": None, "allow_custom_value": True}
+    return selected, empty, empty

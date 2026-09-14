@@ -15,8 +15,8 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from scripts.prepare_public_benchmark_pilot import stable_file_hash  # noqa: E402
-from scripts.run_plotqa_measured_geosym_stage3 import deterministic_prediction_from_measured  # noqa: E402
-from scripts.run_plotqa_measured_geosym_stage4 import analyze_result, as_records_by_id, load_json  # noqa: E402
+from scripts.run_plotqa_locate import deterministic_prediction_from_measured  # noqa: E402
+from scripts.run_plotqa_measure import analyze_result, as_records_by_id, load_json  # noqa: E402
 from scripts.run_public_benchmark_pilot import score_prediction  # noqa: E402
 
 

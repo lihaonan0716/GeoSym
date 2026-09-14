@@ -4,7 +4,6 @@ import json
 from pathlib import Path
 from typing import List, Tuple
 
-import gradio as gr
 import numpy as np
 
 from app.helpers import (
@@ -34,6 +33,11 @@ def _ensure_expr_metrics():
 
 EXPR_PK_PAGE_SIZE = 20
 _expr_pk_results_path = _root / "reports" / "expr_pk_results.json"
+
+
+class _NoOpProgress:
+    def __call__(self, *args, **kwargs):
+        return None
 
 
 def _load_expr_prompt_direct() -> str:
@@ -462,9 +466,10 @@ def run_expr_batch(
     method: str,
     lang: str,
     gemini_enabled: bool = False,
-    progress=gr.Progress(),
+    progress=None,
 ) -> Tuple[str, str]:
     """Run expression recognition on all images with a single model (both modes)."""
+    progress = progress or _NoOpProgress()
     _ensure_expr_metrics()
     images = list_dataset_images()
     is_zh = lang == LANG_ZH
@@ -572,9 +577,10 @@ def run_expr_pk(
     selected_methods: List[str],
     lang: str,
     gemini_enabled: bool = False,
-    progress=gr.Progress(),
+    progress=None,
 ) -> Tuple[str, dict, str, str]:
     """Run expression recognition PK: all selected models on entire dataset, both modes."""
+    progress = progress or _NoOpProgress()
     _ensure_expr_metrics()
     images = list_dataset_images()
     is_zh = lang == LANG_ZH
