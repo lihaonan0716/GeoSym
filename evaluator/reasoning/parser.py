@@ -105,6 +105,8 @@ def normalize_interval_str(s: str) -> str:
 
     s = s.replace('\\cup', 'U')
     s = s.replace('∪', 'U')
+    s = re.sub(r'\bunion\b', 'U', s, flags=re.IGNORECASE)
+    s = re.sub(r'(?<=[\)\]])\s*[uU]\s*(?=[\(\[])', 'U', s)
     s = s.replace(' ', '')
 
     s = re.sub(r'[^\d\w\(\)\[\],\.+\-U]', '', s)
