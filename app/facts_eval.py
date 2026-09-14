@@ -22,7 +22,6 @@ from evaluator.metrics.reasoning import (
     evaluate_extrema,
     evaluate_monotonicity,
 )
-from i18n import LANG_ZH, t
 
 
 def _safe_json(obj: Any) -> str:
@@ -151,7 +150,7 @@ def _match_extrema_points(
 
 def _fmt_list(items: List[str], lang: str, limit: int = 12) -> str:
     if not items:
-        return t("facts_diag_none", lang)
+        return 'none'
     show = items[:limit]
     if len(items) > limit:
         show.append(f"... +{len(items) - limit}")
@@ -161,7 +160,7 @@ def _fmt_list(items: List[str], lang: str, limit: int = 12) -> str:
 def _fmt_list_full(items: List[str], lang: str) -> str:
     """Format full list without truncation (used for coordinate display)."""
     if not items:
-        return t("facts_diag_none", lang)
+        return 'none'
     return "; ".join(items)
 
 
@@ -263,7 +262,7 @@ def _coord_diag_summary(diag: Dict[str, Any]) -> str:
 def run_facts_diagnosis(
     image_name: str,
     gemini_enabled: bool = False,
-    lang: str = LANG_ZH,
+    lang: str = "English",
     model_name: str = "",
 ) -> Tuple[str, str, str, Any]:
     """Run GeoSym fact diagnosis for a single image.
@@ -276,7 +275,7 @@ def run_facts_diagnosis(
     """
     if not image_name:
         return (
-            f"{t('facts_summary_title', lang)}\n\n{t('facts_err_select_image', lang)}",
+            f"{'### GeoSym Function-Specialized M0 Accuracy'}\n\n{'Please select an image before running diagnosis.'}",
             "",
             "",
             None,
@@ -285,8 +284,8 @@ def run_facts_diagnosis(
     img_path = resolve_image_path(image_name)
     if img_path is None:
         return (
-            f"{t('facts_summary_title', lang)}\n\n"
-            f"{t('facts_err_image_not_found', lang).format(image=image_name)}",
+            f"{'### GeoSym Function-Specialized M0 Accuracy'}\n\n"
+            f"{'Image not found: `{image}`'.format(image=image_name)}",
             "",
             "",
             None,
@@ -295,8 +294,8 @@ def run_facts_diagnosis(
     _img, gt = load_image_and_gt(image_name)
     if not gt:
         return (
-            f"{t('facts_summary_title', lang)}\n\n"
-            f"{t('facts_err_gt_not_found', lang).format(image=image_name)}",
+            f"{'### GeoSym Function-Specialized M0 Accuracy'}\n\n"
+            f"{'Ground truth not found: `{image}`'.format(image=image_name)}",
             "",
             "",
             None,
@@ -370,40 +369,40 @@ def run_facts_diagnosis(
     avg_score = round(sum(score_map.values()) / len(score_map), 1)
 
     summary_md = (
-        f"{t('facts_summary_title', lang)}\n\n"
-        f"- {t('facts_summary_image', lang)}: `{image_name}`\n"
-        f"- {t('facts_summary_avg', lang)}: **{avg_score}**\n"
-        f"- {t('facts_item_coordinates', lang)}: **{score_map['coordinates']}**\n"
-        f"- {t('facts_item_intercepts', lang)}: **{score_map['intercepts']}**\n"
-        f"- {t('facts_item_extrema', lang)}: **{score_map['extrema']}**\n"
-        f"- {t('facts_item_monotonicity', lang)}: **{score_map['monotonicity']}**\n"
+        f"{'### GeoSym Function-Specialized M0 Accuracy'}\n\n"
+        f"- {'Image'}: `{image_name}`\n"
+        f"- {'Overall (4-item average)'}: **{avg_score}**\n"
+        f"- {'Coordinates'}: **{score_map['coordinates']}**\n"
+        f"- {'Intercepts'}: **{score_map['intercepts']}**\n"
+        f"- {'Extrema'}: **{score_map['extrema']}**\n"
+        f"- {'Visible-range Monotonicity'}: **{score_map['monotonicity']}**\n"
     )
 
     detail_md = (
-        f"{t('facts_detail_title', lang)}\n\n"
-        f"#### {t('facts_item_coordinates', lang)}\n"
-        f"- {t('facts_label_pred', lang)}: `{_fmt_list_full(pred_coords_list, lang)}`\n"
-        f"- {t('facts_label_gt', lang)}: `{_fmt_list(gt_coords_list, lang, limit=20)}`\n"
-        f"- {t('facts_label_details', lang)}: {_coord_diag_summary(coord_diag)}\n"
+        f"{'### Prediction vs Ground Truth'}\n\n"
+        f"#### {'Coordinates'}\n"
+        f"- {'Pred'}: `{_fmt_list_full(pred_coords_list, lang)}`\n"
+        f"- {'GT'}: `{_fmt_list(gt_coords_list, lang, limit=20)}`\n"
+        f"- {'Details'}: {_coord_diag_summary(coord_diag)}\n"
         f"- Score policy: **precision-only** (max=100, no miss penalty), current score=`{coord_precision_score}`\n"
-        f"- {t('facts_diag_gt_total', lang)}: **{len(gt_coords_norm)}** | {t('facts_diag_pred_total', lang)}: **{len(pred_coords_norm)}** | "
-        f"{t('facts_diag_matched', lang)}: **{len(coord_diag['matched'])}** | {t('facts_diag_missed', lang)}: **{len(coord_diag['missed_gt'])}** | "
-        f"{t('facts_diag_extra', lang)}: **{len(coord_diag['extra_pred'])}**\n"
-        f"- {t('facts_diag_matched_pairs', lang)}: `{_fmt_list(coord_matched_list, lang)}`\n"
-        f"- {t('facts_diag_missed_points', lang)}: `{_fmt_list(coord_missed_list, lang)}`\n"
-        f"- {t('facts_diag_extra_points', lang)}: `{_fmt_list(coord_extra_list, lang)}`\n\n"
-        f"#### {t('facts_item_intercepts', lang)}\n- {t('facts_label_pred', lang)}: `{s_intercepts.get('pred_display', '')}`\n- {t('facts_label_gt', lang)}: `{s_intercepts.get('gt_display', '')}`\n- {t('facts_label_details', lang)}: {s_intercepts.get('details', '')}\n\n"
-        f"#### {t('facts_item_extrema', lang)}\n"
-        f"- {t('facts_label_pred', lang)}: `{s_extrema.get('pred_display', '')}`\n"
-        f"- {t('facts_label_gt', lang)}: `{_fmt_list(gt_extrema_list, lang, limit=20)}`\n"
-        f"- {t('facts_label_details', lang)}: {s_extrema.get('details', '')}\n"
-        f"- {t('facts_diag_gt_total', lang)}: **{len(gt_extrema_norm)}** | {t('facts_diag_pred_total', lang)}: **{len(pred_extrema_norm)}** | "
-        f"{t('facts_diag_matched', lang)}: **{len(extrema_diag['matched'])}** | {t('facts_diag_type_ok', lang)}: **{extrema_type_ok}** | "
-        f"{t('facts_diag_missed', lang)}: **{len(extrema_diag['missed_gt'])}** | {t('facts_diag_extra', lang)}: **{len(extrema_diag['extra_pred'])}**\n"
-        f"- {t('facts_diag_matched_pairs', lang)}: `{_fmt_list(extrema_matched_list, lang)}`\n"
-        f"- {t('facts_diag_missed_points', lang)}: `{_fmt_list(extrema_missed_list, lang)}`\n"
-        f"- {t('facts_diag_extra_points', lang)}: `{_fmt_list(extrema_extra_list, lang)}`\n\n"
-        f"#### {t('facts_item_monotonicity', lang)}\n- {t('facts_label_pred', lang)}: `{s_mono.get('pred_display', '')}`\n- {t('facts_label_gt', lang)}: `{s_mono.get('gt_display', '')}`\n- {t('facts_label_details', lang)}: {s_mono.get('details', '')}\n"
+        f"- {'GT total'}: **{len(gt_coords_norm)}** | {'Pred total'}: **{len(pred_coords_norm)}** | "
+        f"{'Matched'}: **{len(coord_diag['matched'])}** | {'Missed GT'}: **{len(coord_diag['missed_gt'])}** | "
+        f"{'Extra Pred'}: **{len(coord_diag['extra_pred'])}**\n"
+        f"- {'Matched pairs'}: `{_fmt_list(coord_matched_list, lang)}`\n"
+        f"- {'Missed GT points'}: `{_fmt_list(coord_missed_list, lang)}`\n"
+        f"- {'Extra predicted points'}: `{_fmt_list(coord_extra_list, lang)}`\n\n"
+        f"#### {'Intercepts'}\n- {'Pred'}: `{s_intercepts.get('pred_display', '')}`\n- {'GT'}: `{s_intercepts.get('gt_display', '')}`\n- {'Details'}: {s_intercepts.get('details', '')}\n\n"
+        f"#### {'Extrema'}\n"
+        f"- {'Pred'}: `{s_extrema.get('pred_display', '')}`\n"
+        f"- {'GT'}: `{_fmt_list(gt_extrema_list, lang, limit=20)}`\n"
+        f"- {'Details'}: {s_extrema.get('details', '')}\n"
+        f"- {'GT total'}: **{len(gt_extrema_norm)}** | {'Pred total'}: **{len(pred_extrema_norm)}** | "
+        f"{'Matched'}: **{len(extrema_diag['matched'])}** | {'Type-correct matches'}: **{extrema_type_ok}** | "
+        f"{'Missed GT'}: **{len(extrema_diag['missed_gt'])}** | {'Extra Pred'}: **{len(extrema_diag['extra_pred'])}**\n"
+        f"- {'Matched pairs'}: `{_fmt_list(extrema_matched_list, lang)}`\n"
+        f"- {'Missed GT points'}: `{_fmt_list(extrema_missed_list, lang)}`\n"
+        f"- {'Extra predicted points'}: `{_fmt_list(extrema_extra_list, lang)}`\n\n"
+        f"#### {'Visible-range Monotonicity'}\n- {'Pred'}: `{s_mono.get('pred_display', '')}`\n- {'GT'}: `{s_mono.get('gt_display', '')}`\n- {'Details'}: {s_mono.get('details', '')}\n"
     )
 
     raw_payload = {
@@ -433,6 +432,6 @@ def run_facts_diagnosis(
             },
         },
     }
-    raw_md = f"{t('facts_raw_title', lang)}\n\n```json\n" + _safe_json(raw_payload) + "\n```"
+    raw_md = f"{'### Raw Diagnosis Data'}\n\n```json\n" + _safe_json(raw_payload) + "\n```"
     return summary_md, detail_md, raw_md, annotated_rgb
 

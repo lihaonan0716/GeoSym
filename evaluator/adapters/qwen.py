@@ -15,7 +15,6 @@ import os
 from openai import OpenAI
 
 from .base import BaseLLMAdapter
-from i18n import t, get_lang
 
 # DashScope OpenAI-compatible endpoint (Beijing region)
 DASHSCOPE_BASE_URL = "https://dashscope.aliyuncs.com/compatible-mode/v1"
@@ -42,7 +41,7 @@ class QwenVLAdapter(BaseLLMAdapter):
     def _get_client(self) -> OpenAI:
         if self._client is None:
             if not self.api_key:
-                raise ValueError(t("eval_qwen_key_missing", get_lang()))
+                raise ValueError('Bailian API key not provided. Get one at https://bailian.console.aliyun.com/?tab=model#/api-key')
             self._client = OpenAI(
                 api_key=self.api_key,
                 base_url=DASHSCOPE_BASE_URL,

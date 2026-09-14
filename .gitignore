@@ -65,6 +65,7 @@ scripts/*
 !scripts/build_evidence_selection_selective_propagation_robustness_roster.py
 !scripts/build_robustness_benchmark.py
 !scripts/export_chartqa_manifest.py
+!scripts/export_paper_results.py
 !scripts/finalize_full_paper_evidence_package.py
 !scripts/finalize_plotqa_measured_geosym_evidence.py
 !scripts/freeze_evidence_selection_candidate_guided_confirmation_manifest.py

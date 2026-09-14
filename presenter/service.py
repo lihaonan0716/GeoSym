@@ -6,7 +6,6 @@ import re
 from pathlib import Path
 from typing import Any, Dict, List, Tuple
 
-from i18n import LANG_ZH
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +71,7 @@ def get_sample_image_path(sample_id: str) -> str | None:
     return str(image_path) if image_path.exists() else None
 
 
-def build_sample_overview(sample_id: str, lang: str = LANG_ZH) -> str:
+def build_sample_overview(sample_id: str, lang: str = "English") -> str:
     if not sample_id:
         return ""
     try:
@@ -80,11 +79,11 @@ def build_sample_overview(sample_id: str, lang: str = LANG_ZH) -> str:
     except Exception as exc:
         return f"### Sample Error\n\n`{exc}`"
 
-    is_zh = lang == LANG_ZH
-    title = "### Presenter Sample" if not is_zh else "### Presenter 样例"
+    is_zh = False
+    title = "### Presenter Sample"
     labels = {
-        "source": "Source" if not is_zh else "来源",
-        "question": "Question" if not is_zh else "问题",
+        "source": "Source",
+        "question": "Question",
     }
     lines = [
         title,
@@ -481,13 +480,13 @@ def _run_pairwise_compare(compare_adapter, image_path: str, sample: Dict[str, An
 # ---------------------------------------------------------------------------
 
 def _build_direct_markdown(result: Dict[str, Any], lang: str) -> str:
-    is_zh = lang == LANG_ZH
+    is_zh = False
     parsed = result["parsed_response"]
-    title = "## Direct LLM" if not is_zh else "## 纯 LLM"
-    evidence_title = "Evidence" if not is_zh else "证据"
-    answer_label = "Answer" if not is_zh else "回答"
-    confidence_label = "Confidence" if not is_zh else "置信度"
-    raw_title = "Raw response" if not is_zh else "原始响应"
+    title = "## Direct LLM"
+    evidence_title = "Evidence"
+    answer_label = "Answer"
+    confidence_label = "Confidence"
+    raw_title = "Raw response"
     lines = [
         title,
         "",
@@ -506,13 +505,13 @@ def _build_direct_markdown(result: Dict[str, Any], lang: str) -> str:
 
 
 def _build_geosym_markdown(result: Dict[str, Any], lang: str) -> str:
-    is_zh = lang == LANG_ZH
+    is_zh = False
     parsed = result["final_answer"]
     title = "## GeoSym"
-    evidence_title = "Evidence" if not is_zh else "证据"
-    answer_label = "Answer" if not is_zh else "回答"
-    confidence_label = "Confidence" if not is_zh else "置信度"
-    raw_title = "Raw response" if not is_zh else "原始响应"
+    evidence_title = "Evidence"
+    answer_label = "Answer"
+    confidence_label = "Confidence"
+    raw_title = "Raw response"
     lines = [
         title,
         "",
@@ -531,12 +530,12 @@ def _build_geosym_markdown(result: Dict[str, Any], lang: str) -> str:
 
 
 def _build_pairwise_markdown(result: Dict[str, Any], lang: str) -> str:
-    is_zh = lang == LANG_ZH
+    is_zh = False
     parsed = result["parsed"]
-    title = "## Pairwise comparison" if not is_zh else "## 成对比较结论"
-    summary_label = "Summary" if not is_zh else "总结"
-    dims_label = "Improvement dimensions" if not is_zh else "提升维度"
-    just_label = "Justification" if not is_zh else "理由"
+    title = "## Pairwise comparison"
+    summary_label = "Summary"
+    dims_label = "Improvement dimensions"
+    just_label = "Justification"
     lines = [
         title,
         "",
@@ -559,8 +558,8 @@ def _build_pairwise_markdown(result: Dict[str, Any], lang: str) -> str:
 
 
 def _build_trace_markdown(result: Dict[str, Any], lang: str) -> str:
-    is_zh = lang == LANG_ZH
-    title = "## GeoSym internal stages" if not is_zh else "## GeoSym 内部阶段"
+    is_zh = False
+    title = "## GeoSym internal stages"
     lines = [title, ""]
 
     # M0 = Visual Evidence Extraction (Enhanced: OCR Ruler + LLM Locate + Numerical Measure)
@@ -632,7 +631,7 @@ def _build_trace_markdown(result: Dict[str, Any], lang: str) -> str:
 
 def _build_m0_enhanced_markdown(geosym_group: Dict[str, Any], lang: str) -> str:
     """构建 M0 增强过程的详细 Markdown，展示 OCR标尺 + LLM定位 + 数值计算 的完整链路。"""
-    is_zh = lang == LANG_ZH
+    is_zh = False
     m0 = geosym_group.get("M0", {})
     enhanced = m0.get("enhanced", False)
     diag = m0.get("ruler_diagnostics", {})
@@ -641,32 +640,32 @@ def _build_m0_enhanced_markdown(geosym_group: Dict[str, Any], lang: str) -> str:
     lines = []
 
     if not enhanced:
-        fallback_title = "M0 Fallback: Pure LLM Mode" if not is_zh else "M0 降级: 纯 LLM 模式"
+        fallback_title = "M0 Fallback: Pure LLM Mode"
         lines.append(f"### {fallback_title}")
         lines.append("")
-        reason = diag.get("error", "Ruler construction failed" if not is_zh else "标尺构建失败")
-        lines.append(f"- **{'Reason' if not is_zh else '原因'}**: {reason}")
-        lines.append(f"- **{'OCR boxes detected' if not is_zh else 'OCR 检测到的文本框'}**: {diag.get('ocr_boxes', 'N/A')}")
-        lines.append(f"- **{'X ticks' if not is_zh else 'X轴刻度'}**: {diag.get('x_tick_count', 0)}")
-        lines.append(f"- **{'Y ticks' if not is_zh else 'Y轴刻度'}**: {diag.get('y_tick_count', 0)}")
+        reason = diag.get("error", "Ruler construction failed")
+        lines.append(f"- **{'Reason'}**: {reason}")
+        lines.append(f"- **{'OCR boxes detected'}**: {diag.get('ocr_boxes', 'N/A')}")
+        lines.append(f"- **{'X ticks'}**: {diag.get('x_tick_count', 0)}")
+        lines.append(f"- **{'Y ticks'}**: {diag.get('y_tick_count', 0)}")
         return "\n".join(lines)
 
     # ===== Phase 1: Ruler =====
-    ruler_title = "### Phase 1: Coordinate Ruler (OCR)" if not is_zh else "### Phase 1: 坐标标尺 (OCR 建立)"
+    ruler_title = "### Phase 1: Coordinate Ruler (OCR)"
     lines.append(ruler_title)
     lines.append("")
-    lines.append(f"- **{'Confidence' if not is_zh else '置信度'}**: `{trace.get('ruler_confidence', 'N/A')}`")
-    lines.append(f"- **{'X-axis scale' if not is_zh else 'X轴类型'}**: `{trace.get('x_axis_scale', 'N/A')}`")
-    lines.append(f"- **{'Y-axis scale' if not is_zh else 'Y轴类型'}**: `{trace.get('y_axis_scale', 'N/A')}`")
+    lines.append(f"- **{'Confidence'}**: `{trace.get('ruler_confidence', 'N/A')}`")
+    lines.append(f"- **{'X-axis scale'}**: `{trace.get('x_axis_scale', 'N/A')}`")
+    lines.append(f"- **{'Y-axis scale'}**: `{trace.get('y_axis_scale', 'N/A')}`")
 
     # 展示刻度标签映射
     x_ticks = diag.get("x_tick_labels", [])
     y_ticks = diag.get("y_tick_labels", [])
     if x_ticks:
         lines.append("")
-        lines.append(f"**{'X-axis tick marks' if not is_zh else 'X轴刻度标记'}** ({len(x_ticks)}):")
+        lines.append(f"**{'X-axis tick marks'}** ({len(x_ticks)}):")
         lines.append("")
-        lines.append(f"| {'Pixel' if not is_zh else '像素位置'} | {'Value' if not is_zh else '刻度值'} |")
+        lines.append(f"| {'Pixel'} | {'Value'} |")
         lines.append("|--------|-------|")
         for t in x_ticks[:10]:
             lines.append(f"| {t['px']} | {t['text']} |")
@@ -675,9 +674,9 @@ def _build_m0_enhanced_markdown(geosym_group: Dict[str, Any], lang: str) -> str:
 
     if y_ticks:
         lines.append("")
-        lines.append(f"**{'Y-axis tick marks' if not is_zh else 'Y轴刻度标记'}** ({len(y_ticks)}):")
+        lines.append(f"**{'Y-axis tick marks'}** ({len(y_ticks)}):")
         lines.append("")
-        lines.append(f"| {'Pixel' if not is_zh else '像素位置'} | {'Value' if not is_zh else '刻度值'} |")
+        lines.append(f"| {'Pixel'} | {'Value'} |")
         lines.append("|--------|-------|")
         for t in y_ticks:
             lines.append(f"| {t['px']} | {t['text']} |")
@@ -687,36 +686,36 @@ def _build_m0_enhanced_markdown(geosym_group: Dict[str, Any], lang: str) -> str:
     if x_map:
         lines.append("")
         s, o = x_map.get('scale', 0), x_map.get('offset', 0)
-        lines.append(f"**{'X-axis linear fit' if not is_zh else 'X轴线性拟合'}**: `value = {s:.6f} * pixel + {o:.2f}`")
+        lines.append(f"**{'X-axis linear fit'}**: `value = {s:.6f} * pixel + {o:.2f}`")
     if y_map:
         s, o = y_map.get('scale', 0), y_map.get('offset', 0)
-        lines.append(f"**{'Y-axis linear fit' if not is_zh else 'Y轴线性拟合'}**: `value = {s:.6f} * pixel + {o:.2f}`")
+        lines.append(f"**{'Y-axis linear fit'}**: `value = {s:.6f} * pixel + {o:.2f}`")
 
     # ===== Phase 2: LLM Locate =====
     lines.append("")
-    locate_title = "### Phase 2: LLM Locate" if not is_zh else "### Phase 2: LLM 像素定位"
+    locate_title = "### Phase 2: LLM Locate"
     lines.append(locate_title)
     lines.append("")
 
     m0_parsed = m0.get("parsed", {})
     candidate_facts = m0_parsed.get("candidate_facts", [])
     points_measured = trace.get("points_measured", 0)
-    lines.append(f"- **{'Points located' if not is_zh else '定位点数'}**: {points_measured}")
-    lines.append(f"- **{'High confidence' if not is_zh else '高置信度'}**: {trace.get('points_high_conf', 0)}")
+    lines.append(f"- **{'Points located'}**: {points_measured}")
+    lines.append(f"- **{'High confidence'}**: {trace.get('points_high_conf', 0)}")
 
     # ===== Phase 3: Numerical Measurement =====
     lines.append("")
-    measure_title = "### Phase 3: Numerical Measurement" if not is_zh else "### Phase 3: 数值计算测量"
+    measure_title = "### Phase 3: Numerical Measurement"
     lines.append(measure_title)
     lines.append("")
-    lines.append(f"- **{'Method' if not is_zh else '计算方法'}**: `{trace.get('method', 'N/A')}`")
-    lines.append(f"- **{'Derived quantities' if not is_zh else '衍生量计算'}**: {trace.get('derived_quantities', 0)}")
+    lines.append(f"- **{'Method'}**: `{trace.get('method', 'N/A')}`")
+    lines.append(f"- **{'Derived quantities'}**: {trace.get('derived_quantities', 0)}")
 
     if candidate_facts:
         lines.append("")
-        h_val = "Value" if not is_zh else "数值"
-        h_pixel = "Pixel → Ruler" if not is_zh else "像素 → 标尺计算"
-        h_conf = "Confidence" if not is_zh else "置信度"
+        h_val = "Value"
+        h_pixel = "Pixel → Ruler"
+        h_conf = "Confidence"
         lines.append(f"| {h_val} | {h_pixel} | {h_conf} |")
         lines.append("|------|-------------|------|")
         for fact in candidate_facts:
@@ -741,7 +740,7 @@ def _build_m0_enhanced_markdown(geosym_group: Dict[str, Any], lang: str) -> str:
     useful_facts = m0_parsed.get("useful_facts", [])
     if useful_facts:
         lines.append("")
-        facts_title = "### Fused Evidence" if not is_zh else "### 融合证据 (送入 L1/L2/L3)"
+        facts_title = "### Fused Evidence"
         lines.append(facts_title)
         lines.append("")
         for f in useful_facts:
@@ -752,13 +751,13 @@ def _build_m0_enhanced_markdown(geosym_group: Dict[str, Any], lang: str) -> str:
 
 
 def _build_status_markdown(sample: Dict[str, Any], analysis_model: str, comparison_model: str, output_dir: Path, lang: str) -> str:
-    is_zh = lang == LANG_ZH
-    title = "### Presenter Run Complete" if not is_zh else "### Presenter 运行完成"
+    is_zh = False
+    title = "### Presenter Run Complete"
     labels = {
-        "sample": "Sample" if not is_zh else "样例",
-        "analysis": "Analysis model" if not is_zh else "主分析模型",
-        "compare": "Comparison model" if not is_zh else "比较模型",
-        "dir": "Output directory" if not is_zh else "输出目录",
+        "sample": "Sample",
+        "analysis": "Analysis model",
+        "compare": "Comparison model",
+        "dir": "Output directory",
     }
     return "\n".join([
         title,
@@ -791,9 +790,9 @@ def _persist_presenter_run(output_dir: Path, sample: Dict[str, Any], direct_grou
 # Main entry point
 # ---------------------------------------------------------------------------
 
-def run_presenter_showcase(sample_id: str, analysis_model: str, comparison_model: str, lang: str = LANG_ZH):
+def run_presenter_showcase(sample_id: str, analysis_model: str, comparison_model: str, lang: str = "English"):
     if not sample_id:
-        msg = "Please select a sample first." if lang != LANG_ZH else "请先选择样例。"
+        msg = "Please select a sample first."
         return msg, "", "", "", "", "", ""
     try:
         sample = _load_sample_spec(sample_id)
@@ -823,5 +822,5 @@ def run_presenter_showcase(sample_id: str, analysis_model: str, comparison_model
         return status_md, sample_md, direct_md, geosym_md, pairwise_md, trace_md, m0_enhanced_md
     except Exception as exc:
         logger.exception("Presenter showcase failed")
-        title = "### Presenter Run Failed" if lang != LANG_ZH else "### Presenter 运行失败"
+        title = "### Presenter Run Failed"
         return f"{title}\n\n`{exc}`", "", "", "", "", "", ""

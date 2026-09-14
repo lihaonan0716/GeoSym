@@ -16,7 +16,6 @@ import os
 from openai import OpenAI
 
 from .base import BaseLLMAdapter
-from i18n import t, get_lang
 
 # ZhipuAI OpenAI-compatible endpoint
 ZHIPUAI_BASE_URL = "https://open.bigmodel.cn/api/paas/v4/"
@@ -43,7 +42,7 @@ class GLMAdapter(BaseLLMAdapter):
     def _get_client(self) -> OpenAI:
         if self._client is None:
             if not self.api_key:
-                raise ValueError(t("eval_glm_key_missing", get_lang()))
+                raise ValueError('ZhipuAI API key not provided. Get one at https://bigmodel.cn/usercenter/proj-mgmt/apikeys')
             timeout = float(os.environ.get("GEOSYM_GLM_TIMEOUT_SECONDS", "180.0"))
             max_retries = int(os.environ.get("GEOSYM_GLM_MAX_RETRIES", "2"))
             self._client = OpenAI(

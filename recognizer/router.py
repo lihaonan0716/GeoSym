@@ -26,7 +26,6 @@ from pathlib import Path as _Path
 _exp_root = _Path(__file__).resolve().parent.parent
 if str(_exp_root) not in _sys.path:
     _sys.path.insert(0, str(_exp_root))
-from i18n import log_tag as _lt  # noqa: E402
 
 # 获取日志记录器
 logger = logging.getLogger(__name__)
@@ -52,10 +51,10 @@ def _decode_chart_image(chart_image_base64: Optional[str]) -> Optional[np.ndarra
         image_array = np.frombuffer(image_bytes, dtype=np.uint8)
         image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
         if image is None:
-            raise ValueError("OpenCV 解码失败")
+            raise ValueError("OpenCV decode failed")
         return image
     except Exception as exc:
-        logger.error(f"chart_image 解码失败: {exc}", exc_info=True)
+        logger.error(f"chart_image decode failed: {exc}", exc_info=True)
         return None
 
 @router.get("/")
@@ -107,7 +106,7 @@ async def recognize_coordinates(
                 status_code=400,
                 content={
                     "status": "error",
-                    "message": "必须提供文件或image_base64参数",
+                    "message": "A file or image_base64 parameter is required",
                     "timestamp": datetime.now().isoformat(),
                     "duration": int(time.time() * 1000) - start,
                 },
@@ -121,7 +120,7 @@ async def recognize_coordinates(
                 status_code=400,
                 content={
                     "status": "error",
-                    "message": f"ocr_result 不是有效的JSON字符串: {str(e)}",
+                    "message": f"ocr_result is not a valid JSON string: {str(e)}",
                     "timestamp": datetime.now().isoformat(),
                     "duration": int(time.time() * 1000) - start,
                 },
@@ -152,7 +151,7 @@ async def recognize_coordinates(
                 status_code=422,
                 content={
                     "status": "error",
-                    "message": result.get("error", "处理失败"),
+                    "message": result.get("error", "Processing failed"),
                     "result": result,
                     "timestamp": datetime.now().isoformat(),
                     "duration": int(time.time() * 1000) - start,
@@ -172,7 +171,7 @@ async def recognize_coordinates(
             chart_image_base64 = result["stages"]["stage0"]["chart_image"]
             processed_image = _decode_chart_image(chart_image_base64)
             if processed_image is None:
-                raise ValueError("chart_image 无法解码")
+                raise ValueError("chart_image could not be decoded")
 
             code = draw_image_to_base64(
                 processed_image, transformed_points, stage1_data
@@ -196,12 +195,12 @@ async def recognize_coordinates(
         )
 
     except Exception as e:
-        logger.error(f"坐标识别失败: {str(e)}", exc_info=True)
+        logger.error(f"coordinate recognition failed: {str(e)}", exc_info=True)
         return JSONResponse(
             status_code=500,
             content={
                 "status": "error",
-                "message": f"服务器内部错误: {str(e)}",
+                "message": f"Internal server error: {str(e)}",
                 "timestamp": datetime.now().isoformat(),
                 "duration": int(time.time() * 1000) - start,
             },
@@ -223,12 +222,12 @@ def draw_image_to_base64(processed_image, transformed_points, stage1_data):
         )
 
     # 1. 在AI增强后的图上绘制标注
-    print(f"[{_lt('阶段3')}] 在AI增强图上绘制标注...")
+    print(f"[Stage3] Drawing annotations on the AI-enhanced image...")
 
     # 2. 在真正的原始图上绘制标注（如果有的话）
     annotated_raw_rgb = None
     if processed_image is not None:
-        print(f"[{_lt('阶段3')}] 在原始Chart图上绘制标注...")
+        print(f"[Stage3] Drawing annotations on the original chart image...")
         annotated_raw = draw_annotations_on_image(processed_image, transformed_points)
         annotated_raw_rgb = cv2.cvtColor(annotated_raw, cv2.COLOR_BGR2RGB)
 

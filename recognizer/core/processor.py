@@ -22,7 +22,6 @@ from pathlib import Path as _Path
 _exp_root = _Path(__file__).resolve().parent.parent.parent
 if str(_exp_root) not in _sys.path:
     _sys.path.insert(0, str(_exp_root))
-from i18n import log_tag as _lt  # noqa: E402
 
 class CoordinateProcessor:
     """
@@ -52,14 +51,14 @@ class CoordinateProcessor:
             # 判断是URL还是base64
             if image_input.startswith('http://') or image_input.startswith('https://'):
                 # 从URL加载
-                print(f"[{_lt('图像加载')}] 从URL加载图像: {image_input[:50]}...")
+                print(f"[ImageLoad] Loading image from URL: {image_input[:50]}...")
                 response = requests.get(image_input, timeout=30)
                 response.raise_for_status()
                 image_data = response.content
                 pil_image = Image.open(BytesIO(image_data))
             else:
                 # 从base64加载
-                print(f"[{_lt('图像加载')}] 从base64加载图像")
+                print(f"[ImageLoad] Loading image from base64")
                 # 移除可能的前缀
                 if ',' in image_input:
                     image_input = image_input.split(',', 1)[1]
@@ -82,13 +81,13 @@ class CoordinateProcessor:
                 image_rgb = cv2.cvtColor(image_array, cv2.COLOR_RGBA2RGB)
                 image_bgr = cv2.cvtColor(image_rgb, cv2.COLOR_RGB2BGR)
             else:
-                raise ValueError(f"不支持的图像格式: {image_array.shape}")
+                raise ValueError(f"textsupportstextimagetext: {image_array.shape}")
             
-            print(f"[{_lt('图像加载')}] 成功，尺寸: {image_bgr.shape[1]}x{image_bgr.shape[0]}")
+            print(f"[ImageLoad] Succeeded, size: {image_bgr.shape[1]}x{image_bgr.shape[0]}")
             return image_bgr
             
         except Exception as e:
-            print(f"[{_lt('图像加载')}] 失败: {str(e)}")
+            print(f"[ImageLoad] Failed: {str(e)}")
             return None
 
     def _chart_image_to_base64(self, image: Optional[np.ndarray], quality: int = 90) -> Optional[str]:
@@ -107,7 +106,7 @@ class CoordinateProcessor:
 
         success, buffer = cv2.imencode(".jpg", image, [cv2.IMWRITE_JPEG_QUALITY, quality])
         if not success:
-            print(f"[{_lt('图像编码')}] chart_image 编码失败")
+            print(f"[ImageEncode] chart_image textFailed")
             return None
 
         base64_str = base64.b64encode(buffer.tobytes()).decode("utf-8")
@@ -140,11 +139,11 @@ class CoordinateProcessor:
             - debug_info: 调试信息
         """
         print("\n" + "="*50)
-        print("阶段0: Chart提取（从OCR数据）")
+        print("Stage 0: chart extraction from OCR data")
         print("="*50)
-        print(f"[{_lt('参数')}] horizontal_tolerance = {horizontal_tolerance}")
-        print(f"[{_lt('参数')}] vertical_tolerance = {vertical_tolerance}")
-        print(f"[{_lt('参数')}] interval_percentile = {interval_percentile}")
+        print(f"[Params] horizontal_tolerance = {horizontal_tolerance}")
+        print(f"[Params] vertical_tolerance = {vertical_tolerance}")
+        print(f"[Params] interval_percentile = {interval_percentile}")
         
         try:
             # 使用ChartExtractor处理OCR结果（不调用API）
@@ -157,17 +156,17 @@ class CoordinateProcessor:
             )
             
             if result['success']:
-                print(f"[Chart提取] 成功")
-                print(f"  - Chart区域: {result['chart_bbox']}")
-                print(f"  - X轴标签数: {len(result['x_tick_labels'])}")
-                print(f"  - Y轴标签数: {len(result['y_tick_labels'])}")
+                print(f"[Charttext] text")
+                print(f"  - Chart region: {result['chart_bbox']}")
+                print(f"  - X-axis label count: {len(result['x_tick_labels'])}")
+                print(f"  - Y-axis label count: {len(result['y_tick_labels'])}")
             else:
-                print(f"[Chart提取] 失败: {result.get('error', '未知错误')}")
+                print(f"[Charttext] Failed: {result.get('error', 'unknown error')}")
             
             return result
             
         except Exception as e:
-            print(f"[Chart提取] 异常: {str(e)}")
+            print(f"[Charttext] Exception: {str(e)}")
             import traceback
             traceback.print_exc()
             return {
@@ -195,7 +194,7 @@ class CoordinateProcessor:
             - error: 错误信息（如果失败）
         """
         print("\n" + "="*50)
-        print(f"阶段0.5: AI图像增强 (模型: {model_id})")
+        print(f"Stage 0.5: AI image enhancement (model: {model_id})")
         print("="*50)
         
         try:
@@ -206,12 +205,12 @@ class CoordinateProcessor:
             )
             
             if result['success']:
-                print(f"[AI增强] 成功")
+                print(f"[AIEnhance] text")
                 # 尺寸调整：增强后的图像调整回原图尺寸
                 enhanced_image = result['processed_image']
                 transform_params = None
                 if enhanced_image.shape[:2] != image.shape[:2]:
-                    print(f"[AI增强] 调整尺寸: {enhanced_image.shape[1]}x{enhanced_image.shape[0]} -> {image.shape[1]}x{image.shape[0]}")
+                    print(f"[AIEnhance] Resized: {enhanced_image.shape[1]}x{enhanced_image.shape[0]} -> {image.shape[1]}x{image.shape[0]}")
                     enhanced_image, transform_params = self.preprocessor.resize_to_match_original(
                         enhanced_image, 
                         image.shape[:2]
@@ -228,13 +227,13 @@ class CoordinateProcessor:
                         'original_size': (image.shape[1], image.shape[0])
                     }
             else:
-                print(f"[AI增强] 失败: {result.get('error', '未知错误')}")
+                print(f"[AIEnhance] Failed: {result.get('error', 'unknown error')}")
             
             result['model_used'] = model_id
             return result
             
         except Exception as e:
-            print(f"[AI增强] 异常: {str(e)}")
+            print(f"[AIEnhance] Exception: {str(e)}")
             import traceback
             traceback.print_exc()
             return {
@@ -288,26 +287,26 @@ class CoordinateProcessor:
             - error: 错误信息（如果失败）
         """
         print("\n" + "="*50)
-        print("阶段1: 图像预处理")
+        print("Stage 1: image preprocessing")
         print("="*50)
-        print(f"[{_lt('开关')}] enable_curve_erase = {enable_curve_erase}")
-        print(f"[{_lt('开关')}] enable_dashed_line_connection = {enable_dashed_line_connection}")
-        print(f"[{_lt('开关')}] enable_perspective_correction = {enable_perspective_correction}")
-        print(f"[{_lt('开关')}] enable_rotation_correction = {enable_rotation_correction}")
-        print(f"[{_lt('旋转校正')}] rotation_hough_threshold = {rotation_hough_threshold}")
-        print(f"[{_lt('旋转校正')}] rotation_min_line_length = {rotation_min_line_length}")
-        print(f"[{_lt('旋转校正')}] rotation_max_line_gap = {rotation_max_line_gap}")
-        print(f"[{_lt('旋转校正')}] rotation_angle_threshold = {rotation_angle_threshold}")
-        print(f"[{_lt('网格检测')}] grid_hough_threshold = {grid_hough_threshold}")
-        print(f"[{_lt('网格检测')}] grid_min_line_length = {grid_min_line_length}")
-        print(f"[{_lt('网格检测')}] grid_max_line_gap = {grid_max_line_gap}")
-        print(f"[{_lt('网格检测')}] grid_angle_threshold = {grid_angle_threshold}")
-        print(f"[{_lt('线段合并')}] merge_distance_threshold = {merge_distance_threshold}")
-        print(f"[{_lt('虚线连接')}] dashed_gap_threshold = {dashed_gap_threshold}")
-        print(f"[{_lt('虚线连接')}] dashed_collinear_threshold = {dashed_collinear_threshold}")
-        print(f"[{_lt('曲线擦除')}] curve_saturation_threshold = {curve_saturation_threshold}")
-        print(f"[{_lt('曲线擦除')}] curve_value_threshold = {curve_value_threshold}")
-        print(f"[{_lt('曲线擦除')}] curve_feather_size = {curve_feather_size}")
+        print(f"[Toggle] enable_curve_erase = {enable_curve_erase}")
+        print(f"[Toggle] enable_dashed_line_connection = {enable_dashed_line_connection}")
+        print(f"[Toggle] enable_perspective_correction = {enable_perspective_correction}")
+        print(f"[Toggle] enable_rotation_correction = {enable_rotation_correction}")
+        print(f"[RotCorrection] rotation_hough_threshold = {rotation_hough_threshold}")
+        print(f"[RotCorrection] rotation_min_line_length = {rotation_min_line_length}")
+        print(f"[RotCorrection] rotation_max_line_gap = {rotation_max_line_gap}")
+        print(f"[RotCorrection] rotation_angle_threshold = {rotation_angle_threshold}")
+        print(f"[GridDetect] grid_hough_threshold = {grid_hough_threshold}")
+        print(f"[GridDetect] grid_min_line_length = {grid_min_line_length}")
+        print(f"[GridDetect] grid_max_line_gap = {grid_max_line_gap}")
+        print(f"[GridDetect] grid_angle_threshold = {grid_angle_threshold}")
+        print(f"[LineMerge] merge_distance_threshold = {merge_distance_threshold}")
+        print(f"[DashedConn] dashed_gap_threshold = {dashed_gap_threshold}")
+        print(f"[DashedConn] dashed_collinear_threshold = {dashed_collinear_threshold}")
+        print(f"[CurveErase] curve_saturation_threshold = {curve_saturation_threshold}")
+        print(f"[CurveErase] curve_value_threshold = {curve_value_threshold}")
+        print(f"[CurveErase] curve_feather_size = {curve_feather_size}")
         
         try:
             # process() 返回 (processed_image, intermediate_results)
@@ -339,9 +338,9 @@ class CoordinateProcessor:
             h_lines = intermediate_results.get('merged_h_lines', [])
             v_lines = intermediate_results.get('merged_v_lines', [])
             
-            print(f"[{_lt('预处理')}] 成功")
-            print(f"  - 水平网格线: {len(h_lines)}条")
-            print(f"  - 垂直网格线: {len(v_lines)}条")
+            print(f"[Preprocess] text")
+            print(f"  - horizontal grid lines: {len(h_lines)}text")
+            print(f"  - vertical grid lines: {len(v_lines)}text")
             
             # 保存调试图片
             # try:
@@ -367,9 +366,9 @@ class CoordinateProcessor:
             #         cv2.line(vis_image, (int(x), 0), (int(x), vis_image.shape[0]), (255, 0, 0), 2)
             #     cv2.imwrite(f"{debug_dir}/3_final_grid_lines_{timestamp}.jpg", vis_image)
                 
-            #     print(f"[{_lt('调试')}] 阶段1图片已保存到: {debug_dir}/")
+            #     print(f"[Debug] text1imagetext: {debug_dir}/")
             # except Exception as e:
-            #     print(f"[{_lt('调试')}] 保存图片失败: {str(e)}")
+            #     print(f"[Debug] textimageFailed: {str(e)}")
             
             return {
                 'success': True,
@@ -380,7 +379,7 @@ class CoordinateProcessor:
             }
             
         except Exception as e:
-            print(f"[{_lt('预处理')}] 异常: {str(e)}")
+            print(f"[Preprocess] Exception: {str(e)}")
             import traceback
             traceback.print_exc()
             return {
@@ -429,15 +428,15 @@ class CoordinateProcessor:
             - error: 错误信息（如果失败）
         """
         print("\n" + "="*50)
-        print("阶段2: 坐标识别")
+        print("Stage 2: coordinate recognition")
         print("="*50)
-        print(f"[{_lt('参数')}] tolerance = {tolerance}")
-        print(f"[{_lt('参数')}] enable_morph_connect = {enable_morph_connect}")
-        print(f"[{_lt('参数')}] morph_kernel_size = {morph_kernel_size}")
-        print(f"[{_lt('参数')}] morph_iterations = {morph_iterations}")
-        print(f"[{_lt('参数')}] color_saturation_threshold = {color_saturation_threshold}")
-        print(f"[{_lt('参数')}] color_value_threshold = {color_value_threshold}")
-        print(f"[{_lt('参数')}] integer_approximation_threshold = {integer_approximation_threshold}")
+        print(f"[Params] tolerance = {tolerance}")
+        print(f"[Params] enable_morph_connect = {enable_morph_connect}")
+        print(f"[Params] morph_kernel_size = {morph_kernel_size}")
+        print(f"[Params] morph_iterations = {morph_iterations}")
+        print(f"[Params] color_saturation_threshold = {color_saturation_threshold}")
+        print(f"[Params] color_value_threshold = {color_value_threshold}")
+        print(f"[Params] integer_approximation_threshold = {integer_approximation_threshold}")
         
         try:
             # 设置参数
@@ -464,16 +463,16 @@ class CoordinateProcessor:
             
             # 检查是否成功（不能只检查 'error' in result，因为 error 键总是存在）
             if not result.get('success', False) or result.get('error'):
-                error_msg = result.get('error', '未知错误')
-                print(f"[{_lt('坐标识别')}] 失败: {error_msg}")
+                error_msg = result.get('error', 'unknown error')
+                print(f"[CoordRecog] Failed: {error_msg}")
                 return {
                     'success': False,
                     'error': error_msg
                 }
             
-            print(f"[{_lt('坐标识别')}] 成功")
+            print(f"[CoordRecog] text")
             if 'intersections' in result:
-                print(f"  - 检测到交点: {len(result['intersections'])}个")
+                print(f"  - Detected intersections: {len(result['intersections'])}text")
             
             # 从 axes_info 提取坐标系信息
             axes_info = result.get('axes_info', {})
@@ -570,10 +569,10 @@ class CoordinateProcessor:
             #         cv2.circle(vis_all, (px, py), 7, (255, 255, 255), 1)
             #     cv2.imwrite(f"{debug_dir}/6_all_combined_{timestamp}.jpg", vis_all)
                 
-            #     print(f"[{_lt('调试')}] 阶段2图片已保存到: {debug_dir}/")
-            #     print(f"  - 输入图像、曲线二值化、坐标轴、网格映射、交点、综合图")
+            #     print(f"[Debug] text2imagetext: {debug_dir}/")
+            #     print(f"  - textimage, curvetext, axis, text, intersection, text")
             # except Exception as e:
-            #     print(f"[{_lt('调试')}] 保存图片失败: {str(e)}")
+            #     print(f"[Debug] textimageFailed: {str(e)}")
             
             # 构建返回结果
             return {
@@ -598,7 +597,7 @@ class CoordinateProcessor:
             }
             
         except Exception as e:
-            print(f"[{_lt('坐标识别')}] 异常: {str(e)}")
+            print(f"[CoordRecog] Exception: {str(e)}")
             import traceback
             traceback.print_exc()
             return {
@@ -746,7 +745,7 @@ class CoordinateProcessor:
             完整结果字典
         """
         print("\n" + "="*70)
-        print(" 开始完整处理流程 ")
+        print(" Starting full processing pipeline ")
         print("="*70)
         
         # 默认配置
@@ -824,7 +823,7 @@ class CoordinateProcessor:
                         result['ai_transform_params'] = ai_transform_params
                         
                         # 对刻度标签进行正向变换
-                        print(f"[AI增强] 对刻度标签进行正向变换...")
+                        print(f"[AIEnhance] Applying forward transform to tick labels...")
                         if x_tick_labels:
                             x_tick_labels = self.preprocessor.transform_labels_for_ai_enhanced(
                                 x_tick_labels, ai_transform_params
@@ -909,7 +908,7 @@ class CoordinateProcessor:
                 }
                 result['ruler_enhancement'] = ruler_enhancement
             except Exception as e:
-                print(f"[阶段2.5] Ruler增强跳过: {e}")
+                print(f"[Stage 2.5] Ruler enhancement skipped: {e}")
                 result['stages']['stage25'] = {
                     'status': 'skipped',
                     'error': str(e),
@@ -923,7 +922,7 @@ class CoordinateProcessor:
             
             if intersections or reasoning_intersections:
                 print("\n" + "="*50)
-                print("阶段3: 坐标逆变换")
+                print("Stage 3: inverse coordinate transform")
                 print("="*50)
                 
                 # 获取变换信息
@@ -938,20 +937,20 @@ class CoordinateProcessor:
                 needs_transform = rotation_matrix is not None or perspective_matrix is not None
                 
                 if needs_transform:
-                    print(f"[{_lt('逆变换')}] 检测到变换:")
+                    print(f"[InvTransform] Detected transforms:")
                     if rotation_matrix is not None:
-                        print(f"  - 旋转变换: 启用")
+                        print(f"  - rotation transform: enabled")
                     if perspective_matrix is not None:
-                        print(f"  - 透视变换: 启用")
-                    print(f"  - 裁剪偏移: {crop_offset}")
+                        print(f"  - perspective transform: enabled")
+                    print(f"  - crop offset: {crop_offset}")
                     
                     # 获取AI增强变换参数
                     ai_transform_params = result.get('ai_transform_params')
                     if ai_transform_params:
-                        print(f"  - AI增强逆变换: 启用")
+                        print(f"  - AIEnhancetext: enabled")
                     
-                    print(f"  - 可视化交点数量: {len(intersections)}")
-                    print(f"  - 推理交点数量: {len(reasoning_intersections)}")
+                    print(f"  - visualization intersection count: {len(intersections)}")
+                    print(f"  - reasoning intersection count: {len(reasoning_intersections)}")
                     
                     # 执行逆变换
                     try:
@@ -972,15 +971,15 @@ class CoordinateProcessor:
                         intersections = _inverse_transform(intersections)
                         reasoning_intersections = _inverse_transform(reasoning_intersections)
                         print(
-                            f"[{_lt('逆变换')}] 成功完成，"
+                            f"[InvTransform] 成功完成，"
                             f"{len(intersections)}个可视化交点和"
                             f"{len(reasoning_intersections)}个推理交点已转换到原图坐标"
                         )
                         
                     except Exception as e:
-                        print(f"[{_lt('逆变换')}] 警告: 逆变换失败，使用原始坐标: {str(e)}")
+                        print(f"[InvTransform] Warning: textFailed, textoriginalcoordinate: {str(e)}")
                 else:
-                    print(f"[{_lt('逆变换')}] 无需变换（未进行旋转或透视校正）")
+                    print(f"[InvTransform] No transform needed (no rotation or perspective correction was applied)")
                 
                 result['stages']['stage3'] = {
                     'status': 'success',
@@ -990,7 +989,7 @@ class CoordinateProcessor:
                     'duration': int(time.time() * 1000) - stage3_start_time
                 }
             else:
-                print(f"\n[{_lt('阶段3')}] 跳过（无交点）")
+                print(f"\n[Stage3] Skipped (no intersections)")
                 result['stages']['stage3'] = {
                     'status': 'skipped',
                     'reason': 'no_intersections',
@@ -1011,9 +1010,9 @@ class CoordinateProcessor:
                         x_tick_labels=x_tick_labels,
                         y_tick_labels=y_tick_labels,
                     )
-                    print(f"[{_lt('阶段3')}] 已在原始Chart图像上绘制标注")
+                    print(f"[Stage3] Annotations drawn on original chart image")
                 except Exception as e:
-                    print(f"[{_lt('阶段3')}] 绘制标注失败: {str(e)}")
+                    print(f"[Stage3] textFailed: {str(e)}")
             
             # 构建最终结果
             result['success'] = True
@@ -1034,13 +1033,13 @@ class CoordinateProcessor:
             }
             
             print("\n" + "="*70)
-            print(" 完整处理流程成功完成 ")
+            print(" Full processing pipeline completed successfully ")
             print("="*70)
             
             return result
             
         except Exception as e:
-            print(f"\n[{_lt('完整流程')}] 异常: {str(e)}")
+            print(f"\n[FullPipeline] Exception: {str(e)}")
             import traceback
 
             traceback.print_exc()

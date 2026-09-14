@@ -121,11 +121,11 @@ def setup_logging(
     logging.getLogger("fastapi").setLevel(logging.INFO)
 
     logger = logging.getLogger(__name__)
-    logger.info(f"日志系统初始化完成，日志级别: {log_level}")
+    logger.info(f"Logging initialized, level: {log_level}")
     if log_path_for_message:
-        logger.info(f"日志文件: {log_path_for_message}")
+        logger.info(f"Log file: {log_path_for_message}")
     else:
-        logger.info("日志文件: 未启用（仅控制台输出）")
+        logger.info("Log file: disabled (console only)")
 
     return logger
 
@@ -166,7 +166,7 @@ web_logger = get_web_logger()
 # 创建 FastAPI 应用
 app = FastAPI(
     title="Coordinate Recognizer API 服务",
-    description="高并发 Coordinate Recognizer API 服务",
+    description="High-concurrency Coordinate Recognizer API service",
     version="1.0.0",
     redoc_url="/redoc",
 )
@@ -197,7 +197,7 @@ async def log_requests(request: Request, call_next):
     start_time = datetime.now()
 
     # 记录请求信息
-    logger.info(f"收到请求: {request.method} {request.url.path}")
+    logger.info(f"Received request: {request.method} {request.url.path}")
 
     # 读取请求体，但 Starlette 会缓存结果，后续 handler 仍可访问
     request_body_bytes = await request.body()
@@ -297,13 +297,13 @@ async def log_requests(request: Request, call_next):
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     """全局异常处理"""
-    logger.error(f"未处理的异常: {str(exc)}", exc_info=True)
+    logger.error(f"Unhandled exception: {str(exc)}", exc_info=True)
 
     return JSONResponse(
         status_code=500,
         content={
             "status": "error",
-            "message": "服务器内部错误",
+            "message": "Internal server error",
             "timestamp": datetime.now().isoformat(),
         },
     )
@@ -384,20 +384,20 @@ def start_server(
     cpu_count = multiprocessing.cpu_count()
     process_id = os.getpid()
     logger.info("=" * 60)
-    logger.info("启动 Coordinate Recognizer API 服务")
+    logger.info("Starting Coordinate Recognizer API service")
     logger.info("=" * 60)
-    logger.info(f"进程 ID: {process_id}")
-    logger.info(f"CPU 核心数: {cpu_count}")
-    logger.info(f"服务地址: http://{host}:{port}")
-    logger.info(f"健康检查: http://{host}:{port}/health")
-    logger.info(f"Worker 数量: {workers}")
-    logger.info(f"日志级别: {log_level}")
+    logger.info(f"Process ID: {process_id}")
+    logger.info(f"CPU cores: {cpu_count}")
+    logger.info(f"Service URL: http://{host}:{port}")
+    logger.info(f"Health check: http://{host}:{port}/health")
+    logger.info(f"Worker count: {workers}")
+    logger.info(f"text: {log_level}")
     if log_file_description:
-        logger.info(f"日志文件: {log_file_description}")
+        logger.info(f"Log file: {log_file_description}")
     else:
-        logger.info("日志文件: 未启用（仅控制台输出）")
-    logger.info(f"自动重载: {reload}")
-    logger.info(f"优雅关闭超时: {timeout_graceful_shutdown}秒")
+        logger.info("Log file: disabled (console only)")
+    logger.info(f"Auto reload: {reload}")
+    logger.info(f"Graceful shutdown timeout: {timeout_graceful_shutdown}s")
     logger.info("=" * 60)
 
     # 启动 uvicorn 服务器
@@ -441,7 +441,7 @@ if __name__ == "__main__":
 """
 
     parser = argparse.ArgumentParser(
-        description="启动 Coordinate Recognizer API 服务",
+        description="Start the Coordinate Recognizer API service",
         epilog=examples,
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -449,13 +449,13 @@ if __name__ == "__main__":
         "--host",
         type=str,
         default=os.getenv("API_SERVER_HOST", serverconfig.DEFAULT_HOST),
-        help="服务监听地址",
+        help="Service bind address",
     )
     parser.add_argument(
         "--port",
         type=int,
         default=int(os.getenv("API_SERVER_PORT", str(serverconfig.DEFAULT_PORT))),
-        help="服务端口",
+        help="Service port",
     )
     # 计算默认 worker 数量
     default_workers = get_default_workers()
@@ -467,34 +467,34 @@ if __name__ == "__main__":
         "--workers",
         type=int,
         default=default_workers,
-        help=f"Worker 进程数（用于高并发，默认: {default_workers}，基于 CPU 核心数自动计算）",
+        help=f"Worker process count for high concurrency, default: {default_workers}, computed from CPU cores)",
     )
     parser.add_argument(
         "--log-level",
         type=str,
         default=os.getenv("LOG_LEVEL", serverconfig.DEFAULT_LOG_LEVEL),
         choices=["debug", "info", "warning", "error", "critical"],
-        help="日志级别",
+        help="Log level",
     )
     parser.add_argument(
-        "--reload", action="store_true", help="启用自动重载（开发模式，仅单进程）"
+        "--reload", action="store_true", help="Enable auto reload (development mode, single process only)"
     )
     parser.add_argument(
         "--log-file",
         type=str,
         default=os.getenv("LOG_FILE", None),
-        help="日志文件路径（默认: 自动生成，格式: server_YYYYMMDD_HHMMSS.log）",
+        help="Log file path (default: auto-generated as server_YYYYMMDD_HHMMSS.log)",
     )
     parser.add_argument(
         "--no-log-file",
         action="store_true",
-        help="禁用日志文件，只输出到控制台",
+        help="Disable log file and write only to console",
     )
     parser.add_argument(
         "--timeout-graceful-shutdown",
         type=int,
         default=30,
-        help="优雅关闭超时时间（秒），默认: 30",
+        help="Graceful shutdown timeout in seconds, default: 30",
     )
 
     args = parser.parse_args()

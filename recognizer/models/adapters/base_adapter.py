@@ -36,7 +36,7 @@ class BaseModelAdapter(ABC):
                 'response_text': str or None
             }
         """
-        raise NotImplementedError("子类必须实现 process_image 方法")
+        raise NotImplementedError("Subclasses must implement process_image")
     
     def _create_error_result(self, error_message, response_text=None):
         """创建错误结果"""

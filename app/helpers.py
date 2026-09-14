@@ -21,7 +21,6 @@ if str(_root) not in sys.path:
     sys.path.insert(0, str(_root))
 
 from generator.config_loader import load_config
-from i18n import t, LANG_EN, LANG_ZH, set_lang
 from evaluator.adapters.base import BaseLLMAdapter
 
 # ==================== Global State ====================
@@ -123,10 +122,10 @@ def load_image_and_gt(image_name: str) -> Tuple[np.ndarray | None, dict | None]:
 def format_gt_coords(gt: dict, lang: str) -> str:
     """Format ground truth coordinates as string."""
     if not gt or "intersections" not in gt:
-        return t("no_intersections", lang)
+        return 'No intersections'
     coords = gt["intersections"]
     lines = [f"({c['coordinate_x']}, {c['coordinate_y']}) - {c['type']}" for c in coords]
-    return "\n".join(lines) if lines else t("no_intersections", lang)
+    return "\n".join(lines) if lines else 'No intersections'
 
 
 def format_gt_functions(gt: dict, lang: str) -> str:
@@ -136,25 +135,25 @@ def format_gt_functions(gt: dict, lang: str) -> str:
     functions = gt["functions"]
     if not functions:
         return "N/A"
-    is_zh = lang == LANG_ZH
+    is_zh = False
     lines = []
     for i, fn in enumerate(functions, 1):
         ftype = fn.get("type", "unknown")
         latex = fn.get("expression_latex", "N/A")
         sympy_expr = fn.get("expression_sympy", "N/A")
         params = fn.get("parameters", {})
-        lines.append(f"{'曲线' if is_zh else 'Curve'} {i} [{ftype}]")
+        lines.append(f"{'Curve'} {i} [{ftype}]")
         lines.append(f"  LaTeX:  {latex}")
         lines.append(f"  Sympy:  {sympy_expr}")
         lines.append(f"  Params: {params}")
 
         mp = fn.get("math_properties", {})
         if mp:
-            lines.append(f"  {'定义域' if is_zh else 'Domain'}: {mp.get('domain', '')}")
-            lines.append(f"  {'值域' if is_zh else 'Range'}:  {mp.get('range', '')}")
+            lines.append(f"  {'Domain'}: {mp.get('domain', '')}")
+            lines.append(f"  {'Range'}:  {mp.get('range', '')}")
             zeros = mp.get("zeros", [])
-            zeros_str = ", ".join(str(z) for z in zeros) if zeros else ("无" if is_zh else "None")
-            lines.append(f"  {'零点' if is_zh else 'Zeros'}:  {zeros_str}")
+            zeros_str = ", ".join(str(z) for z in zeros) if zeros else ("None")
+            lines.append(f"  {'Zeros'}:  {zeros_str}")
         lines.append("")
 
     question = gt.get("question", {})
@@ -162,7 +161,7 @@ def format_gt_functions(gt: dict, lang: str) -> str:
     if gt_data:
         coords = gt_data.get("coordinates", [])
         if coords:
-            lines.append(f"{'关键点坐标' if is_zh else 'Key Coordinates'}: {len(coords)} {'个' if is_zh else 'points'}")
+            lines.append(f"{'Key Coordinates'}: {len(coords)} {'points'}")
             for c in coords[:20]:
                 lines.append(f"  ({c[0]}, {c[1]})")
             if len(coords) > 20:
@@ -171,13 +170,13 @@ def format_gt_functions(gt: dict, lang: str) -> str:
         pred_tgt = gt_data.get("prediction_targets", {})
         if pred_tgt:
             lines.append("")
-            lines.append(f"{'函数值预测真值' if is_zh else 'Prediction Targets'}:")
+            lines.append(f"{'Prediction Targets'}:")
             for x, y in pred_tgt.items():
                 lines.append(f"  f({x}) = {y}")
 
         roc = gt_data.get("rate_of_change", {})
         if roc and "gt_value" in roc:
-            lines.append(f"{'变化率真值' if is_zh else 'Rate of Change'}: {roc['gt_value']} "
+            lines.append(f"{'Rate of Change'}: {roc['gt_value']} "
                          f"(x∈[{roc.get('x1', '?')},{roc.get('x2', '?')}])")
 
     return "\n".join(lines)

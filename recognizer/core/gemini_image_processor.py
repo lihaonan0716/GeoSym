@@ -65,7 +65,7 @@ class GeminiImageProcessor:
                     vertexai=True,
                 )
             except ImportError:
-                raise ImportError("请安装google-genai库: pip install google-genai")
+                raise ImportError("Please install the google-genai package: pip install google-genai")
     
     def process_image(self, image: np.ndarray, prompt: str, 
                      model: str = "gemini-2.5-flash-image") -> Dict:
@@ -101,7 +101,7 @@ class GeminiImageProcessor:
             image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             pil_image = Image.fromarray(image_rgb)
             
-            print(f"[Gemini] 调用API，模型: {model}")
+            print(f"[Gemini] Calling API, model: {model}")
             print(f"[Gemini] Prompt: {prompt[:100]}...")
             
             # 调用Gemini API
@@ -120,11 +120,11 @@ class GeminiImageProcessor:
             for part in response.candidates[0].content.parts:
                 if part.text is not None:
                     response_texts.append(part.text)
-                    print(f"[Gemini] 返回文本: {part.text[:200]}...")
+                    print(f"[Gemini] Returned text: {part.text[:200]}...")
                 elif part.inline_data is not None:
                     # 提取生成的图片
                     generated_image = Image.open(BytesIO(part.inline_data.data))
-                    print(f"[Gemini] 返回图片，尺寸: {generated_image.size}")
+                    print(f"[Gemini] Returned image, size: {generated_image.size}")
             
             # 保存文本响应
             if response_texts:
@@ -146,11 +146,11 @@ class GeminiImageProcessor:
                     # RGBA
                     processed_cv = cv2.cvtColor(generated_np, cv2.COLOR_RGBA2BGR)
                 else:
-                    raise ValueError(f"不支持的图片格式: {generated_np.shape}")
+                    raise ValueError(f"textsupportstextimagetext: {generated_np.shape}")
                 
                 result['processed_image'] = processed_cv
                 result['success'] = True
-                print(f"[Gemini] ✅ 处理成功，输出图片尺寸: {processed_cv.shape}")
+                print(f"[Gemini] ✅ Processing succeeded, output image size: {processed_cv.shape}")
             else:
                 result['error'] = "API没有返回图片，只返回了文本"
                 print(f"[Gemini] ⚠️ {result['error']}")

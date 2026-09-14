@@ -34,7 +34,7 @@ class ImageEnhancer:
             for model_id in self.supported_models.keys()
         }
         
-        logger.debug("ImageEnhancer 初始化完成，支持 %d 个模型", len(self.supported_models))
+        logger.debug("ImageEnhancer textComplete, supports %d models", len(self.supported_models))
     
     def get_default_prompt(self, model_name):
         """
@@ -75,18 +75,18 @@ class ImageEnhancer:
             model_id: self.manager.get_default_prompt(model_id)
             for model_id in self.supported_models.keys()
         }
-        print("[ImageEnhancer] 配置已重新加载")
+        print("[ImageEnhancer] Configuration reloaded")
 
 
 # 测试代码
 if __name__ == "__main__":
     enhancer = ImageEnhancer()
     
-    print("\n支持的模型:")
+    print("\nsupportstextmodel:")
     for key, name in enhancer.supported_models.items():
         print(f"  - {key}: {name}")
     
-    print("\n默认Prompts:")
+    print("\nDefault prompts:")
     for model, prompt in enhancer.default_prompts.items():
         print(f"\n{model}:")
         print(f"  {prompt[:100]}...")

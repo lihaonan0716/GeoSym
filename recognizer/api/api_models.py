@@ -37,90 +37,90 @@ class TickLabel(BaseModel):
 
 class GridLine(BaseModel):
     """网格线映射"""
-    pixel: float = Field(..., description="像素位置")
-    value: Optional[float] = Field(None, description="坐标值")
+    pixel: float = Field(..., description="Pixel position")
+    value: Optional[float] = Field(None, description="Coordinate value")
 
 
 class CoordinateSystem(BaseModel):
     """坐标系信息"""
-    x_axis_position: Optional[float] = Field(None, description="X轴位置（像素）")
-    y_axis_position: Optional[float] = Field(None, description="Y轴位置（像素）")
-    origin_pixel: Optional[Point] = Field(None, description="原点像素坐标")
-    origin_value: Optional[Point] = Field(None, description="原点数值坐标")
+    x_axis_position: Optional[float] = Field(None, description="X-axis position in pixels")
+    y_axis_position: Optional[float] = Field(None, description="Y-axis position in pixels")
+    origin_pixel: Optional[Point] = Field(None, description="Origin pixel coordinate")
+    origin_value: Optional[Point] = Field(None, description="Origin value coordinate")
 
 
 class Intersection(BaseModel):
     """交点"""
-    pixel_x: float = Field(..., description="原图Chart上的X坐标（经过阶段3逆变换后）")
-    pixel_y: float = Field(..., description="原图Chart上的Y坐标（经过阶段3逆变换后）")
-    corrected_pixel_x: Optional[float] = Field(None, description="校正后图像的X坐标（如果进行了旋转/透视校正）")
-    corrected_pixel_y: Optional[float] = Field(None, description="校正后图像的Y坐标（如果进行了旋转/透视校正）")
-    coordinate_x: Union[float, int, str] = Field(..., description="真实坐标系X值")
-    coordinate_y: Union[float, int, str] = Field(..., description="真实坐标系Y值")
-    real_x_rounded: Optional[int] = Field(None, description="取整后的真实X坐标")
-    real_y_rounded: Optional[int] = Field(None, description="取整后的真实Y坐标")
-    is_axis_point: bool = Field(False, description="是否为坐标轴上的点")
-    type: str = Field(..., description="交点类型: origin/x_axis/y_axis/curve_grid")
+    pixel_x: float = Field(..., description="X coordinate on the original chart after Stage 3 inverse transform")
+    pixel_y: float = Field(..., description="Y coordinate on the original chart after Stage 3 inverse transform")
+    corrected_pixel_x: Optional[float] = Field(None, description="X coordinate on the corrected image if rotation or perspective correction was applied")
+    corrected_pixel_y: Optional[float] = Field(None, description="Y coordinate on the corrected image if rotation or perspective correction was applied")
+    coordinate_x: Union[float, int, str] = Field(..., description="Real coordinate-system X value")
+    coordinate_y: Union[float, int, str] = Field(..., description="Real coordinate-system Y value")
+    real_x_rounded: Optional[int] = Field(None, description="Rounded real X coordinate")
+    real_y_rounded: Optional[int] = Field(None, description="Rounded real Y coordinate")
+    is_axis_point: bool = Field(False, description="Whether the point lies on an axis")
+    type: str = Field(..., description="Intersection type: origin/x_axis/y_axis/curve_grid")
 
 
 class GridMapping(BaseModel):
     """网格映射"""
-    horizontal_lines: List[GridLine] = Field(default_factory=list, description="水平网格线")
-    vertical_lines: List[GridLine] = Field(default_factory=list, description="垂直网格线")
+    horizontal_lines: List[GridLine] = Field(default_factory=list, description="Horizontal grid lines")
+    vertical_lines: List[GridLine] = Field(default_factory=list, description="Vertical grid lines")
 
 
 class CurveInfo(BaseModel):
     """曲线信息"""
-    has_curve: bool = Field(False, description="是否检测到曲线")
+    has_curve: bool = Field(False, description="Whether a curve was detected")
 
 
 # ===== 请求模型 =====
 
 class Stage0Config(BaseModel):
     """阶段0配置"""
-    horizontal_tolerance: float = Field(1.5, description="水平聚类容差倍数")
-    vertical_tolerance: float = Field(1.5, description="垂直聚类容差倍数")
-    interval_percentile: float = Field(50, description="间隔分位数(0-100)")
+    horizontal_tolerance: float = Field(1.5, description="Horizontal clustering tolerance multiplier")
+    vertical_tolerance: float = Field(1.5, description="Vertical clustering tolerance multiplier")
+    interval_percentile: float = Field(50, description="Interval percentile(0-100)")
 
 
 class Stage05Config(BaseModel):
     """阶段0.5配置"""
-    enabled: bool = Field(False, description="是否启用AI增强")
-    model_id: str = Field("gemini", description="模型ID")
-    prompt: Optional[str] = Field(None, description="提示词，None时使用默认")
+    enabled: bool = Field(False, description="Whether AI enhancement is enabled")
+    model_id: str = Field("gemini", description="Model ID")
+    prompt: Optional[str] = Field(None, description="Prompt; uses the default when None")
 
 
 class Stage1Config(BaseModel):
     """阶段1配置"""
-    enable_curve_erase: bool = Field(True, description="是否擦除曲线边缘")
-    enable_dashed_line_connection: bool = Field(True, description="是否连接虚线")
-    enable_perspective_correction: bool = Field(True, description="是否透视校正")
-    enable_rotation_correction: bool = Field(True, description="是否倾斜校正")
-    rotation_hough_threshold: int = Field(65, description="倾斜检测Hough阈值")
-    rotation_min_line_length: int = Field(60, description="倾斜检测最小线段长度")
-    rotation_max_line_gap: int = Field(10, description="倾斜检测最大线段间隙")
-    rotation_angle_threshold: int = Field(5, description="倾斜检测角度阈值")
-    grid_hough_threshold: int = Field(65, description="网格检测Hough阈值")
-    grid_min_line_length: int = Field(45, description="网格检测最小线段长度")
-    grid_max_line_gap: int = Field(10, description="网格检测最大线段间隙")
-    grid_angle_threshold: int = Field(5, description="网格检测角度阈值")
-    merge_distance_threshold: int = Field(20, description="线段合并距离阈值")
-    dashed_gap_threshold: int = Field(10, description="虚线连接间隙阈值")
-    dashed_collinear_threshold: int = Field(3, description="虚线连接共线阈值")
-    curve_saturation_threshold: int = Field(90, description="曲线饱和度阈值")
-    curve_value_threshold: int = Field(60, description="曲线亮度阈值")
-    curve_feather_size: int = Field(3, description="曲线羽化大小")
+    enable_curve_erase: bool = Field(True, description="Whether to erase curve edges")
+    enable_dashed_line_connection: bool = Field(True, description="Whether to connect dashed lines")
+    enable_perspective_correction: bool = Field(True, description="Whether to apply perspective correction")
+    enable_rotation_correction: bool = Field(True, description="Whether to apply tilt correction")
+    rotation_hough_threshold: int = Field(65, description="Tilt-detection Hough threshold")
+    rotation_min_line_length: int = Field(60, description="Tilt-detection minimum line length")
+    rotation_max_line_gap: int = Field(10, description="Tilt-detection maximum line gap")
+    rotation_angle_threshold: int = Field(5, description="Tilt-detection angle threshold")
+    grid_hough_threshold: int = Field(65, description="Grid-detection Hough threshold")
+    grid_min_line_length: int = Field(45, description="Grid-detection minimum line length")
+    grid_max_line_gap: int = Field(10, description="Grid-detection maximum line gap")
+    grid_angle_threshold: int = Field(5, description="Grid-detection angle threshold")
+    merge_distance_threshold: int = Field(20, description="Line-merge distance threshold")
+    dashed_gap_threshold: int = Field(10, description="Dashed-line connection gap threshold")
+    dashed_collinear_threshold: int = Field(3, description="Dashed-line connection collinearity threshold")
+    curve_saturation_threshold: int = Field(90, description="Curve saturation threshold")
+    curve_value_threshold: int = Field(60, description="Curve value threshold")
+    curve_feather_size: int = Field(3, description="Curve feather size")
 
 
 class Stage2Config(BaseModel):
     """阶段2配置"""
-    tolerance: int = Field(3, description="交点容差（像素）")
-    enable_morph_connect: bool = Field(True, description="是否形态学连接")
-    morph_kernel_size: int = Field(7, description="形态学核大小")
-    morph_iterations: int = Field(2, description="形态学迭代次数")
-    color_saturation_threshold: int = Field(90, description="颜色饱和度阈值")
-    color_value_threshold: int = Field(60, description="颜色亮度阈值")
-    integer_approximation_threshold: float = Field(0.1, description="整数近似阈值")
+    tolerance: int = Field(3, description="Intersection tolerance in pixels")
+    enable_morph_connect: bool = Field(True, description="Whether morphological connection is enabled")
+    morph_kernel_size: int = Field(7, description="Morphological kernel size")
+    morph_iterations: int = Field(2, description="Morphological iteration count")
+    color_saturation_threshold: int = Field(90, description="Color saturation threshold")
+    color_value_threshold: int = Field(60, description="Color value threshold")
+    integer_approximation_threshold: float = Field(0.1, description="Integer approximation threshold")
 
 
 class ProcessConfig(BaseModel):
@@ -133,9 +133,9 @@ class ProcessConfig(BaseModel):
 
 class RecognizeCoordinatesRequest(BaseModel):
     """识别坐标请求"""
-    image: str = Field(..., description="图像：base64编码或URL")
-    ocr_result: Dict[str, Any] = Field(..., description="OCR OCR结果")
-    config: Optional[ProcessConfig] = Field(None, description="处理配置")
+    image: str = Field(..., description="Image as base64 data or URL")
+    ocr_result: Dict[str, Any] = Field(..., description="OCR result")
+    config: Optional[ProcessConfig] = Field(None, description="Processing configuration")
 
 
 # ===== 响应模型 =====
@@ -143,7 +143,7 @@ class RecognizeCoordinatesRequest(BaseModel):
 class StageResult(BaseModel):
     """阶段处理结果"""
     status: str = Field(..., description="success/failed")
-    error: Optional[str] = Field(None, description="错误信息")
+    error: Optional[str] = Field(None, description="Error message")
 
 
 class Stage0Result(StageResult):
@@ -176,7 +176,7 @@ class ProcessingStages(BaseModel):
 
 class RecognizeResult(BaseModel):
     """识别结果"""
-    chart_bbox: Optional[tuple] = Field(None, description="Chart边界框(x, y, w, h)")
+    chart_bbox: Optional[tuple] = Field(None, description="Chart bounding box(x, y, w, h)")
     x_tick_labels: List[TickLabel] = Field(default_factory=list)
     y_tick_labels: List[TickLabel] = Field(default_factory=list)
     coordinate_system: CoordinateSystem

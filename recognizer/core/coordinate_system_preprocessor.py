@@ -7,7 +7,6 @@ from pathlib import Path as _Path
 _exp_root = _Path(__file__).resolve().parent.parent.parent
 if str(_exp_root) not in _sys.path:
     _sys.path.insert(0, str(_exp_root))
-from i18n import log_tag as _lt  # noqa: E402
 
 class CoordinateSystemPreprocessor:
     """坐标系图像预处理器"""
@@ -39,7 +38,7 @@ class CoordinateSystemPreprocessor:
         orig_h, orig_w = original_shape[:2]
         enh_h, enh_w = enhanced_image.shape[:2]
         
-        print(f"[{_lt('尺寸调整')}] 原图: {orig_w}x{orig_h}, 增强后: {enh_w}x{enh_h}")
+        print(f"[Resize] text: {orig_w}x{orig_h}, textafter: {enh_w}x{enh_h}")
         
         # 初始化变换参数
         transform_params = {
@@ -51,7 +50,7 @@ class CoordinateSystemPreprocessor:
         }
         
         if (enh_h, enh_w) == (orig_h, orig_w):
-            print(f"[{_lt('尺寸调整')}] 尺寸相同，无需调整")
+            print(f"[Resize] text, text")
             return enhanced_image, transform_params
         
         # 计算缩放比例
@@ -65,7 +64,7 @@ class CoordinateSystemPreprocessor:
         new_w = int(enh_w * scale)
         new_h = int(enh_h * scale)
         
-        print(f"[{_lt('尺寸调整')}] 缩放比例: {scale:.3f}, 缩放后: {new_w}x{new_h}")
+        print(f"[Resize] text: {scale:.3f}, textafter: {new_w}x{new_h}")
         
         resized = cv2.resize(enhanced_image, (new_w, new_h), interpolation=cv2.INTER_LINEAR)
         
@@ -79,8 +78,8 @@ class CoordinateSystemPreprocessor:
         
         result = resized[crop_y:crop_y+orig_h, crop_x:crop_x+orig_w]
         
-        print(f"[{_lt('尺寸调整')}] 裁剪区域: ({crop_x}, {crop_y}) -> ({crop_x+orig_w}, {crop_y+orig_h})")
-        print(f"[{_lt('尺寸调整')}] 最终尺寸: {result.shape[1]}x{result.shape[0]}")
+        print(f"[Resize] text: ({crop_x}, {crop_y}) -> ({crop_x+orig_w}, {crop_y+orig_h})")
+        print(f"[Resize] finaltext: {result.shape[1]}x{result.shape[0]}")
         
         # 保存变换参数
         transform_params['scale'] = scale
@@ -114,18 +113,18 @@ class CoordinateSystemPreprocessor:
         ai_w, ai_h = transform_params['ai_output_size']
         orig_w, orig_h = transform_params['original_size']
         
-        print(f"[{_lt('刻度标签变换')}] 开始变换 {len(labels)} 个标签")
-        print(f"[{_lt('刻度标签变换')}] 原图尺寸: {orig_w}x{orig_h}, AI输出: {ai_w}x{ai_h}")
-        print(f"[{_lt('刻度标签变换')}] resize缩放: {scale:.3f}, 裁剪偏移: ({crop_x}, {crop_y})")
+        print(f"[TickTransform] text {len(labels)} textlabel")
+        print(f"[TickTransform] text: {orig_w}x{orig_h}, AItext: {ai_w}x{ai_h}")
+        print(f"[TickTransform] resizetext: {scale:.3f}, crop offset: ({crop_x}, {crop_y})")
         
         # 步骤0: 计算按高度等比例缩放的比例
         height_scale = ai_h / orig_h
         scaled_width = orig_w * height_scale
-        print(f"[{_lt('刻度标签变换')}] 高度缩放: {height_scale:.4f}, 缩放后宽度: {scaled_width:.1f}")
+        print(f"[TickTransform] heighttext: {height_scale:.4f}, textafterwidth: {scaled_width:.1f}")
         
         # 步骤1: 计算宽度方向的居中对齐偏移
         width_offset = (scaled_width - ai_w) / 2.0
-        print(f"[{_lt('刻度标签变换')}] 宽度居中偏移: {width_offset:.1f}")
+        print(f"[TickTransform] widthtext: {width_offset:.1f}")
         
         transformed_labels = []
         for label in labels:
@@ -225,8 +224,8 @@ class CoordinateSystemPreprocessor:
             
             transformed_labels.append(transformed_label)
         
-        print(f"[{_lt('刻度标签变换')}] 变换完成")
-        print(f"[{_lt('刻度标签变换')}] 变换后的标签: {transformed_labels}")
+        print(f"[TickTransform] textComplete")
+        print(f"[TickTransform] textaftertextlabel: {transformed_labels}")
         return transformed_labels
     
     def detect_curve_mask(self, image, feather_size=5):
@@ -242,10 +241,10 @@ class CoordinateSystemPreprocessor:
         Returns:
             曲线的mask（二值图像）
         """
-        print(f"[{_lt('曲线检测')}] 开始检测彩色曲线（羽化{feather_size}px）...")
+        print(f"[CurveDetect] textcurve (text{feather_size}px)...")
         
         if len(image.shape) == 2:
-            print("  警告：输入是灰度图，返回空mask")
+            print("  Warning: text, textmask")
             return np.zeros(image.shape[:2], dtype=np.uint8)
         
         h, w = image.shape[:2]
@@ -300,7 +299,7 @@ class CoordinateSystemPreprocessor:
         for color_name, mask in color_masks:
             pixel_count = np.sum(mask > 0)
             if pixel_count > 0:
-                print(f"  检测到 {color_name} 颜色: {pixel_count} 像素")
+                print(f"  text {color_name} color: {pixel_count} pixel")
                 combined_mask = cv2.bitwise_or(combined_mask, mask)
         
         # 羽化：膨胀mask
@@ -310,7 +309,7 @@ class CoordinateSystemPreprocessor:
             combined_mask = cv2.dilate(combined_mask, kernel, iterations=1)
         
         total_pixels = np.sum(combined_mask > 0)
-        print(f"[{_lt('曲线检测')}] 完成，检测到曲线区域: {total_pixels} 个像素")
+        print(f"[CurveDetect] Complete, textcurvetext: {total_pixels} textpixel")
         
         # 保存中间结果
         self.intermediate_results['curve_mask'] = combined_mask
@@ -353,7 +352,7 @@ class CoordinateSystemPreprocessor:
                 cv2.rectangle(mask, (left, top), (right, bottom), 255, -1)
 
         self.intermediate_results['text_mask'] = mask
-        print(f"[{_lt('文字屏蔽')}] 文本屏蔽像素数: {int(np.sum(mask > 0))}")
+        print(f"[{'TextMask'}] textpixeltext: {int(np.sum(mask > 0))}")
         return mask
 
     def _build_grid_candidate_map(self, gray: np.ndarray, max_line_gap: int) -> np.ndarray:
@@ -425,19 +424,19 @@ class CoordinateSystemPreprocessor:
         
         # 如果提供了曲线mask，从边缘检测结果中擦除曲线边缘
         if curve_mask is not None:
-            print(f"  从边缘检测中擦除曲线区域...")
+            print(f"  textedgetextcurvetext...")
             edges_before = np.sum(edges > 0)
             edges[curve_mask > 0] = 0  # 擦除曲线区域的边缘
             edges_after = np.sum(edges > 0)
-            print(f"  边缘像素: {edges_before} → {edges_after} (减少{edges_before - edges_after}个)")
+            print(f"  edgepixel: {edges_before} -> {edges_after} (text{edges_before - edges_after}text)")
 
         # 如果提供了文字mask，也从候选图中擦除标签文字区域
         if text_mask is not None:
-            print(f"  从边缘检测中擦除文字区域...")
+            print(f"  textedgetext...")
             edges_before = np.sum(edges > 0)
             edges[text_mask > 0] = 0
             edges_after = np.sum(edges > 0)
-            print(f"  候选像素: {edges_before} → {edges_after} (减少{edges_before - edges_after}个)")
+            print(f"  candidatepixel: {edges_before} -> {edges_after} (text{edges_before - edges_after}text)")
         
         self.intermediate_results['edges'] = edges
 
@@ -535,7 +534,7 @@ class CoordinateSystemPreprocessor:
         lines = np.array(lines, dtype=float)
         connected_lines = []
 
-        print(f"[{_lt('虚线连接')}] 输入线段数: {len(lines)}, 方向: {'水平' if is_horizontal else '垂直'}")
+        print(f"[DashedConn] text: {len(lines)}, text: {'horizontal' if is_horizontal else 'vertical'}")
 
         # 先把线段规整成“正交坐标 + 主轴区间”的形式。
         segments = []
@@ -643,8 +642,8 @@ class CoordinateSystemPreprocessor:
                 x2 = float(slope * merged_end + intercept)
                 connected_lines.append([x1, merged_start, x2, merged_end])
 
-        print(f"[{_lt('虚线连接')}] 共线带数量: {len(bands)}")
-        print(f"[{_lt('虚线连接')}] 连接后线段数: {len(connected_lines)}, 减少了 {len(lines) - len(connected_lines)} 条")
+        print(f"[DashedConn] textcount: {len(bands)}")
+        print(f"[DashedConn] textaftertext: {len(connected_lines)}, text {len(lines) - len(connected_lines)} text")
 
         return connected_lines
     
@@ -832,9 +831,9 @@ class CoordinateSystemPreprocessor:
         # 使用中位数作为旋转角度（更鲁棒）
         rotation_angle = np.median(angles)
         
-        print(f"[{_lt('角度计算')}] 水平线数量: {len(horizontal_lines)}, 垂直线数量: {len(vertical_lines)}")
-        print(f"[{_lt('角度计算')}] 所有角度样本: {[f'{a:.2f}' for a in sorted(angles)[:10]]}...")  # 显示排序后前10个
-        print(f"[{_lt('角度计算')}] 中位数角度（原始）: {rotation_angle:.2f}°")
+        print(f"[AngleCalc] horizontaltextcount: {len(horizontal_lines)}, verticaltextcount: {len(vertical_lines)}")
+        print(f"[AngleCalc] textangletext: {[f'{a:.2f}' for a in sorted(angles)[:10]]}...")  # textaftertext10text
+        print(f"[AngleCalc] medianangle (original): {rotation_angle:.2f}°")
         
         # 角度规范化：分两步处理
         # 第一步：将角度归一化到 -180 到 180 范围
@@ -843,27 +842,27 @@ class CoordinateSystemPreprocessor:
         while rotation_angle < -180:
             rotation_angle += 360
         
-        print(f"[{_lt('角度归一化步骤1')}] 归一化到±180°: {rotation_angle:.2f}°")
+        print(f"[{'AngleNormStep1'}] text±180°: {rotation_angle:.2f}°")
         
         # 第二步：处理±90°附近的角度（线段方向相反导致的±180°偏差）
         if rotation_angle > 135:
             rotation_angle = rotation_angle - 180
-            print(f"[{_lt('角度归一化步骤2')}] 角度 > 135°，减去180° -> {rotation_angle:.2f}°")
+            print(f"[{'AngleNormStep2'}] angle > 135°, text180° -> {rotation_angle:.2f}°")
         elif rotation_angle < -135:
             rotation_angle = rotation_angle + 180
-            print(f"[{_lt('角度归一化步骤2')}] 角度 < -135°，加上180° -> {rotation_angle:.2f}°")
+            print(f"[{'AngleNormStep2'}] angle < -135°, text180° -> {rotation_angle:.2f}°")
         
         # 第三步：坐标系倾斜一般不会超过±45度
         if rotation_angle > 45:
             rotation_angle = rotation_angle - 90
-            print(f"[{_lt('角度归一化步骤3')}] 角度 > 45°，减去90° -> {rotation_angle:.2f}°")
+            print(f"[{'AngleNormStep3'}] angle > 45°, text90° -> {rotation_angle:.2f}°")
         elif rotation_angle < -45:
             rotation_angle = rotation_angle + 90
-            print(f"[{_lt('角度归一化步骤3')}] 角度 < -45°，加上90° -> {rotation_angle:.2f}°")
+            print(f"[{'AngleNormStep3'}] angle < -45°, text90° -> {rotation_angle:.2f}°")
         else:
-            print(f"[{_lt('角度归一化步骤3')}] 角度在±45°范围内，无需调整")
+            print(f"[{'AngleNormStep3'}] angletext±45°text, text")
         
-        print(f"[{_lt('角度计算')}] 最终角度: {rotation_angle:.2f}°")
+        print(f"[AngleCalc] finalangle: {rotation_angle:.2f}°")
         
         return rotation_angle
     
@@ -884,7 +883,7 @@ class CoordinateSystemPreprocessor:
         h, w = image.shape[:2]
         center = (w // 2, h // 2)
         
-        print(f"[{_lt('图像旋转')}] 原始尺寸: {w}x{h}, 旋转角度: {angle:.2f}°")
+        print(f"[ImageRotate] originaltext: {w}x{h}, textangle: {angle:.2f}°")
         
         # 计算旋转矩阵
         M = cv2.getRotationMatrix2D(center, angle, 1.0)
@@ -905,12 +904,12 @@ class CoordinateSystemPreprocessor:
                                  borderMode=cv2.BORDER_CONSTANT,
                                  borderValue=(255, 255, 255))
         
-        print(f"[{_lt('图像旋转')}] 旋转后尺寸: {new_w}x{new_h}")
+        print(f"[ImageRotate] textaftertext: {new_w}x{new_h}")
         
         # 使用几何计算裁剪掉白边
         cropped, crop_offset = self.crop_rotated_rectangle(rotated, angle, w, h)
         
-        print(f"[{_lt('图像裁剪')}] 裁剪后尺寸: {cropped.shape[1]}x{cropped.shape[0]}, 裁剪偏移: {crop_offset}")
+        print(f"[ImageCrop] textaftertext: {cropped.shape[1]}x{cropped.shape[0]}, crop offset: {crop_offset}")
         
         # 返回裁剪后的图像、裁剪偏移量和完整的旋转矩阵（包含平移）
         return cropped, crop_offset, M
@@ -932,11 +931,11 @@ class CoordinateSystemPreprocessor:
                     如果检测失败返回 None
         """
         if not horizontal_lines or not vertical_lines:
-            print(f"[{_lt('角点检测')}] 失败：水平线或垂直线不足")
+            print(f"[CornerDetect] Failed: horizontaltextverticaltext")
             return None
         
         if len(horizontal_lines) < 2 or len(vertical_lines) < 2:
-            print(f"[{_lt('角点检测')}] 失败：水平线{len(horizontal_lines)}条，垂直线{len(vertical_lines)}条（至少需要各2条）")
+            print(f"[CornerDetect] Failed: horizontaltext{len(horizontal_lines)}text, verticaltext{len(vertical_lines)}text (textrequiredtext2text)")
             return None
         
         h, w = image_shape[:2]
@@ -952,11 +951,11 @@ class CoordinateSystemPreprocessor:
         h_lines_filtered = [line for line in horizontal_lines if line_length(line) >= min_h_length]
         v_lines_filtered = [line for line in vertical_lines if line_length(line) >= min_v_length]
         
-        print(f"[{_lt('角点检测')}] 线段过滤: 水平线 {len(horizontal_lines)}->{len(h_lines_filtered)}条, "
+        print(f"[CornerDetect] textfilter: horizontaltext {len(horizontal_lines)}->{len(h_lines_filtered)}text, "
               f"垂直线 {len(vertical_lines)}->{len(v_lines_filtered)}条")
         
         if len(h_lines_filtered) < 2 or len(v_lines_filtered) < 2:
-            print(f"[{_lt('角点检测')}] 失败：过滤后水平线{len(h_lines_filtered)}条，垂直线{len(v_lines_filtered)}条（至少需要各2条）")
+            print(f"[CornerDetect] Failed: filterafterhorizontaltext{len(h_lines_filtered)}text, verticaltext{len(v_lines_filtered)}text (textrequiredtext2text)")
             return None
         
         # 2. 拟合函数：使用多条线进行加权线性拟合
@@ -1028,11 +1027,11 @@ class CoordinateSystemPreprocessor:
         left_a, left_b = fit_lines(left_v_lines, is_horizontal=False)
         right_a, right_b = fit_lines(right_v_lines, is_horizontal=False)
         
-        print(f"[{_lt('角点检测')}] 拟合边界线:")
-        print(f"  上边: y = {top_a:.4f}x + {top_b:.2f}")
-        print(f"  下边: y = {bottom_a:.4f}x + {bottom_b:.2f}")
-        print(f"  左边: x = {left_a:.4f}y + {left_b:.2f}")
-        print(f"  右边: x = {right_a:.4f}y + {right_b:.2f}")
+        print(f"[CornerDetect] textboundarytext:")
+        print(f"  text: y = {top_a:.4f}x + {top_b:.2f}")
+        print(f"  text: y = {bottom_a:.4f}x + {bottom_b:.2f}")
+        print(f"  text: x = {left_a:.4f}y + {left_b:.2f}")
+        print(f"  text: x = {right_a:.4f}y + {right_b:.2f}")
         
         # 4. 计算拟合线的交点
         def fitted_line_intersection(h_params, v_params):
@@ -1070,11 +1069,11 @@ class CoordinateSystemPreprocessor:
         
         corners = np.array([top_left, top_right, bottom_right, bottom_left], dtype=np.float32)
         
-        print(f"[{_lt('角点检测')}] 成功检测到四个角点:")
-        print(f"  左上: {top_left}")
-        print(f"  右上: {top_right}")
-        print(f"  右下: {bottom_right}")
-        print(f"  左下: {bottom_left}")
+        print(f"[CornerDetect] text:")
+        print(f"  text: {top_left}")
+        print(f"  text: {top_right}")
+        print(f"  text: {bottom_right}")
+        print(f"  text: {bottom_left}")
         
         return corners
     
@@ -1112,8 +1111,8 @@ class CoordinateSystemPreprocessor:
                                        borderMode=cv2.BORDER_CONSTANT,
                                        borderValue=(255, 255, 255))
         
-        print(f"[{_lt('透视校正')}] 原始尺寸: {w}x{h}")
-        print(f"[{_lt('透视校正')}] 校正后尺寸: {dst_w}x{dst_h}")
+        print(f"[PerspCorrect] originaltext: {w}x{h}")
+        print(f"[PerspCorrect] textaftertext: {dst_w}x{dst_h}")
         
         return corrected, perspective_matrix
     
@@ -1153,12 +1152,12 @@ class CoordinateSystemPreprocessor:
         crop_w = int(original_w * cos_a - original_h * sin_a)
         crop_h = int(original_h * cos_a - original_w * sin_a)
         
-        print(f"[{_lt('裁剪计算')}] sin={sin_a:.4f}, cos={cos_a:.4f}")
-        print(f"[{_lt('裁剪计算')}] 公式计算: crop_w={crop_w}, crop_h={crop_h}")
+        print(f"[CropCalc] sin={sin_a:.4f}, cos={cos_a:.4f}")
+        print(f"[CropCalc] text: crop_w={crop_w}, crop_h={crop_h}")
         
         # 确保尺寸为正数且不超过旋转后的图像
         if crop_w <= 0 or crop_h <= 0:
-            print(f"[{_lt('裁剪计算')}] 警告：计算结果为负，使用保守裁剪")
+            print(f"[CropCalc] Warning: text, text")
             # 使用保守的估计
             crop_w = int(min(original_w, original_h) * cos_a)
             crop_h = int(min(original_w, original_h) * cos_a)
@@ -1189,10 +1188,10 @@ class CoordinateSystemPreprocessor:
         # 执行裁剪
         cropped = image[y1:y2, x1:x2]
         
-        print(f"[{_lt('裁剪计算')}] 原始: {original_w}x{original_h}, 角度: {angle:.2f}°")
-        print(f"[{_lt('裁剪计算')}] 旋转后: {rot_w}x{rot_h}")
-        print(f"[{_lt('裁剪计算')}] 内接矩形: {crop_w}x{crop_h}")
-        print(f"[{_lt('裁剪计算')}] 裁剪区域: ({x1},{y1}) -> ({x2},{y2})")
+        print(f"[CropCalc] original: {original_w}x{original_h}, angle: {angle:.2f}°")
+        print(f"[CropCalc] textafter: {rot_w}x{rot_h}")
+        print(f"[CropCalc] text: {crop_w}x{crop_h}")
+        print(f"[CropCalc] text: ({x1},{y1}) -> ({x2},{y2})")
         
         # 返回裁剪后的图像和裁剪偏移量
         return cropped, (x1, y1)
@@ -1265,13 +1264,13 @@ class CoordinateSystemPreprocessor:
             result.shape, x_tick_labels=x_tick_labels, y_tick_labels=y_tick_labels, padding=10
         )
         if enable_curve_erase:
-            print("\n====== 步骤0: 曲线检测 ======")
+            print("\n====== text0: curvetext ======")
             self.color_saturation_threshold = curve_saturation_threshold
             self.color_value_threshold = curve_value_threshold
             curve_mask = self.detect_curve_mask(result, feather_size=curve_feather_size)
         
         # 1. 第一次网格检测：提取断续的线段（使用曲线mask擦除边缘）
-        print("\n====== 步骤1: 第一次网格检测 ======")
+        print("\n====== text1: text ======")
         lines = self.detect_grid_lines(result, 
                                        threshold=grid_hough_threshold,
                                        min_line_length=grid_min_line_length,
@@ -1280,11 +1279,11 @@ class CoordinateSystemPreprocessor:
                                        text_mask=text_mask)
         
         horizontal_lines, vertical_lines = self.classify_lines(lines, grid_angle_threshold)
-        print(f"  检测到: 水平线{len(horizontal_lines)}条, 垂直线{len(vertical_lines)}条")
+        print(f"  text: horizontaltext{len(horizontal_lines)}text, verticaltext{len(vertical_lines)}text")
         
         # 1.5. 虚线连接：将断续的线段连接成实线网格
         if enable_dashed_line_connection and (horizontal_lines or vertical_lines):
-            print("\n====== 步骤1.5: 虚线连接 ======")
+            print("\n====== text1.5: text ======")
             
             # 保存连接前的线条（用于可视化对比）
             original_h_lines = horizontal_lines.copy() if horizontal_lines else []
@@ -1325,14 +1324,14 @@ class CoordinateSystemPreprocessor:
                 cv2.line(dashed_connection_image, (x1, y1), (x2, y2), (255, 0, 0), 3)  # 蓝色
             
             self.intermediate_results['dashed_connection'] = dashed_connection_image
-            print(f"  可视化: 灰色细线=原始线段, 红色粗线=连接后的水平线, 蓝色粗线=连接后的垂直线")
+            print(f"  text: text=originaltext, text=textaftertexthorizontaltext, text=textaftertextverticaltext")
         
         # 2. 透视校正：基于实线网格校正原图
         perspective_matrix = None
         grid_corners = None
         
         if enable_perspective_correction and horizontal_lines and vertical_lines:
-            print("\n====== 步骤2: 透视校正 ======")
+            print("\n====== text2: text ======")
             
             # 检测网格四个角点（使用连接后的线条）
             grid_corners = self.detect_grid_corners(horizontal_lines, vertical_lines, result.shape)
@@ -1346,22 +1345,22 @@ class CoordinateSystemPreprocessor:
                 
                 # 同步透视变换曲线mask
                 if curve_mask is not None:
-                    print(f"  同步透视变换曲线mask...")
+                    print(f"  textperspective transformcurvemask...")
                     h, w = result.shape[:2]
                     curve_mask = cv2.warpPerspective(curve_mask, perspective_matrix, (w, h))
                 if text_mask is not None:
-                    print(f"  同步透视变换文字mask...")
+                    print(f"  textperspective transformtextmask...")
                     h, w = result.shape[:2]
                     text_mask = cv2.warpPerspective(text_mask, perspective_matrix, (w, h))
             else:
-                print(f"[{_lt('透视校正')}] 跳过：角点检测失败")
+                print(f"[PerspCorrect] text: textFailed")
 
         # 2.5 透视后的网格重检测：后续倾斜校正必须基于当前图像，而不是
         # 透视前的旧线段；否则角度会明显失真。
         angle_h_lines = horizontal_lines
         angle_v_lines = vertical_lines
         if perspective_matrix is not None:
-            print("\n====== 步骤2.5: 透视后角度重检测 ======")
+            print("\n====== text2.5: textafterangletext ======")
             angle_lines = self.detect_grid_lines(
                 result,
                 threshold=rotation_hough_threshold,
@@ -1371,7 +1370,7 @@ class CoordinateSystemPreprocessor:
                 text_mask=text_mask,
             )
             angle_h_lines, angle_v_lines = self.classify_lines(angle_lines, rotation_angle_threshold)
-            print(f"  角度重检测到: 水平线{len(angle_h_lines)}条, 垂直线{len(angle_v_lines)}条")
+            print(f"  angletext: horizontaltext{len(angle_h_lines)}text, verticaltext{len(angle_v_lines)}text")
             if enable_dashed_line_connection and (angle_h_lines or angle_v_lines):
                 if angle_h_lines:
                     angle_h_lines = self.connect_dashed_lines(
@@ -1387,7 +1386,7 @@ class CoordinateSystemPreprocessor:
                         collinear_threshold=dashed_collinear_threshold,
                         gap_threshold=dashed_gap_threshold
                     )
-                print(f"  角度重检测连接后: 水平线{len(angle_h_lines)}条, 垂直线{len(angle_v_lines)}条")
+                print(f"  angletextafter: horizontaltext{len(angle_h_lines)}text, verticaltext{len(angle_v_lines)}text")
         
         # 3. 倾斜校正：基于实线网格校正原图
         rotation_angle = 0
@@ -1396,7 +1395,7 @@ class CoordinateSystemPreprocessor:
         original_size = None
         
         if enable_rotation_correction and (angle_h_lines or angle_v_lines):
-            print("\n====== 步骤3: 倾斜校正 ======")
+            print("\n====== text3: text ======")
             rotation_angle = self.calculate_rotation_angle(angle_h_lines, angle_v_lines)
             
             # 保存原始尺寸和旋转中心
@@ -1416,14 +1415,14 @@ class CoordinateSystemPreprocessor:
             
             # 同步旋转曲线mask
             if curve_mask is not None:
-                print(f"  同步旋转曲线mask...")
+                print(f"  textcurvemask...")
                 curve_mask, _, _ = self.rotate_image(curve_mask, rotation_angle)
             if text_mask is not None:
-                print(f"  同步旋转文字mask...")
+                print(f"  textmask...")
                 text_mask, _, _ = self.rotate_image(text_mask, rotation_angle)
         
         # 4. 第二次网格检测：校正后重新检测网格线
-        print("\n====== 步骤4: 第二次网格检测 ======")
+        print("\n====== text4: text ======")
         lines = self.detect_grid_lines(result, 
                                        threshold=grid_hough_threshold,
                                        min_line_length=grid_min_line_length,
@@ -1432,11 +1431,11 @@ class CoordinateSystemPreprocessor:
                                        text_mask=text_mask)
         
         horizontal_lines, vertical_lines = self.classify_lines(lines, grid_angle_threshold)
-        print(f"  检测到: 水平线{len(horizontal_lines)}条, 垂直线{len(vertical_lines)}条")
+        print(f"  text: horizontaltext{len(horizontal_lines)}text, verticaltext{len(vertical_lines)}text")
 
         # 最终检测后再做一次虚线连接，避免校正后的灰色虚线在最终映射前仍是碎片
         if enable_dashed_line_connection and (horizontal_lines or vertical_lines):
-            print("\n====== 步骤4.5: 最终虚线连接 ======")
+            print("\n====== text4.5: finaltext ======")
             if horizontal_lines:
                 horizontal_lines = self.connect_dashed_lines(
                     horizontal_lines,
@@ -1451,10 +1450,10 @@ class CoordinateSystemPreprocessor:
                     collinear_threshold=dashed_collinear_threshold,
                     gap_threshold=dashed_gap_threshold
                 )
-            print(f"  最终连接后: 水平线{len(horizontal_lines)}条, 垂直线{len(vertical_lines)}条")
+            print(f"  finaltextafter: horizontaltext{len(horizontal_lines)}text, verticaltext{len(vertical_lines)}text")
         
         # 5. 延伸并合并网格线：得到最终的网格
-        print("\n====== 步骤5: 延伸并合并网格线 ======")
+        print("\n====== text5: textgrid line ======")
         if horizontal_lines:
             merged_h_lines = self.extend_and_merge_lines(
                 horizontal_lines, 
@@ -1485,7 +1484,7 @@ class CoordinateSystemPreprocessor:
             x1, y1, x2, y2 = [int(coord) for coord in line]
             cv2.line(merged_grid_image, (x1, y1), (x2, y2), (255, 0, 0), 2)
         
-        print(f"  合并后: 水平线{len(merged_h_lines)}条, 垂直线{len(merged_v_lines)}条")
+        print(f"  textafter: horizontaltext{len(merged_h_lines)}text, verticaltext{len(merged_v_lines)}text")
         
         # 可视化透视校正检测到的角点（如果有）
         if grid_corners is not None and perspective_matrix is not None:

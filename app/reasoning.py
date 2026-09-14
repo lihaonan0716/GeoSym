@@ -38,7 +38,6 @@ from app.reasoning_schema import (
     condition_extrema_flag,
     stale_extrema_conditions,
 )
-from i18n import t, LANG_EN, LANG_ZH
 from generator.config_loader import load_config
 from evaluator.reasoning.intervention import (
     DEFAULT_INTERVENTION_MODE,
@@ -261,12 +260,12 @@ def _fmt_intercepts(ints: dict, is_zh: bool) -> str:
         parts.append(f"x: {xi}")
     if yi is not None:
         parts.append(f"y: (0, {yi})")
-    return ", ".join(parts) if parts else ("无" if is_zh else "None")
+    return ", ".join(parts) if parts else ("None")
 
 
 def _fmt_extrema(exts: list, is_zh: bool) -> str:
     if not isinstance(exts, list) or not exts:
-        return "无" if is_zh else "None"
+        return "None"
     return ", ".join(f"({e.get('x')},{e.get('y')}) {e.get('type','')}" for e in exts[:5])
 
 
@@ -310,17 +309,17 @@ def _section_layer_overview(eval_result: dict, layer_config: dict, lang: str) ->
     """Per-dimension score overview table (equal weights)."""
     from evaluator.metrics.reasoning import SCORED_DIMENSIONS
 
-    is_zh = lang == LANG_ZH
+    is_zh = False
     dim_scores = eval_result.get("dimension_scores", {})
     total = eval_result.get("total_score", 0)
 
-    header = ("维度" if is_zh else "Dimension",
-              "得分 (0~100)" if is_zh else "Score (0~100)")
+    header = ("Dimension",
+              "Score (0~100)")
     rows = [f"| {header[0]} | {header[1]} |", "|---|---:|"]
     for dim in SCORED_DIMENSIONS:
         sc = dim_scores.get(dim, 0)
         rows.append(f"| {_dim_label(dim, is_zh)} | {sc:.1f} |")
-    rows.append(f"| **{'等权平均' if is_zh else 'Equal-weight Average'}** | **{total:.1f}** |")
+    rows.append(f"| **{'Equal-weight Average'}** | **{total:.1f}** |")
     return "\n".join(rows)
 
 
@@ -328,16 +327,16 @@ def _section_dimension_detail(eval_result: dict, lang: str) -> str:
     """Per-dimension scoring comparison (prediction vs ground truth)."""
     from evaluator.metrics.reasoning import SCORED_DIMENSIONS
 
-    is_zh = lang == LANG_ZH
+    is_zh = False
     sub_scores = eval_result.get("sub_scores", {})
 
     def _esc(text: str) -> str:
         """Escape pipe characters so they don't break Markdown tables."""
         return text.replace("|", "\\|")
 
-    h = ("维度" if is_zh else "Dimension",
-         "得分" if is_zh else "Score", "预测值" if is_zh else "Predicted",
-         "真值" if is_zh else "Ground Truth")
+    h = ("Dimension",
+         "Score", "Predicted",
+         "Ground Truth")
     lines = [f"| {h[0]} | {h[1]} | {h[2]} | {h[3]} |",
              "|---|---:|---|---|"]
 
@@ -354,8 +353,8 @@ def _section_dimension_detail(eval_result: dict, lang: str) -> str:
 
 def _section_parsed_answers(parsed: dict, lang: str) -> str:
     """Display the structured answers extracted from LLM output."""
-    is_zh = lang == LANG_ZH
-    title = "解析后的结构化答案" if is_zh else "Parsed Structured Answers"
+    is_zh = False
+    title = "Parsed Structured Answers"
 
     def _fmt_val(key: str, val) -> str:
         if key == "coordinates":
@@ -366,7 +365,7 @@ def _section_parsed_answers(parsed: dict, lang: str) -> str:
                 s = ", ".join(pts)
                 if len(val) > 20:
                     s += f" +{len(val)-20}"
-                return s or ("无" if is_zh else "None")
+                return s or ("None")
             return str(val)
         if key == "intercepts":
             return _fmt_intercepts(val, is_zh) if isinstance(val, dict) else str(val)
@@ -381,8 +380,8 @@ def _section_parsed_answers(parsed: dict, lang: str) -> str:
         if key == "rate_of_change":
             return str(val) if val is not None else "N/A"
         if key == "inference_explanation":
-            return str(val) if val else ("无" if is_zh else "None")
-        return str(val) if val else ("无" if is_zh else "None")
+            return str(val) if val else ("None")
+        return str(val) if val else ("None")
 
     display_keys = [
         "expression", "domain", "range", "coordinates",
@@ -397,42 +396,42 @@ def _section_parsed_answers(parsed: dict, lang: str) -> str:
 
 def _section_prompt(prompt: str, lang: str) -> str:
     """Collapsible section showing the actual prompt sent to the LLM."""
-    title = "发送给 LLM 的 Prompt" if lang == LANG_ZH else "Prompt Sent to LLM"
+    title = "Prompt Sent to LLM"
     safe = _escape_for_codeblock(prompt)
     return f"<details><summary>{title}</summary>\n\n```\n{safe}\n```\n\n</details>"
 
 
 def _section_raw_response(raw: str, lang: str) -> str:
     """Collapsible section showing the LLM's raw output."""
-    title = "LLM 原始回复" if lang == LANG_ZH else "Raw LLM Response"
+    title = "Raw LLM Response"
     safe = _escape_for_codeblock(raw)
     return f"<details><summary>{title}</summary>\n\n```\n{safe}\n```\n\n</details>"
 
 
 def _section_geosym_detail(detected_coords: list, lang: str, intervention: dict | None = None) -> str:
     """Collapsible section showing GeoSym coordinate detection details."""
-    is_zh = lang == LANG_ZH
-    title = "GeoSym 识别详情" if is_zh else "GeoSym Recognition Details"
+    is_zh = False
+    title = "GeoSym Recognition Details"
     pts = [f"({p[0]},{p[1]})" if isinstance(p, (list, tuple))
            else f"({p.get('coordinate_x','?')},{p.get('coordinate_y','?')})"
            for p in detected_coords[:30]]
-    coord_str = ", ".join(pts) if pts else ("无" if is_zh else "None")
+    coord_str = ", ".join(pts) if pts else ("None")
     if len(detected_coords) > 30:
         coord_str += f" +{len(detected_coords)-30}"
     body_lines = [
-        f"- **{'检测坐标数' if is_zh else 'Detected Points'}:** {len(detected_coords)}",
-        f"- **{'坐标列表' if is_zh else 'Coordinate List'}:** {coord_str}",
+        f"- **{'Detected Points'}:** {len(detected_coords)}",
+        f"- **{'Coordinate List'}:** {coord_str}",
     ]
     if intervention:
-        body_lines.insert(0, f"- **{'干预模式' if is_zh else 'Intervention Mode'}:** {intervention.get('label', intervention.get('mode', 'N/A'))}")
-        body_lines.append(f"- **{'说明' if is_zh else 'Description'}:** {intervention.get('description', '')}")
+        body_lines.insert(0, f"- **{'Intervention Mode'}:** {intervention.get('label', intervention.get('mode', 'N/A'))}")
+        body_lines.append(f"- **{'Description'}:** {intervention.get('description', '')}")
         for line in intervention.get("summary", []):
-            body_lines.append(f"- **{'结构化摘要' if is_zh else 'Structured Summary'}:** {line}")
+            body_lines.append(f"- **{'Structured Summary'}:** {line}")
         facts_text = intervention.get("facts_text", "")
         if facts_text and facts_text != "Not provided in this intervention profile.":
             safe_facts = _escape_for_codeblock(facts_text)
             body_lines.append("")
-            body_lines.append(f"**{'派生图表事实' if is_zh else 'Derived Chart Facts'}:**")
+            body_lines.append(f"**{'Derived Chart Facts'}:**")
             body_lines.append(f"```json\n{safe_facts}\n```")
     body = "\n".join(body_lines)
     return f"<details><summary>{title}</summary>\n\n{body}\n\n</details>"
@@ -442,15 +441,15 @@ def _section_judge_detail(judge_result: dict | None, lang: str) -> str:
     """Collapsible section showing Judge LLM evaluation for mathematical inference."""
     if not judge_result:
         return ""
-    is_zh = lang == LANG_ZH
-    title = "Judge 评分详情" if is_zh else "Judge Evaluation Details"
+    is_zh = False
+    title = "Judge Evaluation Details"
 
     label_map = {
-        "factual_accuracy": "事实准确性" if is_zh else "Factual Accuracy",
-        "inference_quality": "推断质量" if is_zh else "Inference Quality",
-        "reasoning_coherence": "推理连贯性" if is_zh else "Reasoning Coherence",
-        "evidence_support": "证据支撑" if is_zh else "Evidence Support",
-        "comments": "评语" if is_zh else "Comments",
+        "factual_accuracy": "Factual Accuracy",
+        "inference_quality": "Inference Quality",
+        "reasoning_coherence": "Reasoning Coherence",
+        "evidence_support": "Evidence Support",
+        "comments": "Comments",
     }
 
     sub_scores = judge_result.get("sub_scores", {})
@@ -466,12 +465,12 @@ def _section_judge_detail(judge_result: dict | None, lang: str) -> str:
 
     body = "\n".join(items)
     score = judge_result.get("judge_inference_score", judge_result.get("judge_score", 0))
-    header = f"**{'Judge 综合分' if is_zh else 'Judge Score'}:** {score:.3f}/100\n\n"
+    header = f"**{'Judge Score'}:** {score:.3f}/100\n\n"
 
     raw_judge = judge_result.get("raw_judge_response", "")
     raw_section = ""
     if raw_judge:
-        raw_title = "Judge 原始回复" if is_zh else "Judge Raw Response"
+        raw_title = "Judge Raw Response"
         safe_judge = _escape_for_codeblock(raw_judge)
         raw_section = f"\n\n<details><summary>{raw_title}</summary>\n\n```\n{safe_judge}\n```\n\n</details>"
 
@@ -485,16 +484,16 @@ def _escape_for_codeblock(text: str) -> str:
 
 def _section_reasoning_steps(pipeline_result: dict, lang: str) -> str:
     """Render collapsible step details for both staged and single-step pipelines."""
-    is_zh = lang == LANG_ZH
+    is_zh = False
     step_labels = {
-        "L1": "Step 1: Reading the Graph" if not is_zh else "Step 1: 读图",
-        "L2": "Step 2: Quantitative Analysis" if not is_zh else "Step 2: 量化分析",
-        "L3": "Step 3: Reasoning" if not is_zh else "Step 3: 推理",
-        "DirectQA": "Direct QA" if not is_zh else "直接问答",
-        "DirectQA-CoT": "Direct QA + CoT" if not is_zh else "直接问答 + CoT",
-        "OCRRulesQA": "OCR + Rules QA" if not is_zh else "OCR + 规则问答",
-        "OCRRules-CoT": "OCR + Rules + CoT" if not is_zh else "OCR + 规则 + CoT",
-        "SelfConsistency": "Self-Consistency Aggregate" if not is_zh else "自一致性聚合",
+        "L1": "Step 1: Reading the Graph",
+        "L2": "Step 2: Quantitative Analysis",
+        "L3": "Step 3: Reasoning",
+        "DirectQA": "Direct QA",
+        "DirectQA-CoT": "Direct QA + CoT",
+        "OCRRulesQA": "OCR + Rules QA",
+        "OCRRules-CoT": "OCR + Rules + CoT",
+        "SelfConsistency": "Self-Consistency Aggregate",
     }
     parts = []
     steps = pipeline_result.get("steps", {})
@@ -517,21 +516,21 @@ def _section_reasoning_steps(pipeline_result: dict, lang: str) -> str:
 
         block = [
             f"<details><summary><b>{label}</b></summary>\n",
-            f"**{'解析结果' if is_zh else 'Parsed Output'}:**",
+            f"**{'Parsed Output'}:**",
             f"```json\n{safe_parsed}\n```",
             "",
-            f"<details><summary>{'Prompt' if not is_zh else '提示词'}</summary>\n",
+            f"<details><summary>{'Prompt'}</summary>\n",
             f"```\n{safe_prompt}\n```",
             "\n</details>",
             "",
-            f"<details><summary>{'Raw Response' if not is_zh else '原始回复'}</summary>\n",
+            f"<details><summary>{'Raw Response'}</summary>\n",
             f"```\n{safe_raw}\n```",
             "\n</details>",
             "\n</details>",
         ]
         parts.append("\n".join(block))
 
-    title = "Reasoning Steps" if not is_zh else "推理步骤"
+    title = "Reasoning Steps"
     inner = "\n\n".join(parts)
     return f"<details><summary><b>{title}</b></summary>\n\n{inner}\n\n</details>"
 
@@ -553,12 +552,12 @@ def _format_path_result(
 
     Sections are built by independent helpers for easy extension.
     """
-    is_zh = lang == LANG_ZH
+    is_zh = False
     total = eval_result.get("total_score", 0)
     sections = [
         f"### {path_label}",
         "",
-        f"**{'总分' if is_zh else 'Total Score'}:** {total:.3f}/100",
+        f"**{'Total Score'}:** {total:.3f}/100",
         "",
         _section_layer_overview(eval_result, layer_config, lang),
         "",
@@ -607,15 +606,15 @@ _run_judge = run_judge
 
 
 def _condition_labels(lang: str) -> dict:
-    is_zh = lang == LANG_ZH
+    is_zh = False
     return {
-        "E0": "E0: " + ("DirectQA" if not is_zh else "直接视觉问答"),
-        "E1": "E1: " + ("DirectQA-CoT" if not is_zh else "直接视觉问答 + CoT"),
-        "E2": "E2: " + ("DirectQA-SelfConsistency" if not is_zh else "直接视觉问答 + 自一致性"),
-        "E3": "E3: " + ("OCRRulesQA" if not is_zh else "OCR + 规则问答"),
-        "E4": "E4: " + ("OCRRules-CoT" if not is_zh else "OCR + 规则问答 + CoT"),
-        "E5": "E5: " + ("FullGeoSym" if not is_zh else "完整 GeoSym"),
-        "E5_raw": "E5_raw: " + ("GeoSym-Raw" if not is_zh else "GeoSym 原始坐标"),
+        "E0": "E0: " + ("DirectQA"),
+        "E1": "E1: " + ("DirectQA-CoT"),
+        "E2": "E2: " + ("DirectQA-SelfConsistency"),
+        "E3": "E3: " + ("OCRRulesQA"),
+        "E4": "E4: " + ("OCRRules-CoT"),
+        "E5": "E5: " + ("FullGeoSym"),
+        "E5_raw": "E5_raw: " + ("GeoSym-Raw"),
     }
 
 
@@ -635,25 +634,25 @@ def run_reasoning_comparison(
     """Run the quick comparison between `E0` and `E5` for one image."""
     from evaluator.metrics.reasoning import evaluate_comprehensive
 
-    is_zh = lang == LANG_ZH
+    is_zh = False
     blank_outputs = _empty_condition_outputs()
     condition_labels = _condition_labels(lang)
 
     if not image_name:
-        msg = "请选择图像" if is_zh else "Please select an image"
+        msg = "Please select an image"
         yield (msg, "") + blank_outputs
         return
 
     img, gt = load_image_and_gt(image_name)
     if img is None or gt is None:
-        msg = "图像加载失败" if is_zh else "Failed to load image"
+        msg = "Failed to load image"
         yield (msg, "") + blank_outputs
         return
 
     question = gt.get("question", {})
     gt_data = question.get("ground_truth", {})
     if not gt_data:
-        msg = "该图像无综合题目数据" if is_zh else "This image has no comprehensive question data"
+        msg = "This image has no comprehensive question data"
         yield (msg, "") + blank_outputs
         return
 
@@ -662,21 +661,21 @@ def run_reasoning_comparison(
     if len(gt_coords) > 15:
         gt_coords_str += f" +{len(gt_coords)-15}"
     pred_tgt = gt_data.get("prediction_targets", {})
-    pred_tgt_str = ", ".join(f"f({x})={y}" for x, y in pred_tgt.items()) if pred_tgt else ("无" if is_zh else "None")
+    pred_tgt_str = ", ".join(f"f({x})={y}" for x, y in pred_tgt.items()) if pred_tgt else ("None")
     roc_info = gt_data.get("rate_of_change", {})
-    roc_str = f"{roc_info.get('gt_value', 'N/A')} (x∈[{roc_info.get('x1', '?')},{roc_info.get('x2', '?')}])" if roc_info else ("无" if is_zh else "None")
+    roc_str = f"{roc_info.get('gt_value', 'N/A')} (x∈[{roc_info.get('x1', '?')},{roc_info.get('x2', '?')}])" if roc_info else ("None")
     gt_lines = [
-        f"### {'标准答案' if is_zh else 'Ground Truth'}",
-        f"- **{'表达式' if is_zh else 'Expression'}:** {gt_data.get('expression', '')}",
-        f"- **{'定义域' if is_zh else 'Domain'}:** {gt_data.get('domain', '')}",
-        f"- **{'值域' if is_zh else 'Range'}:** {gt_data.get('range', '')}",
-        f"- **{'坐标' if is_zh else 'Coordinates'}:** {gt_coords_str or ('无' if is_zh else 'None')}",
-        f"- **{'截距' if is_zh else 'Intercepts'}:** {_fmt_intercepts(gt_data.get('intercepts', {}), is_zh)}",
-        f"- **{'极值点' if is_zh else 'Extrema'}:** {_fmt_extrema(gt_data.get('extrema', []), is_zh)}",
-        f"- **{'函数值预测' if is_zh else 'Prediction Targets'}:** {pred_tgt_str}",
-        f"- **{'变化率' if is_zh else 'Rate of Change'}:** {roc_str}",
-        f"- **{'单调性' if is_zh else 'Monotonicity'}:** {_fmt_monotonicity(gt_data.get('monotonicity', []))}",
-        f"- **{'对称性' if is_zh else 'Symmetry'}:** {gt_data.get('symmetry', 'N/A')}",
+        f"### {'Ground Truth'}",
+        f"- **{'Expression'}:** {gt_data.get('expression', '')}",
+        f"- **{'Domain'}:** {gt_data.get('domain', '')}",
+        f"- **{'Range'}:** {gt_data.get('range', '')}",
+        f"- **{'Coordinates'}:** {gt_coords_str or ('None')}",
+        f"- **{'Intercepts'}:** {_fmt_intercepts(gt_data.get('intercepts', {}), is_zh)}",
+        f"- **{'Extrema'}:** {_fmt_extrema(gt_data.get('extrema', []), is_zh)}",
+        f"- **{'Prediction Targets'}:** {pred_tgt_str}",
+        f"- **{'Rate of Change'}:** {roc_str}",
+        f"- **{'Monotonicity'}:** {_fmt_monotonicity(gt_data.get('monotonicity', []))}",
+        f"- **{'Symmetry'}:** {gt_data.get('symmetry', 'N/A')}",
     ]
     gt_md = "\n\n".join(gt_lines)
 
@@ -684,13 +683,13 @@ def run_reasoning_comparison(
     if not key:
         key = _get_saved_key(model_name)
     if not key:
-        msg = "请输入 API Key" if is_zh else "Please enter API Key"
+        msg = "Please enter API Key"
         yield (gt_md, msg) + blank_outputs
         return
 
     img_path = _resolve_image_path(image_name)
     if img_path is None:
-        msg = "图像文件未找到" if is_zh else "Image file not found"
+        msg = "Image file not found"
         yield (gt_md, msg) + blank_outputs
         return
 
@@ -702,7 +701,7 @@ def run_reasoning_comparison(
 
     layer_config = _load_layer_config()
     judge_adapter = _ensure_judge_adapter(judge_model_name, judge_api_key, model_name, key)
-    progress = "🔄 " + ("正在运行 E0 与 E5…" if is_zh else "Running E0 and E5…")
+    progress = "🔄 " + ("Running E0 and E5…")
     yield (gt_md, progress) + blank_outputs
 
     def _run_e0():
@@ -747,7 +746,7 @@ def run_reasoning_comparison(
         except Exception as exc:
             result_md[cond] = f"**{cond} Error:** {exc}"
 
-        progress = "✅ " + cond + " " + ("完成" if is_zh else "done")
+        progress = "✅ " + cond + " " + ("done")
         if cond == "E0":
             progress += " · 🔄 E5…"
 
@@ -763,7 +762,7 @@ def run_reasoning_comparison(
             result_md["E5_raw"],
         )
 
-    done = "✅ " + ("全部完成" if is_zh else "All done")
+    done = "✅ " + ("All done")
     yield (
         gt_md,
         done,
@@ -789,24 +788,24 @@ def _build_progress_bar(
     """Build a live progress indicator showing each condition's status."""
     icons = {"done": "✅", "skip": "⏭️", "run": "🔄", "wait": "⏳", "fail": "❌"}
     lines = [
-        f"### {'执行进度' if is_zh else 'Execution Progress'}",
+        f"### {'Execution Progress'}",
         "",
     ]
     for ck in condition_order:
         label = condition_labels.get(ck, ck)
         if ck in failed:
-            icon, status = icons["fail"], ("失败" if is_zh else "Failed")
+            icon, status = icons["fail"], ("Failed")
         elif ck in completed:
-            icon, status = icons["done"], ("完成" if is_zh else "Done")
+            icon, status = icons["done"], ("Done")
         elif ck in skipped:
-            icon, status = icons["skip"], ("缓存" if is_zh else "Cached")
+            icon, status = icons["skip"], ("Cached")
         elif ck == current_step:
-            icon, status = icons["run"], ("**运行中…**" if is_zh else "**Running…**")
+            icon, status = icons["run"], ("**Running…**")
         else:
-            icon, status = icons["wait"], ("等待中" if is_zh else "Pending")
+            icon, status = icons["wait"], ("Pending")
         lines.append(f"{icon} **{ck}** {label.split(': ', 1)[-1]} — {status}")
     lines.append("")
-    lines.append(f"> {'当前步骤' if is_zh else 'Current'}: **{current_step}**")
+    lines.append(f"> {'Current'}: **{current_step}**")
     return "\n\n".join(lines)
 
 
@@ -827,7 +826,7 @@ def run_reasoning_all_conditions(
         load_reasoning_cache, save_reasoning_cache,
     )
 
-    is_zh = lang == LANG_ZH
+    is_zh = False
     condition_order = list(CONDITION_ORDER)
     condition_labels = _condition_labels(lang)
     target_set = {ck for ck in (target_conditions or []) if ck in condition_order}
@@ -836,25 +835,25 @@ def run_reasoning_all_conditions(
     run_started_perf = time.perf_counter()
 
     if target_conditions is not None and not requested_conditions:
-        msg = "请选择有效实验条件" if is_zh else "Please select a valid condition"
+        msg = "Please select a valid condition"
         yield (msg,) + ("",) * 8
         return
 
     if not image_name:
-        msg = "请选择图像" if is_zh else "Please select an image"
+        msg = "Please select an image"
         yield (msg,) + ("",) * 8
         return
 
     img, gt = load_image_and_gt(image_name)
     if img is None or gt is None:
-        msg = "图像加载失败" if is_zh else "Failed to load image"
+        msg = "Failed to load image"
         yield (msg,) + ("",) * 8
         return
 
     question = gt.get("question", {})
     gt_data = question.get("ground_truth", {})
     if not gt_data:
-        msg = "该图像无综合题目数据" if is_zh else "This image has no comprehensive question data"
+        msg = "This image has no comprehensive question data"
         yield (msg,) + ("",) * 8
         return
 
@@ -863,21 +862,21 @@ def run_reasoning_all_conditions(
     if len(gt_coords) > 15:
         gt_coords_str += f" +{len(gt_coords)-15}"
     pred_tgt = gt_data.get("prediction_targets", {})
-    pred_tgt_str = ", ".join(f"f({x})={y}" for x, y in pred_tgt.items()) if pred_tgt else ("无" if is_zh else "None")
+    pred_tgt_str = ", ".join(f"f({x})={y}" for x, y in pred_tgt.items()) if pred_tgt else ("None")
     roc_info = gt_data.get("rate_of_change", {})
-    roc_str = f"{roc_info.get('gt_value', 'N/A')} (x∈[{roc_info.get('x1', '?')},{roc_info.get('x2', '?')}])" if roc_info else ("无" if is_zh else "None")
+    roc_str = f"{roc_info.get('gt_value', 'N/A')} (x∈[{roc_info.get('x1', '?')},{roc_info.get('x2', '?')}])" if roc_info else ("None")
     gt_lines = [
-        f"### {'标准答案' if is_zh else 'Ground Truth'}",
-        f"- **{'表达式' if is_zh else 'Expression'}:** {gt_data.get('expression', '')}",
-        f"- **{'定义域' if is_zh else 'Domain'}:** {gt_data.get('domain', '')}",
-        f"- **{'值域' if is_zh else 'Range'}:** {gt_data.get('range', '')}",
-        f"- **{'坐标' if is_zh else 'Coordinates'}:** {gt_coords_str or ('无' if is_zh else 'None')}",
-        f"- **{'截距' if is_zh else 'Intercepts'}:** {_fmt_intercepts(gt_data.get('intercepts', {}), is_zh)}",
-        f"- **{'极值点' if is_zh else 'Extrema'}:** {_fmt_extrema(gt_data.get('extrema', []), is_zh)}",
-        f"- **{'函数值预测' if is_zh else 'Prediction Targets'}:** {pred_tgt_str}",
-        f"- **{'变化率' if is_zh else 'Rate of Change'}:** {roc_str}",
-        f"- **{'单调性' if is_zh else 'Monotonicity'}:** {_fmt_monotonicity(gt_data.get('monotonicity', []))}",
-        f"- **{'对称性' if is_zh else 'Symmetry'}:** {gt_data.get('symmetry', 'N/A')}",
+        f"### {'Ground Truth'}",
+        f"- **{'Expression'}:** {gt_data.get('expression', '')}",
+        f"- **{'Domain'}:** {gt_data.get('domain', '')}",
+        f"- **{'Range'}:** {gt_data.get('range', '')}",
+        f"- **{'Coordinates'}:** {gt_coords_str or ('None')}",
+        f"- **{'Intercepts'}:** {_fmt_intercepts(gt_data.get('intercepts', {}), is_zh)}",
+        f"- **{'Extrema'}:** {_fmt_extrema(gt_data.get('extrema', []), is_zh)}",
+        f"- **{'Prediction Targets'}:** {pred_tgt_str}",
+        f"- **{'Rate of Change'}:** {roc_str}",
+        f"- **{'Monotonicity'}:** {_fmt_monotonicity(gt_data.get('monotonicity', []))}",
+        f"- **{'Symmetry'}:** {gt_data.get('symmetry', 'N/A')}",
     ]
     gt_md = "\n\n".join(gt_lines)
 
@@ -885,13 +884,13 @@ def run_reasoning_all_conditions(
     if not key:
         key = _get_saved_key(model_name)
     if not key:
-        msg = "请输入 API Key" if is_zh else "Please enter API Key"
+        msg = "Please enter API Key"
         yield (gt_md, msg) + ("",) * 7
         return
 
     img_path = _resolve_image_path(image_name)
     if img_path is None:
-        msg = "图像文件未找到" if is_zh else "Image file not found"
+        msg = "Image file not found"
         yield (gt_md, msg) + ("",) * 7
         return
 
@@ -1018,7 +1017,7 @@ def run_reasoning_all_conditions(
         skipped=skip_conds,
         failed=geosym_failed_conds | judge_failed_conds,
         is_zh=is_zh,
-    ) + "\n\n> " + ("正在初始化…" if is_zh else "Initializing…")
+    ) + "\n\n> " + ("Initializing…")
     yield _snapshot()
 
     cached_geosym = cached.get("geosym_artifacts", {}) if cached else {}
@@ -1151,7 +1150,7 @@ def run_reasoning_all_conditions(
                 geosym_failed_conds.add(cond_key)
                 results_md[cond_key] = (
                     f"**{condition_labels[cond_key]}**\n\n"
-                    f"❌ {'GeoSym 提取失败，该条件数据无效' if is_zh else 'GeoSym extraction failed — condition invalid'}"
+                    f"❌ {'GeoSym extraction failed — condition invalid'}"
                 )
                 cond_statuses[cond_key] = "geosym_failed"
             else:
@@ -1162,9 +1161,9 @@ def run_reasoning_all_conditions(
         yield _snapshot()
 
     # ---- Summary Table ----
-    dim_header = "维度" if is_zh else "Dimension"
+    dim_header = "Dimension"
     tbl = [
-        f"### {'六条件评分对比' if is_zh else 'Six-Condition Score Comparison'}",
+        f"### {'Six-Condition Score Comparison'}",
         "",
         f"| {dim_header} | " + " | ".join(condition_order) + " |",
         "|---|" + "---|" * len(condition_order),
@@ -1198,20 +1197,14 @@ def run_reasoning_all_conditions(
     # Status line: show which conditions were cached vs freshly run
     if loaded_from_cache:
         cached_list = ", ".join(sorted(loaded_from_cache))
-        fresh_list = ", ".join(sorted(set(requested_conditions) - skip_conds)) or ("无" if is_zh else "None")
+        fresh_list = ", ".join(sorted(set(requested_conditions) - skip_conds)) or ("None")
         tbl.append("")
-        if is_zh:
-            tbl.append(f"> ℹ️ 已缓存: {cached_list} | 本次运行: {fresh_list}")
-        else:
-            tbl.append(f"> ℹ️ Cached: {cached_list} | Ran this time: {fresh_list}")
+        tbl.append(f"> ℹ️ Cached: {cached_list} | Ran this time: {fresh_list}")
 
     if target_set:
         tbl.append("")
         selected_text = ", ".join(requested_conditions)
-        if is_zh:
-            tbl.append(f"> ℹ️ 本次仅重跑所选条件: {selected_text}")
-        else:
-            tbl.append(f"> ℹ️ Re-ran selected conditions only: {selected_text}")
+        tbl.append(f"> ℹ️ Re-ran selected conditions only: {selected_text}")
 
     all_failed = judge_failed_conds | geosym_failed_conds
     if all_failed:
@@ -1219,18 +1212,12 @@ def run_reasoning_all_conditions(
         parts = []
         if judge_failed_conds:
             jf = ", ".join(sorted(judge_failed_conds))
-            if is_zh:
-                parts.append(f"条件 **{jf}** 的 Judge 评估失败（已重试 5 次）")
-            else:
-                parts.append(f"Judge evaluation failed for **{jf}** (after 5 retries)")
+            parts.append(f"Judge evaluation failed for **{jf}** (after 5 retries)")
         if geosym_failed_conds:
             gf = ", ".join(sorted(geosym_failed_conds))
-            if is_zh:
-                parts.append(f"条件 **{gf}** 的 GeoSym 提取失败")
-            else:
-                parts.append(f"GeoSym extraction failed for **{gf}**")
-        separator = "；" if is_zh else "; "
-        suffix = "，标记为无效数据（—）。可点击「重跑失败条件」补全。" if is_zh else ". Marked as invalid (—). Click 'Re-run Failed' to retry."
+            parts.append(f"GeoSym extraction failed for **{gf}**")
+        separator = "; "
+        suffix = ". Marked as invalid (—). Click 'Re-run Failed' to retry."
         tbl.append(f"> ⚠️ {separator.join(parts)}{suffix}")
 
     summary_md = "\n".join(tbl)

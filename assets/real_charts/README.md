@@ -12,8 +12,7 @@ assets/real_charts/
 ├── engisphere/               # Engineering charts (grid_aware)
 │   ├── engisphere_001/
 │   │   ├── meta.json
-│   │   ├── image.png
-│   │   └── state.json       # Generator state (engisphere only)
+│   │   └── image.png
 │   └── ...
 └── omniscience/              # Scientific charts (grid_free)
     └── omniscience_001/
@@ -56,6 +55,9 @@ question, gold answer, answer validation rule, and any curated facts used by the
 presenter path. These assets are therefore suitable for task-level presenter
 diagnostics, not for point-level extrema validation unless additional
 coordinate-level annotations are created in a separate, provenance-tracked pass.
+
+Local generator state files, when present, are dev-local capture artifacts and
+are not part of the public asset contract.
 
 ## Data Sources and Attribution
 

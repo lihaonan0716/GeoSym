@@ -11,7 +11,6 @@ from pathlib import Path as _Path
 _exp_root = _Path(__file__).resolve().parent.parent.parent
 if str(_exp_root) not in _sys.path:
     _sys.path.insert(0, str(_exp_root))
-from i18n import log_tag as _lt  # noqa: E402
 
 def calculate_adaptive_font_scale(x_tick_labels: List[Dict], 
                                    y_tick_labels: List[Dict],
@@ -63,7 +62,7 @@ def calculate_adaptive_font_scale(x_tick_labels: List[Dict],
     avg_char_width = np.mean(char_widths)
     avg_char_height = np.mean(char_heights)
     
-    print(f"[{_lt('可视化')}] 刻度标签平均字符: 宽度={avg_char_width:.1f}px, 高度={avg_char_height:.1f}px")
+    print(f"[Visualization] Average tick-label character: width={avg_char_width:.1f}px, height={avg_char_height:.1f}px")
     
     # 估算最长的坐标文本（如 "(-10,-10)"）
     # 获取坐标范围来估算
@@ -79,7 +78,7 @@ def calculate_adaptive_font_scale(x_tick_labels: List[Dict],
     
     max_label_width = len(test_text) * min(avg_char_width, avg_char_height) * 0.8
 
-    print(f"[{_lt('可视化')}] 最大坐标值={max_value:.0f}, 测试文本='{test_text}', 目标宽度={max_label_width:.1f}px")
+    print(f"[Visualization] Maximum coordinate value={max_value:.0f}, test text='{test_text}', textwidth={max_label_width:.1f}px")
 
     # 反推font_scale：从小到大测试，找到能放入目标宽度的最大font_scale
     best_font_scale = 0.3
@@ -102,7 +101,7 @@ def calculate_adaptive_font_scale(x_tick_labels: List[Dict],
     # 限制范围
     best_font_scale = max(0.25, min(1, best_font_scale))
     
-    print(f"[{_lt('可视化')}] 最终font_scale={best_font_scale:.2f}")
+    print(f"[Visualization] Final font_scale={best_font_scale:.2f}")
     
     return best_font_scale
 
@@ -296,8 +295,8 @@ def draw_intersections_on_image(image: np.ndarray, points: List[Dict],
     circle_border_radius = circle_outer_radius + 1
     circle_border_thickness = max(1, int(2 * font_scale * circle_scale))
     
-    print(f"[{_lt('绘图工具')}] 自适应参数: font_scale={font_scale:.2f}, thickness={thickness}, padding={padding}")
-    print(f"[{_lt('绘图工具')}] 交点半径: outer={circle_outer_radius}px, inner={circle_inner_radius}px, border={circle_border_radius}px")
+    print(f"[DrawUtil] Adaptive parameters: font_scale={font_scale:.2f}, thickness={thickness}, padding={padding}")
+    print(f"[DrawUtil] Intersection radius: outer={circle_outer_radius}px, inner={circle_inner_radius}px, border={circle_border_radius}px")
     
     # 绘制每个交点
     for pt in points:

@@ -190,7 +190,6 @@ GeoSym/
 ├── scripts/         # CLI tools
 ├── tests/           # Test suite
 ├── docs/            # Technical documentation
-├── i18n.py          # Bilingual internationalization (EN/ZH)
 └── requirements.txt
 ```
 

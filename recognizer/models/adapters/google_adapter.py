@@ -41,7 +41,7 @@ class GoogleAdapter(BaseModelAdapter):
         except Exception as e:
             import traceback
             error_detail = traceback.format_exc()
-            print(f"[GoogleAdapter] 处理失败: {str(e)}")
+            print(f"[GoogleAdapter] Processing failed: {str(e)}")
             print(error_detail)
             
             return self._create_error_result(

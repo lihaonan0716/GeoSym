@@ -11,7 +11,6 @@ from app.helpers import (
     _get_saved_key,
     _create_llm_adapter, list_dataset_images, load_image_and_gt,
 )
-from i18n import t, LANG_EN, LANG_ZH
 from evaluator.adapters.base import BaseLLMAdapter
 
 
@@ -169,7 +168,7 @@ def _format_expr_result_single(
     lang: str,
 ) -> str:
     """Format expression recognition results for single image display."""
-    is_zh = lang == LANG_ZH
+    is_zh = False
 
     lines = []
 
@@ -182,8 +181,8 @@ def _format_expr_result_single(
         lines.append("| Metric | Direct | GeoSym-Assisted |")
     lines.append("|--------|-------:|----------------:|")
     lines.append(f"| R² | {direct_metrics.get('mean_r2', 0):.4f} | {geosym_metrics.get('mean_r2', 0):.4f} |")
-    lines.append(f"| {'符号等价率' if is_zh else 'Sym Equiv Rate'} | {direct_metrics.get('sym_equiv_rate', 0):.0%} | {geosym_metrics.get('sym_equiv_rate', 0):.0%} |")
-    lines.append(f"| {'类型准确率' if is_zh else 'Type Accuracy'} | {direct_metrics.get('type_accuracy', 0):.0%} | {geosym_metrics.get('type_accuracy', 0):.0%} |")
+    lines.append(f"| {'Sym Equiv Rate'} | {direct_metrics.get('sym_equiv_rate', 0):.0%} | {geosym_metrics.get('sym_equiv_rate', 0):.0%} |")
+    lines.append(f"| {'Type Accuracy'} | {direct_metrics.get('type_accuracy', 0):.0%} | {geosym_metrics.get('type_accuracy', 0):.0%} |")
     lines.append(f"| NRMSE | {direct_metrics.get('mean_nrmse', 0):.4f} | {geosym_metrics.get('mean_nrmse', 0):.4f} |")
 
     # Per-curve detail
@@ -214,8 +213,8 @@ def _format_expr_result_single(
 
     # Raw responses (collapsed)
     lines.append("")
-    lines.append(f"<details><summary>{'直接模式原始响应' if is_zh else 'Direct Mode Raw Response'}</summary>\n\n```\n{direct_raw}\n```\n</details>")
-    lines.append(f"<details><summary>{'GeoSym 模式原始响应' if is_zh else 'GeoSym Mode Raw Response'}</summary>\n\n```\n{geosym_raw}\n```\n</details>")
+    lines.append(f"<details><summary>{'Direct Mode Raw Response'}</summary>\n\n```\n{direct_raw}\n```\n</details>")
+    lines.append(f"<details><summary>{'GeoSym Mode Raw Response'}</summary>\n\n```\n{geosym_raw}\n```\n</details>")
 
     return "\n".join(lines)
 
@@ -287,7 +286,7 @@ def _load_expr_pk_results() -> Tuple[str, dict, str, str]:
         }
         images = pk_data["images"]
         total_pages = max(1, -(-len(images) // EXPR_PK_PAGE_SIZE))
-        detail = _render_expr_pk_detail_page(pk_data, page=0, lang=LANG_ZH)
+        detail = _render_expr_pk_detail_page(pk_data, page=0, lang="English")
         return summary_text, pk_data, detail, f"1 / {total_pages}"
     except Exception:
         return "", {}, "", "- / -"
@@ -296,7 +295,7 @@ def _load_expr_pk_results() -> Tuple[str, dict, str, str]:
 def _render_expr_pk_detail_page(
     pk_data: dict,
     page: int = 0,
-    lang: str = LANG_ZH,
+    lang: str = "English",
     search_query: str = "",
 ) -> str:
     """Render one page of the per-image expression PK detail table."""
@@ -312,7 +311,7 @@ def _render_expr_pk_detail_page(
         images = [img for img in images if query in img.lower()]
 
     if not images:
-        return "No matching images." if lang == LANG_EN else "没有匹配的图像。"
+        return "No matching images."
 
     total_pages = max(1, -(-len(images) // EXPR_PK_PAGE_SIZE))
     page = max(0, min(page, total_pages - 1))
@@ -321,10 +320,10 @@ def _render_expr_pk_detail_page(
     end = min(start + EXPR_PK_PAGE_SIZE, len(images))
     page_images = images[start:end]
 
-    is_zh = lang == LANG_ZH
+    is_zh = False
 
     # Build header: for each method, two columns (Direct, GeoSym)
-    header_cells = ["图像" if is_zh else "Image"]
+    header_cells = ["Image"]
     sep_cells = ["|------"]
     for method_name in methods:
         header_cells.append(f"{method_name} Direct")
@@ -333,7 +332,7 @@ def _render_expr_pk_detail_page(
         sep_cells.append("|------")
 
     lines = [
-        f"**{'每张图像详情' if is_zh else 'Per-Image Detail'}** — {'第' if is_zh else 'Page'} {page + 1}/{total_pages} ({'共' if is_zh else ''}{len(images)} {'张' if is_zh else 'images'})\n",
+        f"**{'Per-Image Detail'}** — {'Page'} {page + 1}/{total_pages} ({''}{len(images)} {'images'})\n",
         "| " + " | ".join(header_cells) + " |",
         "".join(sep_cells) + "|",
     ]
@@ -361,17 +360,17 @@ def run_expr_single(
 ) -> str:
     """Run expression recognition on a single image with both modes."""
     if not image_name:
-        return t("no_image_selected", lang)
+        return 'No image selected'
     if not method:
-        return "Please select a model." if lang == LANG_EN else "请选择模型。"
+        return "Please select a model."
 
     img, gt = load_image_and_gt(image_name)
     if img is None or gt is None:
-        return t("image_not_found", lang)
+        return 'Image not found'
 
     gt_functions = gt.get("functions", [])
     if not gt_functions:
-        return "No functions in ground truth." if lang == LANG_EN else "真值中无函数。"
+        return "No functions in ground truth."
 
     x_range = tuple(gt.get("x_range", [-5, 5]))
     img_path = str(_images_dir / f"{image_name}.png")
@@ -411,27 +410,27 @@ def run_expr_multi_model(
     """Run expression recognition on a single image with multiple models."""
     _ensure_expr_metrics()
     if not image_name:
-        return t("no_image_selected", lang)
+        return 'No image selected'
     if not selected_methods:
-        return "Please select at least one model." if lang == LANG_EN else "请至少选择一个模型。"
+        return "Please select at least one model."
 
     img, gt = load_image_and_gt(image_name)
     if img is None or gt is None:
-        return t("image_not_found", lang)
+        return 'Image not found'
 
     gt_functions = gt.get("functions", [])
     if not gt_functions:
-        return "No functions in ground truth." if lang == LANG_EN else "真值中无函数。"
+        return "No functions in ground truth."
 
     x_range = tuple(gt.get("x_range", [-5, 5]))
     img_path = str(_images_dir / f"{image_name}.png")
-    is_zh = lang == LANG_ZH
+    is_zh = False
 
     # Header
-    header = ["模型" if is_zh else "Model", "模式" if is_zh else "Mode", "R²",
-              "符号等价" if is_zh else "Sym Equiv", "类型准确" if is_zh else "Type Acc", "NRMSE"]
+    header = ["Model", "Mode", "R²",
+              "Sym Equiv", "Type Acc", "NRMSE"]
     lines = [
-        f"#### {'多模型函数识别对比' if is_zh else 'Multi-Model Expression Recognition Comparison'} — {image_name}\n",
+        f"#### {'Multi-Model Expression Recognition Comparison'} — {image_name}\n",
         "| " + " | ".join(header) + " |",
         "|---|---|---:|:---:|:---:|---:|",
     ]
@@ -472,13 +471,13 @@ def run_expr_batch(
     progress = progress or _NoOpProgress()
     _ensure_expr_metrics()
     images = list_dataset_images()
-    is_zh = lang == LANG_ZH
+    is_zh = False
 
     if not images:
-        msg = "没有可评估的图像" if is_zh else "No images to evaluate"
+        msg = "No images to evaluate"
         return msg, ""
     if not method:
-        msg = "请选择模型" if is_zh else "Please select a model"
+        msg = "Please select a model"
         return msg, ""
 
     api_key = _get_saved_key(method)
@@ -491,7 +490,7 @@ def run_expr_batch(
     total = len(images)
 
     for idx, image_name in enumerate(images):
-        progress((idx + 1) / total, desc=f"{'运行' if is_zh else 'Running'} {method}: {image_name}")
+        progress((idx + 1) / total, desc=f"{'Running'} {method}: {image_name}")
 
         img, gt = load_image_and_gt(image_name)
         if img is None or gt is None:
@@ -533,37 +532,20 @@ def run_expr_batch(
     d_agg = _aggregate_expr_metrics(direct_results)
     g_agg = _aggregate_expr_metrics(geosym_results)
 
-    # Summary
-    if is_zh:
-        summary_lines = [
-            f"**{method} 批量函数识别 — {len(images)} 张图像**\n",
-            "| 模式 | 图像数 | R²(Mean) | R²(Micro) | 符号等价(Mean) | 符号等价(Micro) | 类型准确(Mean) | 类型准确(Micro) | NRMSE(Mean) | NRMSE(Micro) |",
-            "|------|-------:|--------:|---------:|-----------:|------------:|-----------:|------------:|-----------:|------------:|",
-            f"| 直接输入 | {d_agg['num_images']} | {d_agg['mean_r2']:.4f} | {d_agg['micro_r2']:.4f} | {d_agg['mean_sym_equiv_rate']:.0%} | {d_agg['micro_sym_equiv_rate']:.0%} | {d_agg['mean_type_accuracy']:.0%} | {d_agg['micro_type_accuracy']:.0%} | {d_agg['mean_nrmse']:.4f} | {d_agg['micro_nrmse']:.4f} |",
-            f"| GeoSym | {g_agg['num_images']} | {g_agg['mean_r2']:.4f} | {g_agg['micro_r2']:.4f} | {g_agg['mean_sym_equiv_rate']:.0%} | {g_agg['micro_sym_equiv_rate']:.0%} | {g_agg['mean_type_accuracy']:.0%} | {g_agg['micro_type_accuracy']:.0%} | {g_agg['mean_nrmse']:.4f} | {g_agg['micro_nrmse']:.4f} |",
-        ]
-    else:
-        summary_lines = [
-            f"**{method} Batch Expression Recognition — {len(images)} images**\n",
-            "| Mode | Images | R²(Mean) | R²(Micro) | SymEq(Mean) | SymEq(Micro) | TypeAcc(Mean) | TypeAcc(Micro) | NRMSE(Mean) | NRMSE(Micro) |",
-            "|------|-------:|--------:|---------:|-----------:|------------:|-----------:|------------:|-----------:|------------:|",
-            f"| Direct | {d_agg['num_images']} | {d_agg['mean_r2']:.4f} | {d_agg['micro_r2']:.4f} | {d_agg['mean_sym_equiv_rate']:.0%} | {d_agg['micro_sym_equiv_rate']:.0%} | {d_agg['mean_type_accuracy']:.0%} | {d_agg['micro_type_accuracy']:.0%} | {d_agg['mean_nrmse']:.4f} | {d_agg['micro_nrmse']:.4f} |",
-            f"| GeoSym | {g_agg['num_images']} | {g_agg['mean_r2']:.4f} | {g_agg['micro_r2']:.4f} | {g_agg['mean_sym_equiv_rate']:.0%} | {g_agg['micro_sym_equiv_rate']:.0%} | {g_agg['mean_type_accuracy']:.0%} | {g_agg['micro_type_accuracy']:.0%} | {g_agg['mean_nrmse']:.4f} | {g_agg['micro_nrmse']:.4f} |",
-        ]
+    summary_lines = [
+        f"**{method} Batch Expression Recognition — {len(images)} images**\n",
+        "| Mode | Images | R²(Mean) | R²(Micro) | SymEq(Mean) | SymEq(Micro) | TypeAcc(Mean) | TypeAcc(Micro) | NRMSE(Mean) | NRMSE(Micro) |",
+        "|------|-------:|--------:|---------:|-----------:|------------:|-----------:|------------:|-----------:|------------:|",
+        f"| Direct | {d_agg['num_images']} | {d_agg['mean_r2']:.4f} | {d_agg['micro_r2']:.4f} | {d_agg['mean_sym_equiv_rate']:.0%} | {d_agg['micro_sym_equiv_rate']:.0%} | {d_agg['mean_type_accuracy']:.0%} | {d_agg['micro_type_accuracy']:.0%} | {d_agg['mean_nrmse']:.4f} | {d_agg['micro_nrmse']:.4f} |",
+        f"| GeoSym | {g_agg['num_images']} | {g_agg['mean_r2']:.4f} | {g_agg['micro_r2']:.4f} | {g_agg['mean_sym_equiv_rate']:.0%} | {g_agg['micro_sym_equiv_rate']:.0%} | {g_agg['mean_type_accuracy']:.0%} | {g_agg['micro_type_accuracy']:.0%} | {g_agg['mean_nrmse']:.4f} | {g_agg['micro_nrmse']:.4f} |",
+    ]
 
     # Per-image detail table
-    if is_zh:
-        detail_lines = [
-            "\n**逐图详情**\n",
-            "| 图像 | R²(直接) | R²(GeoSym) | 符号等价(直接) | 符号等价(GeoSym) |",
-            "|------|--------:|-----------:|:-----------:|:---------------:|",
-        ]
-    else:
-        detail_lines = [
-            "\n**Per-Image Details**\n",
-            "| Image | R²(Direct) | R²(GeoSym) | SymEq(Direct) | SymEq(GeoSym) |",
-            "|-------|----------:|-----------:|:-------------:|:-------------:|",
-        ]
+    detail_lines = [
+        "\n**Per-Image Details**\n",
+        "| Image | R²(Direct) | R²(GeoSym) | SymEq(Direct) | SymEq(GeoSym) |",
+        "|-------|----------:|-----------:|:-------------:|:-------------:|",
+    ]
 
     for img_name, d_m, g_m in per_image_details:
         detail_lines.append(
@@ -583,13 +565,13 @@ def run_expr_pk(
     progress = progress or _NoOpProgress()
     _ensure_expr_metrics()
     images = list_dataset_images()
-    is_zh = lang == LANG_ZH
+    is_zh = False
 
     if not images:
-        msg = "没有可评估的图像" if is_zh else "No images to evaluate"
+        msg = "No images to evaluate"
         return msg, {}, "", "- / -"
     if not selected_methods:
-        msg = "请至少选择一个模型" if is_zh else "Please select at least one model"
+        msg = "Please select at least one model"
         return msg, {}, "", "- / -"
 
     # method_mode_map: {method: {"direct": {img: metrics}, "geosym": {img: metrics}}}
@@ -687,19 +669,11 @@ def run_expr_pk(
         g_agg = _aggregate_expr_metrics(geosym_results)
         all_method_agg.append((method, d_agg, g_agg, None, excluded_imgs))
 
-    # Build summary table
-    if is_zh:
-        summary_lines = [
-            f"**函数表达式 PK — {len(images)} 张图像**\n",
-            "| 模型 | 模式 | 图像数 | R²(Mean) | R²(Micro) | 符号等价(Mean) | 符号等价(Micro) | 类型准确(Mean) | 类型准确(Micro) | NRMSE(Mean) | NRMSE(Micro) |",
-            "|------|------|-------:|--------:|---------:|-----------:|------------:|-----------:|------------:|-----------:|------------:|",
-        ]
-    else:
-        summary_lines = [
-            f"**Expression PK — {len(images)} images**\n",
-            "| Model | Mode | Images | R²(Mean) | R²(Micro) | SymEq(Mean) | SymEq(Micro) | TypeAcc(Mean) | TypeAcc(Micro) | NRMSE(Mean) | NRMSE(Micro) |",
-            "|-------|------|-------:|--------:|---------:|-----------:|------------:|-----------:|------------:|-----------:|------------:|",
-        ]
+    summary_lines = [
+        f"**Expression PK — {len(images)} images**\n",
+        "| Model | Mode | Images | R²(Mean) | R²(Micro) | SymEq(Mean) | SymEq(Micro) | TypeAcc(Mean) | TypeAcc(Micro) | NRMSE(Mean) | NRMSE(Micro) |",
+        "|-------|------|-------:|--------:|---------:|-----------:|------------:|-----------:|------------:|-----------:|------------:|",
+    ]
 
     for item in all_method_agg:
         if len(item) == 5:
@@ -735,14 +709,9 @@ def run_expr_pk(
             all_excluded.append((method, img_name, reason))
 
     if all_excluded:
-        if is_zh:
-            summary_lines.append("\n---\n**排除的图像（识别失败/返回空值）**\n")
-            summary_lines.append("| 模型 | 图像 | 原因 |")
-            summary_lines.append("|------|------|------|")
-        else:
-            summary_lines.append("\n---\n**Excluded Images (recognition failed / empty results)**\n")
-            summary_lines.append("| Model | Image | Reason |")
-            summary_lines.append("|-------|-------|--------|")
+        summary_lines.append("\n---\n**Excluded Images (recognition failed / empty results)**\n")
+        summary_lines.append("| Model | Image | Reason |")
+        summary_lines.append("|-------|-------|--------|")
         for method, img_name, reason in all_excluded:
             summary_lines.append(f"| {method} | {img_name} | {reason} |")
 

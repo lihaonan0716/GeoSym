@@ -16,7 +16,6 @@ from pathlib import Path as _Path
 _exp_root = _Path(__file__).resolve().parent.parent.parent
 if str(_exp_root) not in _sys.path:
     _sys.path.insert(0, str(_exp_root))
-from i18n import log_tag as _lt  # noqa: E402
 
 class CoordinateRecognizer:
     """坐标系识别器 - 第二阶段"""
@@ -116,7 +115,7 @@ class CoordinateRecognizer:
         if 'line_data' not in ocr_result:
             return x_tick_labels, y_tick_labels
         
-        print("\n[OCR标签提取] 开始解析line_data...")
+        print("\n[OCRlabeltext] textline_data...")
         x_label_count = 0
         y_label_count = 0
         
@@ -146,9 +145,9 @@ class CoordinateRecognizer:
                             'center_y': (min(y_coords) + max(y_coords)) / 2
                         }
                         x_tick_labels.append(label_info)
-                        print(f"  ✓ X轴标签: text='{item['text']}', value={value}, center_x={label_info['center_x']:.1f}")
+                        print(f"  ✓ X-axislabel: text='{item['text']}', value={value}, center_x={label_info['center_x']:.1f}")
                 except ValueError as e:
-                    print(f"  ✗ X轴标签解析失败: text='{item['text']}', error={e}")
+                    print(f"  ✗ X-axislabeltextFailed: text='{item['text']}', error={e}")
                     continue
             
             elif item_type == 'y_axis_tick_label' and 'text' in item and 'cnt' in item:
@@ -171,23 +170,23 @@ class CoordinateRecognizer:
                             'center_y': (min(y_coords) + max(y_coords)) / 2
                         }
                         y_tick_labels.append(label_info)
-                        print(f"  ✓ Y轴标签: text='{item['text']}', value={value}, center_y={label_info['center_y']:.1f}")
+                        print(f"  ✓ Y-axis labels: text='{item['text']}', value={value}, center_y={label_info['center_y']:.1f}")
                 except ValueError as e:
-                    print(f"  ✗ Y轴标签解析失败: text='{item['text']}', error={e}")
+                    print(f"  ✗ Y-axis labelstextFailed: text='{item['text']}', error={e}")
                     continue
         
-        print(f"\n[OCR标签提取] 总结:")
-        print(f"  line_data中X轴标签数量: {x_label_count}")
-        print(f"  line_data中Y轴标签数量: {y_label_count}")
-        print(f"  成功解析X轴标签: {len(x_tick_labels)}个")
-        print(f"  成功解析Y轴标签: {len(y_tick_labels)}个")
+        print(f"\n[OCRlabeltext] text:")
+        print(f"  line_datatextX-axis label counttext: {x_label_count}")
+        print(f"  line_datatextY-axis label counttext: {y_label_count}")
+        print(f"  textX-axislabel: {len(x_tick_labels)}text")
+        print(f"  textY-axis labels: {len(y_tick_labels)}text")
         
         # 按位置排序
         x_tick_labels.sort(key=lambda l: l['center_x'])
         y_tick_labels.sort(key=lambda l: l['center_y'])
         
-        print(f"  X轴标签值序列（从左到右）: {[l['value'] for l in x_tick_labels]}")
-        print(f"  Y轴标签值序列（从上到下）: {[l['value'] for l in y_tick_labels]}")
+        print(f"  X-axislabeltext (left to right): {[l['value'] for l in x_tick_labels]}")
+        print(f"  Y-axis labelstext (top to bottom): {[l['value'] for l in y_tick_labels]}")
         
         return x_tick_labels, y_tick_labels
     
@@ -215,8 +214,8 @@ class CoordinateRecognizer:
         if len(labels) < 2:
             return labels
         
-        print(f"\n[OCR标签过滤-{axis.upper()}轴] 开始过滤...")
-        print(f"  原始标签数: {len(labels)}")
+        print(f"\n[OCRlabelfilter-{axis.upper()}text] Starting filtering...")
+        print(f"  Original label count: {len(labels)}")
         
         # 0. 位置聚类过滤：删除不在主流位置线上的标签
         if axis == 'x':
@@ -241,8 +240,8 @@ class CoordinateRecognizer:
         size_median = np.median(sizes)
         position_threshold = 1.5 * size_median  # 允许偏离1.5倍标签尺寸
         
-        print(f"  位置聚类过滤（{position_name}）：")
-        print(f"    中位数: {position_median:.1f}, 阈值: ±{position_threshold:.1f}")
+        print(f"  Position-cluster filtering ({position_name}): ")
+        print(f"    median: {position_median:.1f}, threshold: ±{position_threshold:.1f}")
         
         # 过滤偏离主流位置的标签
         clustered_labels = []
@@ -251,31 +250,31 @@ class CoordinateRecognizer:
             deviation = abs(pos - position_median)
             if deviation <= position_threshold:
                 clustered_labels.append(l)
-                print(f"    ✓ 保留: 值={l['value']}, {position_name}={pos:.1f}, 偏离={deviation:.1f}")
+                print(f"    ✓ Keep: text={l['value']}, {position_name}={pos:.1f}, deviation={deviation:.1f}")
             else:
-                print(f"    ✗ 删除: 值={l['value']}, {position_name}={pos:.1f}, 偏离={deviation:.1f} (超出阈值)")
+                print(f"    ✗ text: text={l['value']}, {position_name}={pos:.1f}, deviation={deviation:.1f} (texthreshold)")
         
-        print(f"  位置聚类后: {len(clustered_labels)}个标签")
+        print(f"  positionclusterafter: {len(clustered_labels)}textlabel")
         
         if len(clustered_labels) < 2:
-            print(f"  ⚠️ 过滤后标签不足2个，返回聚类结果")
+            print(f"  ⚠️ filterafterlabeltext2text, textClustering result")
             return clustered_labels
         
         # 1. 按位置排序
         if axis == 'x':
             # X轴：从左到右排序
             sorted_labels = sorted(clustered_labels, key=lambda l: l['center_x'])
-            print(f"  排序方向: 从左到右（按center_x）")
+            print(f"  Sort direction: left to right (textcenter_x)")
         else:
             # Y轴：从上到下排序
             sorted_labels = sorted(clustered_labels, key=lambda l: l['center_y'])
-            print(f"  排序方向: 从上到下（按center_y）")
+            print(f"  Sort direction: top to bottom (textcenter_y)")
         
-        print(f"  排序后的值序列: {[l['value'] for l in sorted_labels]}")
+        print(f"  textaftertext: {[l['value'] for l in sorted_labels]}")
         
         # 2. 少数服从多数：删除破坏主流趋势的标签
         if len(sorted_labels) < 3:
-            print(f"  标签数量不足3个，跳过单调性检查")
+            print(f"  labelcounttext3text, textMonotonicity check")
         else:
             # 2.1 计算相邻差值，判断主流趋势
             diffs = []
@@ -283,7 +282,7 @@ class CoordinateRecognizer:
                 diff = sorted_labels[i + 1]['value'] - sorted_labels[i]['value']
                 diffs.append(diff)
             
-            print(f"  相邻差值: {[f'{d:.1f}' for d in diffs]}")
+            print(f"  Adjacent differences: {[f'{d:.1f}' for d in diffs]}")
             
             # 统计正负趋势
             positive_count = sum(1 for d in diffs if d > 0)
@@ -301,8 +300,8 @@ class CoordinateRecognizer:
                 is_good_trend = lambda d: d <= 0  # 允许0（重复值）
                 is_bad_trend = lambda d: d > 0    # 只有正值才是坏趋势
             
-            print(f"  期望趋势: {expected_trend}（允许重复值）")
-            print(f"  正向差值数: {positive_count}, 负向差值数: {negative_count}")
+            print(f"  Expected trend: {expected_trend} (textduplicate value)")
+            print(f"  positive difference count: {positive_count}, negative difference count: {negative_count}")
             
             # 2.2 反复删除不符合主流趋势的点
             max_iterations = 10
@@ -350,35 +349,35 @@ class CoordinateRecognizer:
                         # 选择改善度更高的方案
                         if score_remove_i > score_remove_i_plus_1:
                             removed_label = sorted_labels.pop(i)
-                            print(f"  迭代{iteration}: 删除标签 {removed_label['value']} (位置{i}, 破坏{expected_trend}趋势)")
+                            print(f"  iteration{iteration}: Removed label {removed_label['value']} (position{i}, breaks{expected_trend}trend)")
                         else:
                             removed_label = sorted_labels.pop(i + 1)
-                            print(f"  迭代{iteration}: 删除标签 {removed_label['value']} (位置{i+1}, 破坏{expected_trend}趋势)")
+                            print(f"  iteration{iteration}: Removed label {removed_label['value']} (position{i+1}, breaks{expected_trend}trend)")
                         
                         removed_in_this_iteration = True
                         break  # 删除一个后重新开始
                 
                 if not removed_in_this_iteration:
-                    print(f"  单调性检查完成（迭代{iteration}次）")
+                    print(f"  Monotonicity checkComplete (iteration{iteration}text)")
                     break
             
             if len(sorted_labels) < 2:
-                print(f"  ⚠️ 过滤后标签不足2个，返回原始标签")
+                print(f"  ⚠️ filterafterlabeltext2text, textoriginallabel")
                 return labels
             
             # 检查是否至少有2个不同的值
             unique_values_after_monotone = set(l['value'] for l in sorted_labels)
             if len(unique_values_after_monotone) < 2:
-                print(f"  ❌ 单调性过滤后只剩{len(unique_values_after_monotone)}个不同的值，OCR识别失败")
-                print(f"  当前保留的值: {list(unique_values_after_monotone)}")
+                print(f"  ❌ textfilteraftertext{len(unique_values_after_monotone)}text, OCRtextFailed")
+                print(f"  Currently retained values: {list(unique_values_after_monotone)}")
                 return []  # 返回空列表表示失败
             
-            print(f"  单调性过滤后: {len(sorted_labels)}个标签，{len(unique_values_after_monotone)}个不同值")
-            print(f"  过滤后的值序列: {[l['value'] for l in sorted_labels]}")
+            print(f"  textfilterafter: {len(sorted_labels)}textlabel, {len(unique_values_after_monotone)}text")
+            print(f"  filteraftertext: {[l['value'] for l in sorted_labels]}")
         
         # 2.5. 处理重复值（基于间隔一致性）
         if len(sorted_labels) >= 3:
-            print(f"\n  检查重复值...")
+            print(f"\n  textduplicate value...")
             deduplicated = []
             i = 0
             removed_duplicates = 0
@@ -395,7 +394,7 @@ class CoordinateRecognizer:
                 
                 if len(duplicates) > 1:
                     # 有重复值，需要选择保留哪个
-                    print(f"    发现重复值: {current_label['value']} ({len(duplicates)}个)")
+                    print(f"    Foundduplicate value: {current_label['value']} ({len(duplicates)}text)")
                     
                     # 获取位置坐标key
                     if axis == 'x':
@@ -418,7 +417,7 @@ class CoordinateRecognizer:
                             spacing = abs(non_duplicate_labels[k + 1][pos_key] - non_duplicate_labels[k][pos_key])
                             pixel_spacings.append(spacing)
                         avg_pixel_spacing = np.mean(pixel_spacings)
-                        print(f"      平均像素间距（参考）: {avg_pixel_spacing:.1f}")
+                        print(f"      Average pixel spacing (reference): {avg_pixel_spacing:.1f}")
                     
                     # 对每个候选计算得分（基于像素位置的均匀性）
                     best_candidate = None
@@ -460,7 +459,7 @@ class CoordinateRecognizer:
                         else:
                             score = 0
                         
-                        print(f"      候选 值={candidate['value']}, 位置={candidate_pos:.1f}, 像素间距={[f'{x:.1f}' for x in pixel_intervals]}, 得分={score:.2f}")
+                        print(f"      candidate text={candidate['value']}, position={candidate_pos:.1f}, pixel intervals={[f'{x:.1f}' for x in pixel_intervals]}, score={score:.2f}")
                         
                         if score > best_score:
                             best_score = score
@@ -469,7 +468,7 @@ class CoordinateRecognizer:
                     # 保留最佳候选
                     deduplicated.append(best_candidate)
                     pos = best_candidate[pos_key]
-                    print(f"    ✓ 保留: 值={best_candidate['value']}, 位置={pos:.1f}")
+                    print(f"    ✓ Keep: text={best_candidate['value']}, position={pos:.1f}")
                     removed_duplicates += len(duplicates) - 1
                 else:
                     # 没有重复，直接添加
@@ -478,9 +477,9 @@ class CoordinateRecognizer:
                 i = j  # 跳到下一组
             
             if removed_duplicates > 0:
-                print(f"  重复值处理: 删除了{removed_duplicates}个重复标签")
+                print(f"  duplicate valuetext: removed{removed_duplicates}duplicate labels")
                 sorted_labels = deduplicated
-                print(f"  去重后的值序列: {[l['value'] for l in sorted_labels]}")
+                print(f"  After deduplicationtext: {[l['value'] for l in sorted_labels]}")
         
         # 3. 计算相邻标签的间隔
         intervals = []
@@ -488,18 +487,18 @@ class CoordinateRecognizer:
             val_diff = abs(sorted_labels[i + 1]['value'] - sorted_labels[i]['value'])
             intervals.append(val_diff)
         
-        print(f"  间隔序列: {[f'{v:.1f}' for v in intervals]}")
+        print(f"  text: {[f'{v:.1f}' for v in intervals]}")
         
         # 4. 计算P75分位的单位间隔
         p75_interval = np.percentile(intervals, 75)
-        print(f"  P75分位间隔: {p75_interval:.2f}")
+        print(f"  P75text: {p75_interval:.2f}")
         
         # 5. 成对间隔检查：识别异常间隔，成对删除
         min_valid_interval = p75_interval * 0.5
         max_valid_interval = p75_interval * 1.5
         
-        print(f"  有效间隔范围: [{min_valid_interval:.2f}, {max_valid_interval:.2f}]")
-        print(f"  使用成对间隔检查策略（异常间隔删除两端）...")
+        print(f"  text: [{min_valid_interval:.2f}, {max_valid_interval:.2f}]")
+        print(f"  text (Exceptiontext)...")
         
         # 第一步：识别所有异常间隔
         abnormal_intervals = []  # [(i, i+1, interval), ...]
@@ -507,7 +506,7 @@ class CoordinateRecognizer:
             interval = abs(sorted_labels[i + 1]['value'] - sorted_labels[i]['value'])
             if interval < min_valid_interval or interval > max_valid_interval:
                 abnormal_intervals.append((i, i + 1, interval))
-                print(f"  异常间隔: [{sorted_labels[i]['value']}] ↔ [{sorted_labels[i+1]['value']}] = {interval:.2f}")
+                print(f"  Exceptiontext: [{sorted_labels[i]['value']}] ↔ [{sorted_labels[i+1]['value']}] = {interval:.2f}")
         
         # 第二步：删除异常间隔的两端标签
         keep_flags = [True] * len(sorted_labels)
@@ -516,10 +515,10 @@ class CoordinateRecognizer:
             # 异常间隔表示中间缺失了刻度，两端标签都可能有误，全部删除
             if keep_flags[i]:
                 keep_flags[i] = False
-                print(f"  ✗ 删除标签 {sorted_labels[i]['value']} (位置{i}, 异常间隔{interval:.2f}的左端)")
+                print(f"  ✗ Removed label {sorted_labels[i]['value']} (position{i}, Exceptiontext{interval:.2f}text)")
             if keep_flags[j]:
                 keep_flags[j] = False
-                print(f"  ✗ 删除标签 {sorted_labels[j]['value']} (位置{j}, 异常间隔{interval:.2f}的右端)")
+                print(f"  ✗ Removed label {sorted_labels[j]['value']} (position{j}, Exceptiontext{interval:.2f}text)")
         
         # 输出保留的标签
         for i, label in enumerate(sorted_labels):
@@ -528,7 +527,7 @@ class CoordinateRecognizer:
                 right_interval = abs(sorted_labels[i+1]['value'] - sorted_labels[i]['value']) if i < len(sorted_labels)-1 and keep_flags[i+1] else None
                 left_interval_debug = left_interval if left_interval else 'N/A'
                 right_interval_debug = right_interval if right_interval else 'N/A'
-                print(f"  ✓ 保留标签 {sorted_labels[i]['value']} (位置{i}, 左={left_interval_debug}, 右={right_interval_debug})")
+                print(f"  ✓ Keeplabel {sorted_labels[i]['value']} (position{i}, text={left_interval_debug}, text={right_interval_debug})")
         
         # 应用过滤
         filtered_labels = [label for i, label in enumerate(sorted_labels) if keep_flags[i]]
@@ -536,15 +535,15 @@ class CoordinateRecognizer:
         # 最后检查：必须至少有2个不同的值
         unique_values = set(l['value'] for l in filtered_labels)
         if len(unique_values) < 2:
-            print(f"\n[OCR标签过滤-{axis.upper()}轴] ❌ 过滤后只有{len(unique_values)}个不同的值，OCR识别失败")
-            print(f"  当前保留的值: {list(unique_values)}")
-            print(f"  至少需要2个不同的值才能建立坐标映射")
+            print(f"\n[OCRlabelfilter-{axis.upper()}text] ❌ filteraftertext{len(unique_values)}text, OCRtextFailed")
+            print(f"  Currently retained values: {list(unique_values)}")
+            print(f"  textrequired2textcoordinatetext")
             return []  # 返回空列表表示失败
         
-        print(f"\n[OCR标签过滤-{axis.upper()}轴] 完成")
-        print(f"  最终保留: {len(filtered_labels)}个标签")
-        print(f"  不同值数量: {len(unique_values)}个")
-        print(f"  最终值序列: {[l['value'] for l in filtered_labels]}")
+        print(f"\n[OCRlabelfilter-{axis.upper()}text] Complete")
+        print(f"  finalKeep: {len(filtered_labels)}textlabel")
+        print(f"  Distinct value count: {len(unique_values)}text")
+        print(f"  Final value sequence: {[l['value'] for l in filtered_labels]}")
         
         return filtered_labels
     
@@ -583,8 +582,8 @@ class CoordinateRecognizer:
         # 注意：图像坐标系中y向下递增，所以"向上"是减去
         x_reference_y = x_label_center_y_median - x_label_avg_height / 4
         
-        print(f"[{_lt('轴推断')}] X轴标签: 中心Y={x_label_center_y_median:.1f}, 平均高度={x_label_avg_height:.1f}")
-        print(f"[{_lt('轴推断')}] X轴参考点: y={x_reference_y:.1f} (中心 - 高度/4)")
+        print(f"[AxisInfer] X-axislabel: textY={x_label_center_y_median:.1f}, textheight={x_label_avg_height:.1f}")
+        print(f"[AxisInfer] X-axisreferencetext: y={x_reference_y:.1f} (text - height/4)")
         
         # 在水平网格线中找参考点上方最近的那条
         # "上方"意味着 line_y < x_reference_y
@@ -601,9 +600,9 @@ class CoordinateRecognizer:
                     axes_info['x_axis_y'] = line_y
         
         if x_axis_line is not None:
-            print(f"[{_lt('轴推断')}] ✓ X轴位置: y={axes_info['x_axis_y']:.1f} (距参考点{min_dist:.1f}px)")
+            print(f"[AxisInfer] ✓ X-axisposition: y={axes_info['x_axis_y']:.1f} (textreferencetext{min_dist:.1f}px)")
         else:
-            print(f"[{_lt('轴推断')}] ⚠️ 未找到X轴（没有在参考点上方的水平网格线）")
+            print(f"[AxisInfer] ⚠️ textFoundX-axis (textreferencetexthorizontal grid lines)")
         
         axes_info['x_axis_line'] = x_axis_line
         
@@ -622,8 +621,8 @@ class CoordinateRecognizer:
         # x向右递增，所以"向右"是加上
         y_reference_x = y_label_center_x_median + y_label_avg_width / 4
         
-        print(f"[{_lt('轴推断')}] Y轴标签: 中心X={y_label_center_x_median:.1f}, 平均宽度={y_label_avg_width:.1f}")
-        print(f"[{_lt('轴推断')}] Y轴参考点: x={y_reference_x:.1f} (中心 + 宽度/4)")
+        print(f"[AxisInfer] Y-axis labels: textX={y_label_center_x_median:.1f}, textwidth={y_label_avg_width:.1f}")
+        print(f"[AxisInfer] Y-axisreferencetext: x={y_reference_x:.1f} (text + width/4)")
         
         # 在垂直网格线中找参考点右侧最近的那条
         # "右侧"意味着 line_x > y_reference_x
@@ -640,9 +639,9 @@ class CoordinateRecognizer:
                     axes_info['y_axis_x'] = line_x
         
         if y_axis_line is not None:
-            print(f"[{_lt('轴推断')}] ✓ Y轴位置: x={axes_info['y_axis_x']:.1f} (距参考点{min_dist:.1f}px)")
+            print(f"[AxisInfer] ✓ Y-axisposition: x={axes_info['y_axis_x']:.1f} (textreferencetext{min_dist:.1f}px)")
         else:
-            print(f"[{_lt('轴推断')}] ⚠️ 未找到Y轴（没有在参考点右侧的垂直网格线）")
+            print(f"[AxisInfer] ⚠️ textFoundY-axis (textreferencetextvertical grid lines)")
         
         axes_info['y_axis_line'] = y_axis_line
         
@@ -700,8 +699,8 @@ class CoordinateRecognizer:
         )
         h_grid_y = [int(round(item[1])) for item in h_grid_sampled]
         
-        print(f"[{_lt('坐标映射')}] 垂直网格线数量: {len(v_grid_x)}")
-        print(f"[{_lt('坐标映射')}] 水平网格线数量: {len(h_grid_y)}")
+        print(f"[CoordMapping] vertical grid linescount: {len(v_grid_x)}")
+        print(f"[CoordMapping] horizontal grid linescount: {len(h_grid_y)}")
         
         # ===== X方向映射（优化版）=====
         if len(x_tick_labels) >= 2 and len(v_grid_x) >= 2:
@@ -731,7 +730,7 @@ class CoordinateRecognizer:
                     mapping['x_offset'] = float(lstsq_result[0][1])
             else:
                 # 回退到旧算法
-                print(f"[{_lt('坐标映射')}] X方向回退到旧算法")
+                print(f"[CoordMapping] Xtext")
                 self._map_grid_fallback(mapping, x_tick_labels, v_grid_x, 'x', 'center_x')
         
         # ===== Y方向映射（优化版）=====
@@ -762,14 +761,14 @@ class CoordinateRecognizer:
                     mapping['y_offset'] = float(lstsq_result[0][1])
             else:
                 # 回退到旧算法
-                print(f"[{_lt('坐标映射')}] Y方向回退到旧算法")
+                print(f"[CoordMapping] Ytext")
                 self._map_grid_fallback(mapping, y_tick_labels, h_grid_y, 'y', 'center_y')
         
         # ===== 基于坐标轴的校准（重要！）=====
         # 原理：Y轴应该是x=0，X轴应该是y=0
         # 如果映射结果显示Y轴不是x=0，说明整体有偏移，需要统一调整
         
-        # print(f"\n[{_lt('坐标映射')}] === 开始坐标轴校准 ===")
+        # print(f"\n[CoordMapping] === textaxistext ===")
 
         # # 1. 校准X方向（基于Y轴）
         # if 'y_axis_x' in axes_info and 'v_grid_x_pixels' in mapping and 'v_grid_x_values' in mapping:
@@ -790,14 +789,14 @@ class CoordinateRecognizer:
         #     if closest_grid_idx is not None:
         #         y_axis_mapped_value = v_grid_values[closest_grid_idx]
                 
-        #         print(f"[{_lt('坐标轴校准')}] Y轴位置: x={y_axis_pixel_x:.1f}px")
-        #         print(f"[{_lt('坐标轴校准')}] Y轴最近网格线: 索引{closest_grid_idx}, x={v_grid_x[closest_grid_idx]}px, 映射值={y_axis_mapped_value:.2f}")
+        #         print(f"[AxisCalibrate] Y-axisposition: x={y_axis_pixel_x:.1f}px")
+        #         print(f"[AxisCalibrate] Y-axistextgrid line: text{closest_grid_idx}, x={v_grid_x[closest_grid_idx]}px, text={y_axis_mapped_value:.2f}")
                 
         #         # 如果Y轴对应的值不是0，需要统一调整
         #         if abs(y_axis_mapped_value) > 0.01:  # 容忍0.01的误差
         #             x_offset_correction = -y_axis_mapped_value
-        #             print(f"[{_lt('坐标轴校准')}] ⚠️ Y轴映射值不是0，需要校准")
-        #             print(f"[{_lt('坐标轴校准')}] X方向整体偏移: {x_offset_correction:+.2f}")
+        #             print(f"[AxisCalibrate] ⚠️ Y-axistext0, requiredtext")
+        #             print(f"[AxisCalibrate] Xtext: {x_offset_correction:+.2f}")
                     
         #             # 调整所有垂直网格线的值
         #             mapping['v_grid_x_values'] = [v + x_offset_correction for v in v_grid_values]
@@ -808,12 +807,12 @@ class CoordinateRecognizer:
         #                 mapping['x_scale'] = (new_v_grid_values[1] - new_v_grid_values[0]) / (v_grid_x[1] - v_grid_x[0])
         #                 mapping['x_offset'] = new_v_grid_values[0] - mapping['x_scale'] * v_grid_x[0]
                     
-        #             print(f"[{_lt('坐标轴校准')}] ✓ X方向已校准，Y轴现在对应 x=0")
-        #             print(f"[{_lt('坐标轴校准')}] 调整后垂直网格值范围: [{mapping['v_grid_x_values'][0]:.2f}, {mapping['v_grid_x_values'][-1]:.2f}]")
+        #             print(f"[AxisCalibrate] ✓ Xtext, Y-axistext x=0")
+        #             print(f"[AxisCalibrate] textafterverticaltext: [{mapping['v_grid_x_values'][0]:.2f}, {mapping['v_grid_x_values'][-1]:.2f}]")
         #         else:
-        #             print(f"[{_lt('坐标轴校准')}] ✓ Y轴映射正确 (x≈0)，无需X方向校准")
+        #             print(f"[AxisCalibrate] ✓ Y-axistext (x≈0), textXtext")
         # else:
-        #     print(f"[{_lt('坐标轴校准')}] ⚠️ 缺少Y轴信息或X方向映射，跳过X方向校准")
+        #     print(f"[AxisCalibrate] ⚠️ textY-axistextXtext, textXtext")
         
         # # 2. 校准Y方向（基于X轴）
         # if 'x_axis_y' in axes_info and 'h_grid_y_pixels' in mapping and 'h_grid_y_values' in mapping:
@@ -834,14 +833,14 @@ class CoordinateRecognizer:
         #     if closest_grid_idx is not None:
         #         x_axis_mapped_value = h_grid_values[closest_grid_idx]
                 
-        #         print(f"\n[{_lt('坐标轴校准')}] X轴位置: y={x_axis_pixel_y:.1f}px")
-        #         print(f"[{_lt('坐标轴校准')}] X轴最近网格线: 索引{closest_grid_idx}, y={h_grid_y[closest_grid_idx]}px, 映射值={x_axis_mapped_value:.2f}")
+        #         print(f"\n[AxisCalibrate] X-axisposition: y={x_axis_pixel_y:.1f}px")
+        #         print(f"[AxisCalibrate] X-axistextgrid line: text{closest_grid_idx}, y={h_grid_y[closest_grid_idx]}px, text={x_axis_mapped_value:.2f}")
                 
         #         # 如果X轴对应的值不是0，需要统一调整
         #         if abs(x_axis_mapped_value) > 0.01:  # 容忍0.01的误差
         #             y_offset_correction = -x_axis_mapped_value
-        #             print(f"[{_lt('坐标轴校准')}] ⚠️ X轴映射值不是0，需要校准")
-        #             print(f"[{_lt('坐标轴校准')}] Y方向整体偏移: {y_offset_correction:+.2f}")
+        #             print(f"[AxisCalibrate] ⚠️ X-axistext0, requiredtext")
+        #             print(f"[AxisCalibrate] Ytext: {y_offset_correction:+.2f}")
                     
         #             # 调整所有水平网格线的值
         #             mapping['h_grid_y_values'] = [v + y_offset_correction for v in h_grid_values]
@@ -852,14 +851,14 @@ class CoordinateRecognizer:
         #                 mapping['y_scale'] = (new_h_grid_values[1] - new_h_grid_values[0]) / (h_grid_y[1] - h_grid_y[0])
         #                 mapping['y_offset'] = new_h_grid_values[0] - mapping['y_scale'] * h_grid_y[0]
                     
-        #             print(f"[{_lt('坐标轴校准')}] ✓ Y方向已校准，X轴现在对应 y=0")
-        #             print(f"[{_lt('坐标轴校准')}] 调整后水平网格值范围: [{mapping['h_grid_y_values'][0]:.2f}, {mapping['h_grid_y_values'][-1]:.2f}]")
+        #             print(f"[AxisCalibrate] ✓ Ytext, X-axistext y=0")
+        #             print(f"[AxisCalibrate] textafterhorizontaltext: [{mapping['h_grid_y_values'][0]:.2f}, {mapping['h_grid_y_values'][-1]:.2f}]")
         #         else:
-        #             print(f"[{_lt('坐标轴校准')}] ✓ X轴映射正确 (y≈0)，无需Y方向校准")
+        #             print(f"[AxisCalibrate] ✓ X-axistext (y≈0), textYtext")
         # else:
-        #     print(f"[{_lt('坐标轴校准')}] ⚠️ 缺少X轴信息或Y方向映射，跳过Y方向校准")
+        #     print(f"[AxisCalibrate] ⚠️ textX-axistextYtext, textYtext")
         
-        # print(f"[{_lt('坐标映射')}] === 坐标轴校准完成 ===\n")
+        # print(f"[CoordMapping] === axistextComplete ===\n")
         
         # 保存刻度信息
         mapping['x_tick_labels'] = x_tick_labels
@@ -923,13 +922,13 @@ class CoordinateRecognizer:
         Returns:
             网格线对应的值列表，失败返回None
         """
-        print(f"[坐标映射-{axis_name}] 使用优化算法v2")
+        print(f"[coordinatetext-{axis_name}] textv2")
 
-        print(f"[坐标映射-{axis_name}] tick_labels: {tick_labels}")
-        print(f"[坐标映射-{axis_name}] grid_positions: {grid_positions}")
-        print(f"[坐标映射-{axis_name}] bbox_keys: {bbox_keys}")
-        print(f"[坐标映射-{axis_name}] coord_key: {coord_key}")
-        print(f"[坐标映射-{axis_name}] axis_name: {axis_name}")
+        print(f"[coordinatetext-{axis_name}] tick_labels: {tick_labels}")
+        print(f"[coordinatetext-{axis_name}] grid_positions: {grid_positions}")
+        print(f"[coordinatetext-{axis_name}] bbox_keys: {bbox_keys}")
+        print(f"[coordinatetext-{axis_name}] coord_key: {coord_key}")
+        print(f"[coordinatetext-{axis_name}] axis_name: {axis_name}")
         
         grid_values = [None] * len(grid_positions)
         bbox_min_key, bbox_max_key = bbox_keys
@@ -937,12 +936,12 @@ class CoordinateRecognizer:
         # ===== 阶段1：基于中心点距离的最近匹配 =====
         # 策略：每个标签匹配距离最近的网格线，使用贪心算法确保一对一匹配
         
-        print(f"[坐标映射-{axis_name}] 阶段1：基于中心点距离匹配")
+        print(f"[coordinatetext-{axis_name}] text1: text")
         
         # 根据grid_positions计算有效边界
         grid_min = min(grid_positions)
         grid_max = max(grid_positions)
-        print(f"  网格线范围: [{grid_min:.1f}, {grid_max:.1f}]")
+        print(f"  grid linetext: [{grid_min:.1f}, {grid_max:.1f}]")
         
         # 计算所有标签到所有网格线的距离
         potential_matches = []  # [(grid_idx, label, distance), ...]
@@ -961,8 +960,8 @@ class CoordinateRecognizer:
         # 按距离排序，优先匹配距离最近的
         potential_matches.sort(key=lambda x: x[2])
         
-        print(f"  总共有 {len(tick_labels)} 个标签 和 {len(grid_positions)} 条网格线")
-        print(f"  生成 {len(potential_matches)} 个潜在匹配对")
+        print(f"  text {len(tick_labels)} textlabel text {len(grid_positions)} textgrid line")
+        print(f"  text {len(potential_matches)} text")
         
         # 使用贪心算法进行唯一匹配（每个网格线只匹配一个标签）
         matched_grids = set()
@@ -976,15 +975,15 @@ class CoordinateRecognizer:
                 grid_values[grid_idx] = label['value']
                 matched_grids.add(grid_idx)
                 matched_labels.add(label_id)
-                print(f"  ✓ 网格线#{grid_idx} @ {grid_positions[grid_idx]:.0f}px ↔ 标签 {label['value']} "
+                print(f"  ✓ grid line#{grid_idx} @ {grid_positions[grid_idx]:.0f}px ↔ label {label['value']} "
                       f"(中心={label[coord_key]:.0f}px, 距离={distance:.1f}px)")
         
         # 统计匹配情况
         matched_count = sum(1 for v in grid_values if v is not None)
-        print(f"[坐标映射-{axis_name}] 直接匹配: {matched_count}/{len(grid_positions)} 条网格线")
+        print(f"[coordinatetext-{axis_name}] text: {matched_count}/{len(grid_positions)} textgrid line")
         
         if matched_count < 2:
-            print(f"[坐标映射-{axis_name}] ⚠️ 匹配的网格线少于2条，无法推算")
+            print(f"[coordinatetext-{axis_name}] ⚠️ textgrid linetext2text, text")
             return None
         
         # ===== 阶段2：计算单位间隔（中位数）=====
@@ -1002,15 +1001,15 @@ class CoordinateRecognizer:
             if grid_diff > 0:
                 interval = value_diff / grid_diff
                 intervals.append(interval)
-                print(f"  间隔: 标签{val1}到{val2}, 跨{grid_diff}格, 单位间隔={interval:.3f}")
+                print(f"  text: label{val1}text{val2}, text{grid_diff}text, text={interval:.3f}")
         
         if not intervals:
-            print(f"[坐标映射-{axis_name}] ⚠️ 无法计算间隔")
+            print(f"[coordinatetext-{axis_name}] ⚠️ text")
             return None
         
         # 使用中位数作为单位间隔
         unit_interval = np.median(intervals)
-        print(f"[坐标映射-{axis_name}] 单位间隔（中位数）: {unit_interval:.3f}")
+        print(f"[coordinatetext-{axis_name}] text (median): {unit_interval:.3f}")
         
         # ===== 阶段3：推算未匹配的网格线（基于最近邻）=====
         known_indices = [idx for idx, _ in known_pairs]
@@ -1025,10 +1024,10 @@ class CoordinateRecognizer:
                 distance = i - nearest_known_idx
                 grid_values[i] = nearest_value + distance * unit_interval
                 
-                print(f"  → 网格线#{i} @ {grid_positions[i]:.0f}px 推算得到 {grid_values[i]:.3f} "
+                print(f"  -> grid line#{i} @ {grid_positions[i]:.0f}px text {grid_values[i]:.3f} "
                       f"(基于网格#{nearest_known_idx}={nearest_value:.3f}, 距离{distance}格)")
         
-        print(f"[坐标映射-{axis_name}] ✅ 优化算法完成")
+        print(f"[coordinatetext-{axis_name}] ✅ textComplete")
         return grid_values
     
     def _map_grid_fallback(self, mapping: Dict, tick_labels: List[Dict], 
@@ -1188,11 +1187,11 @@ class CoordinateRecognizer:
         intermediates = {}
         h, w = image.shape[:2]
         
-        print(f"[{_lt('曲线提取')}] 新方案：基于颜色提取曲线")
+        print(f"[CurveExtract] text: textcolortextcurve")
         
         # 确保是彩色图像
         if len(image.shape) == 2:
-            print("  警告：输入是灰度图，无法使用颜色提取")
+            print("  Warning: text, textcolortext")
             # 回退到旧方案
             return self._extract_curve_grayscale(image, grid_h_lines, grid_v_lines, 
                                                 ocr_result, line_thickness)
@@ -1200,11 +1199,11 @@ class CoordinateRecognizer:
         color_image = image.copy()
         
         # ===== 步骤1: 转换到HSV颜色空间 =====
-        print(f"[{_lt('曲线提取')}] 步骤1: 转换到HSV颜色空间")
+        print(f"[CurveExtract] text1: textHSVcolortext")
         hsv = cv2.cvtColor(color_image, cv2.COLOR_BGR2HSV)
         
         # ===== 步骤2: 提取彩色区域（曲线） =====
-        print(f"[{_lt('曲线提取')}] 步骤2: 提取彩色区域")
+        print(f"[CurveExtract] text2: text")
         
         # Adaptive saturation threshold: darker backgrounds reduce edge
         # pixel saturation due to anti-aliasing blending, so we lower the
@@ -1223,7 +1222,7 @@ class CoordinateRecognizer:
         s_thresh = int(round(self.color_saturation_threshold * scale))
         v_thresh = int(round(self.color_value_threshold * scale))
         
-        print(f"[{_lt('曲线提取')}] 背景亮度V={bg_v_mean:.0f}, "
+        print(f"[CurveExtract] textV={bg_v_mean:.0f}, "
               f"自适应阈值 S>{s_thresh} V>{v_thresh} "
               f"(基准 S>{self.color_saturation_threshold} V>{self.color_value_threshold})")
         
@@ -1271,13 +1270,13 @@ class CoordinateRecognizer:
         for color_name, mask in color_masks:
             pixel_count = np.sum(mask > 0)
             if pixel_count > 0:
-                print(f"  检测到 {color_name} 颜色: {pixel_count} 像素")
+                print(f"  text {color_name} color: {pixel_count} pixel")
                 combined_mask = cv2.bitwise_or(combined_mask, mask)
         
         intermediates['binary'] = combined_mask.copy()
         
         # ===== 步骤3: 形态学操作 - 去噪和连接 =====
-        print(f"[{_lt('曲线提取')}] 步骤3: 形态学操作（去噪+连接）")
+        print(f"[CurveExtract] text3: text (text+text)")
         
         # 先去除小噪点
         kernel_open = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
@@ -1294,7 +1293,7 @@ class CoordinateRecognizer:
         intermediates['filtered'] = result.copy()
         intermediates['connected'] = result.copy()
         
-        print(f"[{_lt('曲线提取')}] 提取完成，曲线像素数: {np.sum(result > 0)}")
+        print(f"[CurveExtract] textComplete, curvepixeltext: {np.sum(result > 0)}")
         
         return result, intermediates
     
@@ -1311,7 +1310,7 @@ class CoordinateRecognizer:
         
         # 1. 提取骨架（Zhang-Suen细化算法）
         skeleton = cv2.ximgproc.thinning(binary_image, thinningType=cv2.ximgproc.THINNING_ZHANGSUEN)
-        print(f"   骨架像素数: {np.sum(skeleton > 0)}")
+        print(f"   textpixeltext: {np.sum(skeleton > 0)}")
         
         # 2. 分析方向变化，过滤直线
         # 对骨架进行轮廓提取
@@ -1327,7 +1326,7 @@ class CoordinateRecognizer:
             # 计算方向变化率
             direction_change = self._calculate_direction_variance(contour)
             
-            print(f"   轮廓长度: {len(contour)}, 方向变化率: {direction_change:.4f}")
+            print(f"   text: {len(contour)}, text: {direction_change:.4f}")
             
             # 方向变化大的是曲线，保留
             # 方向变化小的是直线（网格线残留），过滤
@@ -1335,7 +1334,7 @@ class CoordinateRecognizer:
                 cv2.drawContours(filtered_mask, [contour], -1, 255, 1)
                 kept_count += 1
         
-        print(f"   保留轮廓数: {kept_count}/{len(contours)}")
+        print(f"   Keeptext: {kept_count}/{len(contours)}")
         
         return filtered_mask, skeleton
     
@@ -1402,8 +1401,8 @@ class CoordinateRecognizer:
         
         # 1. 找出所有端点
         endpoints = self._find_endpoints(skeleton)
-        print(f"   检测到端点数: {len(endpoints)}")
-        print(f"   连接参数: 最大距离={self.endpoint_max_distance}, 角度阈值={self.endpoint_angle_threshold}°")
+        print(f"   text: {len(endpoints)}")
+        print(f"   textparameter: text={self.endpoint_max_distance}, anglethreshold={self.endpoint_angle_threshold}°")
         
         if len(endpoints) < 2:
             return result
@@ -1456,7 +1455,7 @@ class CoordinateRecognizer:
                         connected_count += 1
                         break
         
-        print(f"   连接了{connected_count}对端点")
+        print(f"   text{connected_count}text")
         
         return result
     
@@ -1597,8 +1596,8 @@ class CoordinateRecognizer:
         # 第一步：过滤掉接近水平或垂直的线段
         curve_contours = []
         
-        print(f"[{_lt('曲线过滤')}] 初始轮廓数: {len(contours)}")
-        print(f"[{_lt('曲线过滤')}] 参数 - 最小面积: {min_area}, 长宽比阈值: {aspect_threshold}, 角度容差: {angle_tol}°")
+        print(f"[CurveFilter] text: {len(contours)}")
+        print(f"[CurveFilter] parameter - text: {min_area}, texthreshold: {aspect_threshold}, angletext: {angle_tol}°")
         
         for contour in contours:
             # 计算轮廓的基本属性
@@ -1642,7 +1641,7 @@ class CoordinateRecognizer:
             if should_keep:
                 curve_contours.append(contour)
         
-        print(f"[{_lt('曲线过滤')}] 过滤后轮廓数: {len(curve_contours)}")
+        print(f"[CurveFilter] filteraftertext: {len(curve_contours)}")
         
         if len(curve_contours) == 0:
             return np.zeros((h, w), dtype=np.uint8)
@@ -1652,7 +1651,7 @@ class CoordinateRecognizer:
         cv2.drawContours(curve_mask, curve_contours, -1, 255, -1)
         
         # 使用形态学闭运算连接断裂的曲线段
-        print(f"[{_lt('曲线连接')}] 核大小: {close_size}, 迭代次数: {close_iter}")
+        print(f"[CurveConnect] text: {close_size}, iterationtext: {close_iter}")
         kernel_close = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (close_size, close_size))
         curve_mask = cv2.morphologyEx(curve_mask, cv2.MORPH_CLOSE, kernel_close, iterations=close_iter)
         
@@ -1671,7 +1670,7 @@ class CoordinateRecognizer:
                 cv2.drawContours(result, [contour], -1, 255, -1)
                 kept_count += 1
         
-        print(f"[{_lt('曲线过滤')}] 最终保留轮廓数: {kept_count}")
+        print(f"[CurveFilter] finalKeeptext: {kept_count}")
         
         # 可选：对曲线进行轻微膨胀，使其更连续
         if kept_count > 0:
@@ -2492,7 +2491,7 @@ class CoordinateRecognizer:
             to_drop = set(to_drop).union(vertical_drop)
 
         if cleanup_runs_debug:
-            print(f"[{_lt('推理交点')}] run-cleanup diagnostics:")
+            print(f"[{'ReasoningIntersections'}] run-cleanup diagnostics:")
             for item in cleanup_runs_debug:
                 print(
                     f"  y={item['y']} run={item['run_x']} len={item['run_len']} "
@@ -2500,17 +2499,17 @@ class CoordinateRecognizer:
                     f"drop_long={item['drop_long']} drop_short={item['drop_short']}"
                 )
         if vertical_debug:
-            print(f"[{_lt('推理交点')}] vertical-cleanup diagnostics:")
+            print(f"[{'ReasoningIntersections'}] vertical-cleanup diagnostics:")
             for item in vertical_debug:
                 print(
                     f"  side={item['side']} x={item['x']} "
                     f"s_edge={item['s_edge']} s_next={item['s_next']} drop={item['drop']}"
                 )
         if to_drop:
-            print(f"[{_lt('推理交点')}] dropped keys: {sorted(list(to_drop))}")
+            print(f"[{'ReasoningIntersections'}] dropped keys: {sorted(list(to_drop))}")
 
         print(
-            f"[{_lt('推理交点')}] 保留整数去重点: {len(intersections)} -> {len(prepared)} "
+            f"[{'ReasoningIntersections'}] 保留整数去重点: {len(intersections)} -> {len(prepared)} "
             f"(rescued={rescued})"
         )
         self._last_reasoning_debug = {
@@ -2555,7 +2554,7 @@ class CoordinateRecognizer:
         # 可视化路径也从轻量推理点集开始，避免与推理输入出现额外偏差
         intersections = self._prepare_reasoning_intersections(intersections)
         
-        print(f"[{_lt('交点过滤')}] 原始交点数: {len(intersections)}")
+        print(f"[IntersFilter] originalintersectiontext: {len(intersections)}")
         
         # 分类点：只保留 x、y 都是整数的点作为轴交点
         x_axis_points = [p for p in intersections 
@@ -2563,25 +2562,25 @@ class CoordinateRecognizer:
         y_axis_points = [p for p in intersections 
                         if p['real_x_rounded'] == 0 and p['is_x_integer'] and p['is_y_integer']]
         
-        print(f"[{_lt('交点过滤')}] X轴交点: {len(x_axis_points)}, Y轴交点: {len(y_axis_points)}")
+        print(f"[IntersFilter] X-axisintersection: {len(x_axis_points)}, Y-axisintersection: {len(y_axis_points)}")
         
         # ==== 步骤1: 保留关键点 + 找极值点 + 删除中间冗余 ====
         key_points = set()
         
         # 保留所有坐标轴交点（只保留整数坐标）
-        print(f"\n[{_lt('步骤1')}] 保留X轴和Y轴交点（仅整数坐标）")
+        print(f"\n[Step1] KeepX-axistextY-axisintersection (textcoordinate)")
         for p in x_axis_points + y_axis_points:
             key_points.add((p['pixel_x'], p['pixel_y']))
             if p['is_x_integer'] and p['is_y_integer']:
-                print(f"  ✓ 轴交点: ({int(p['real_x_rounded'])}, {int(p['real_y_rounded'])})")
+                print(f"  ✓ textintersection: ({int(p['real_x_rounded'])}, {int(p['real_y_rounded'])})")
             else:
-                print(f"  ○ 非整数轴交点: ({p['real_x_rounded']:.2f}, {p['real_y_rounded']:.2f})")
+                print(f"  ○ textintersection: ({p['real_x_rounded']:.2f}, {p['real_y_rounded']:.2f})")
         
         # 查找极值点
         extrema_points = []
         if len(x_axis_points) >= 2:
             x_axis_sorted = sorted(x_axis_points, key=lambda p: p['real_x_rounded'])
-            print(f"\n[{_lt('步骤1')}] 查找极值点（{len(x_axis_sorted)-1}个区间）")
+            print(f"\n[Step1] textextrema point ({len(x_axis_sorted)-1}text)")
             
             for i in range(len(x_axis_sorted) - 1):
                 x_min = x_axis_sorted[i]['real_x_rounded']
@@ -2597,14 +2596,14 @@ class CoordinateRecognizer:
                     max_y = max(y_values)
                     min_y = min(y_values)
                     
-                    print(f"  区间[{x_min}, {x_max}]: {len(between)}个点")
+                    print(f"  text[{x_min}, {x_max}]: {len(between)}text")
                     
                     # 保留所有最大值点（可能有多个）
                     max_points = [p for p in between if p['real_y_rounded'] == max_y]
                     for p in max_points:
                         key_points.add((p['pixel_x'], p['pixel_y']))
                         extrema_points.append(p)
-                        print(f"    ✓ 极大值: ({p['real_x_rounded']}, {p['real_y_rounded']})")
+                        print(f"    ✓ text: ({p['real_x_rounded']}, {p['real_y_rounded']})")
                     
                     # 保留所有最小值点（可能有多个，且不同于最大值）
                     if min_y != max_y:
@@ -2612,16 +2611,16 @@ class CoordinateRecognizer:
                         for p in min_points:
                             key_points.add((p['pixel_x'], p['pixel_y']))
                             extrema_points.append(p)
-                            print(f"    ✓ 极小值: ({p['real_x_rounded']}, {p['real_y_rounded']})")
+                            print(f"    ✓ text: ({p['real_x_rounded']}, {p['real_y_rounded']})")
                     
                     # 输出被删除的点
                     for p in between:
                         if (p['pixel_x'], p['pixel_y']) not in key_points:
-                            print(f"    ✗ 删除中间点: ({p['real_x_rounded']}, {p['real_y_rounded']})")
+                            print(f"    ✗ text: ({p['real_x_rounded']}, {p['real_y_rounded']})")
         
         # 查找间断函数点（X坐标相同的点对）
         discontinuity_points = []
-        print(f"\n[{_lt('步骤1.5')}] 查找间断函数点（X坐标相同的点对）")
+        print(f"\n[Step1.5] text (Xcoordinatetext)")
         
         # 按X坐标分组
         x_groups = defaultdict(list)
@@ -2632,15 +2631,15 @@ class CoordinateRecognizer:
         # discontinuity_groups = {}  # {x_val: [points]}
         # for x_val, points in x_groups.items():
         #     if len(points) >= 2:
-        #         print(f"  发现间断点组：x={x_val}, {len(points)}个点")
+        #         print(f"  Founddiscontinuity pointtext: x={x_val}, {len(points)}text")
         #         discontinuity_groups[x_val] = points
         #         for p in points:
         #             discontinuity_points.append(p)
-        #             print(f"    ✓ 间断点: ({p['real_x_rounded']}, {p['real_y_rounded']})")
+        #             print(f"    ✓ discontinuity point: ({p['real_x_rounded']}, {p['real_y_rounded']})")
         
         # # 如果间断点太多（≥6个），进行稀疏化
         # if len(discontinuity_points) >= 6:
-        #     print(f"\n[{_lt('步骤1.6')}] 间断点稀疏化（共{len(discontinuity_points)}个点 ≥ 6）")
+        #     print(f"\n[Step1.6] discontinuity pointtext (text{len(discontinuity_points)}text ≥ 6)")
             
         #     # 获取所有间断点组的X坐标，排序
         #     x_vals = sorted(discontinuity_groups.keys())
@@ -2651,8 +2650,8 @@ class CoordinateRecognizer:
         #         x_second_min = x_vals[1] if len(x_vals) >= 2 else None
         #         x_second_max = x_vals[-2] if len(x_vals) >= 2 else None
                 
-        #         print(f"  间断X坐标范围: [{x_min_disc}, {x_max_disc}]")
-        #         print(f"  删除边界，保留次边界: [{x_second_min}, {x_second_max}]")
+        #         print(f"  textXcoordinatetext: [{x_min_disc}, {x_max_disc}]")
+        #         print(f"  textboundary, Keeptextboundary: [{x_second_min}, {x_second_max}]")
                 
         #         # 保留的间断点
         #         kept_discontinuity = []
@@ -2661,43 +2660,43 @@ class CoordinateRecognizer:
         #         for x_val in [x_min_disc, x_max_disc]:
         #             if x_val in discontinuity_groups:
         #                 for p in discontinuity_groups[x_val]:
-        #                     print(f"  ✗ 删除边界间断点: ({p['real_x_rounded']}, {p['real_y_rounded']})")
+        #                     print(f"  ✗ textboundarydiscontinuity point: ({p['real_x_rounded']}, {p['real_y_rounded']})")
                 
         #         # 保留次边界的间断点
         #         for x_val in [x_second_min, x_second_max]:
         #             if x_val and x_val in discontinuity_groups:
         #                 for p in discontinuity_groups[x_val]:
         #                     kept_discontinuity.append(p)
-        #                     print(f"  ✓ 保留次边界间断点: ({p['real_x_rounded']}, {p['real_y_rounded']})")
+        #                     print(f"  ✓ Keeptextboundarydiscontinuity point: ({p['real_x_rounded']}, {p['real_y_rounded']})")
                 
         #         # 对剩余的间断点组进行稀疏化（每隔一个保留一个）
         #         remaining_x_vals = [x for x in x_vals if x not in [x_min_disc, x_max_disc, x_second_min, x_second_max]]
                 
         #         if remaining_x_vals:
-        #             print(f"  剩余{len(remaining_x_vals)}个间断点组，进行稀疏化（每2个保留1个）")
+        #             print(f"  text{len(remaining_x_vals)}textdiscontinuity pointtext, text (text2textKeep1text)")
         #             for i, x_val in enumerate(remaining_x_vals):
         #                 if i % 2 == 0:  # 每2个保留1个
         #                     for p in discontinuity_groups[x_val]:
         #                         kept_discontinuity.append(p)
-        #                         print(f"  ✓ 稀疏保留间断点: ({p['real_x_rounded']}, {p['real_y_rounded']})")
+        #                         print(f"  ✓ textKeepdiscontinuity point: ({p['real_x_rounded']}, {p['real_y_rounded']})")
         #                 else:
         #                     for p in discontinuity_groups[x_val]:
-        #                         print(f"  ✗ 稀疏删除间断点: ({p['real_x_rounded']}, {p['real_y_rounded']})")
+        #                         print(f"  ✗ textdiscontinuity point: ({p['real_x_rounded']}, {p['real_y_rounded']})")
                 
         #         # 更新间断点列表
         #         discontinuity_points = kept_discontinuity
-        #         print(f"  稀疏化后保留: {len(discontinuity_points)}个间断点")
+        #         print(f"  textafterKeep: {len(discontinuity_points)}textdiscontinuity point")
         
         # # 将保留的间断点加入关键点集合
         # for p in discontinuity_points:
         #     key_points.add((p['pixel_x'], p['pixel_y']))
         
-        print(f"\n[{_lt('步骤1总结')}] X轴交点: {len(x_axis_points)}, Y轴交点: {len(y_axis_points)}, 极值点: {len(extrema_points)}, 间断点: {len(discontinuity_points)}")
+        print(f"\n[Step1Summary] X-axisintersection: {len(x_axis_points)}, Y-axisintersection: {len(y_axis_points)}, extrema point: {len(extrema_points)}, discontinuity point: {len(discontinuity_points)}")
         
         # ==== 步骤2: 保留边界端点（严格模式：两个维度都在边界）====
         boundary_points = set()
         
-        print(f"\n[{_lt('步骤2')}] 保留边界端点（严格模式：两个维度都在边界上）")
+        print(f"\n[Step2] Keepboundarytext (text: textboundarytext)")
         
         if intersections:
             x_values = sorted(set([p['real_x_rounded'] for p in intersections]))
@@ -2708,7 +2707,7 @@ class CoordinateRecognizer:
             y_min_val = y_values[0]
             y_max_val = y_values[-1]
             
-            print(f"  边界值范围: X[{x_min_val}, {x_max_val}], Y[{y_min_val}, {y_max_val}]")
+            print(f"  boundarytext: X[{x_min_val}, {x_max_val}], Y[{y_min_val}, {y_max_val}]")
             
             # 检查网格信息
             v_grids = coordinate_mapping.get('v_grid_x_pixels', [])
@@ -2720,7 +2719,7 @@ class CoordinateRecognizer:
                 topmost_grid = min(h_grids)
                 bottommost_grid = max(h_grids)
                 
-                print(f"  最外侧网格: X[{leftmost_grid:.0f}, {rightmost_grid:.0f}], Y[{topmost_grid:.0f}, {bottommost_grid:.0f}]")
+                print(f"  text: X[{leftmost_grid:.0f}, {rightmost_grid:.0f}], Y[{topmost_grid:.0f}, {bottommost_grid:.0f}]")
                 
                 # 严格模式：只保留同时在x和y边界上的点（四个角）
                 for p in intersections:
@@ -2749,12 +2748,12 @@ class CoordinateRecognizer:
                                 boundary_type.append('y_min')
                             if y == y_max_val:
                                 boundary_type.append('y_max')
-                            print(f"  ✓ 保留边界点: ({x}, {y}) - {'+'.join(boundary_type)}")
+                            print(f"  ✓ Keepboundarytext: ({x}, {y}) - {'+'.join(boundary_type)}")
                         else:
-                            print(f"  ✗ 角点在最外侧网格: ({x}, {y})")
+                            print(f"  ✗ text: ({x}, {y})")
         
         # ==== 步骤3: 边缘过滤 ====
-        print(f"\n[{_lt('步骤3')}] 边缘过滤（最外侧网格且靠边的点）")
+        print(f"\n[Step3] edgefilter (text)")
         
         filtered_out = 0
         if len(intersections) >= 2 and v_grids and h_grids:
@@ -2771,7 +2770,7 @@ class CoordinateRecognizer:
             threshold = 1.5 * grid_spacing
             h_img, w_img = image_shape
             
-            print(f"  距离阈值: {threshold:.0f}px (1.5×网格间距)")
+            print(f"  texthreshold: {threshold:.0f}px (1.5×text)")
             
             for p in intersections:
                 px, py = p['pixel_x'], p['pixel_y']
@@ -2789,12 +2788,12 @@ class CoordinateRecognizer:
                     if dist_to_edge < threshold:
                         # 如果是关键点，不过滤
                         if (px, py) in key_points or (px, py) in boundary_points:
-                            print(f"  ○ 靠边但保护: ({p['real_x_rounded']}, {p['real_y_rounded']}) 距离{dist_to_edge:.0f}px")
+                            print(f"  ○ text: ({p['real_x_rounded']}, {p['real_y_rounded']}) text{dist_to_edge:.0f}px")
                         else:
                             filtered_out += 1
-                            print(f"  ✗ 边缘过滤: ({p['real_x_rounded']}, {p['real_y_rounded']}) 距离{dist_to_edge:.0f}px < {threshold:.0f}px")
+                            print(f"  ✗ edgefilter: ({p['real_x_rounded']}, {p['real_y_rounded']}) text{dist_to_edge:.0f}px < {threshold:.0f}px")
         
-        print(f"[{_lt('步骤3总结')}] 边缘过滤删除: {filtered_out}个点")
+        print(f"[Step3Summary] edgefiltertext: {filtered_out}text")
         
         # ==== 应用过滤，收集通过边缘过滤的点 ====
         protected_points = key_points.union(boundary_points)
@@ -2823,11 +2822,11 @@ class CoordinateRecognizer:
             candidates.append(p)
         
         # ==== 步骤4: 基于标注框碰撞检测的智能稀疏化 ====
-        print(f"\n[{_lt('步骤4')}] 基于标注框碰撞检测的智能稀疏化")
+        print(f"\n[Step4] text")
         
-        print(f"  候选点总数: {len(candidates)}")
-        print(f"  其中保护点: {len([p for p in candidates if (p['pixel_x'], p['pixel_y']) in protected_points])}个")
-        print(f"  稀疏化规则: 检测标注框碰撞（含{collision_margin}px安全边距），优先保留保护点和局部密度低的点")
+        print(f"  candidatetext: {len(candidates)}")
+        print(f"  text: {len([p for p in candidates if (p['pixel_x'], p['pixel_y']) in protected_points])}text")
+        print(f"  text: text (text{collision_margin}pxtext), textKeeptext")
         
         # 获取字体参数（与visualize_result中一致）
         # 使用自适应字体大小计算
@@ -2837,10 +2836,10 @@ class CoordinateRecognizer:
         thickness = max(1, int(font_scale * 2))
         padding = int(font_scale * 8)
         
-        print(f"  字体参数: font_scale={font_scale:.2f}, thickness={thickness}, padding={padding}")
+        print(f"  fontparameter: font_scale={font_scale:.2f}, thickness={thickness}, padding={padding}")
         
         # === 步骤4.1: 为每个点计算标注框 ===
-        print(f"\n  [{_lt('步骤4.1')}] 计算标注框（使用统一的位置计算函数）")
+        print(f"\n  [Step4.1] text (textpositiontext)")
         point_bboxes = {}  # {(px, py): bbox}
         point_dict = {}  # {(px, py): point_data}
         point_label_info = {}  # {(px, py): label_info} 保存标注信息供后续使用
@@ -2857,10 +2856,10 @@ class CoordinateRecognizer:
             point_dict[(px, py)] = p
             point_label_info[(px, py)] = label_info
         
-        print(f"  计算完成: {len(point_bboxes)}个标注框")
+        print(f"  textComplete: {len(point_bboxes)}text")
         
         # === 步骤4.2: 构建碰撞图 ===
-        print(f"\n  [{_lt('步骤4.2')}] 构建碰撞图（含{collision_margin}px安全边距）")
+        print(f"\n  [Step4.2] text (text{collision_margin}pxtext)")
         collision_graph = defaultdict(set)  # {(px, py): set of colliding (px, py)}
         
         point_keys = list(point_bboxes.keys())
@@ -2873,11 +2872,11 @@ class CoordinateRecognizer:
                     collision_graph[p2].add(p1)
                     collision_count += 1
         
-        print(f"  检测到碰撞: {collision_count}对")
-        print(f"  有碰撞的点: {len([p for p in point_keys if p in collision_graph])}个")
+        print(f"  text: {collision_count}text")
+        print(f"  text: {len([p for p in point_keys if p in collision_graph])}text")
         
         # === 步骤4.3: 迭代删除碰撞点 ===
-        print(f"\n  [{_lt('步骤4.3')}] 迭代删除碰撞点")
+        print(f"\n  [Step4.3] iterationtext")
         
         remaining_points = set(point_keys)  # 当前保留的点
         iteration = 0
@@ -2894,11 +2893,11 @@ class CoordinateRecognizer:
                         break
             
             if not has_collision:
-                print(f"  迭代{iteration}: 无碰撞，完成")
+                print(f"  iteration{iteration}: text, Complete")
                 break
             
             iteration += 1
-            print(f"\n  === 迭代{iteration} ===")
+            print(f"\n  === iteration{iteration} ===")
             
             # 计算每个有碰撞的点的"冲突分数"
             conflict_scores = {}
@@ -2932,7 +2931,7 @@ class CoordinateRecognizer:
             
             # 如果没有可删除的点（都是保护点），强制删除碰撞最多的非保护点
             if not conflict_scores:
-                print(f"  警告: 所有碰撞点都是保护点，跳出循环")
+                print(f"  Warning: text, text")
                 break
             
             # 找出冲突分数最高的点（最应该删除的）
@@ -2951,13 +2950,13 @@ class CoordinateRecognizer:
                 p_data, remaining_point_list + [p_data], k=5
             )
             
-            print(f"  ✗ 删除: ({p_data['real_x_rounded']}, {p_data['real_y_rounded']}) "
+            print(f"  ✗ text: ({p_data['real_x_rounded']}, {p_data['real_y_rounded']}) "
                   f"| 碰撞数={len(colliding)} | 局部密度={local_density:.1f}px | 冲突分数={score:.4f}")
         
-        print(f"\n  [{_lt('步骤4.3总结')}] 迭代{iteration}轮，删除{len(candidates) - len(remaining_points)}个点")
+        print(f"\n  [Step4.3Sum] iteration{iteration}text, text{len(candidates) - len(remaining_points)}text")
         
         # === 步骤4.4: 输出保留的点 ===
-        print(f"\n  [{_lt('步骤4.4')}] 保留的点列表:")
+        print(f"\n  [Step4.4] Keeptext:")
         filtered_intersections = []
         
         for p_key in sorted(remaining_points, key=lambda k: point_dict[k]['real_x_rounded']):
@@ -2981,9 +2980,9 @@ class CoordinateRecognizer:
             
             print(f"    ✓ {point_type}: ({p['real_x_rounded']}, {p['real_y_rounded']})")
         
-        print(f"[{_lt('步骤4总结')}] 碰撞检测稀疏化: {len(candidates)}个 → 保留{len(filtered_intersections)}个")
+        print(f"[Step4Summary] text: {len(candidates)}text -> Keep{len(filtered_intersections)}text")
         
-        print(f"\n[{_lt('最终结果')}] 原始{len(intersections)}个点 → 保留{len(filtered_intersections)}个点")
+        print(f"\n[FinalResult] original{len(intersections)}text -> Keep{len(filtered_intersections)}text")
         
         return filtered_intersections
     
@@ -3400,7 +3399,7 @@ class CoordinateRecognizer:
         y_tick_labels = self.coordinate_mapping.get('y_tick_labels', [])
         font_scale = self._calculate_adaptive_font_scale(x_tick_labels, y_tick_labels, (h, w))
         
-        print(f"[{_lt('可视化')}] 自适应字体大小: {font_scale:.2f}")
+        print(f"[Visualization] Adaptive fonttext: {font_scale:.2f}")
         
         # 标注X轴（红色粗线）- 使用网格线绘制
         if 'x_axis_line' in axes_info and axes_info['x_axis_line'] is not None:
@@ -3498,9 +3497,9 @@ class CoordinateRecognizer:
         if not tick_labels:
             return tick_labels
         
-        print(f"[{_lt('坐标变换')}] 原始刻度数量: {len(tick_labels)}, 裁剪偏移: {crop_offset}")
-        print(f"[{_lt('坐标变换')}] 透视变换: {'启用' if perspective_matrix is not None else '禁用'}")
-        print(f"[{_lt('坐标变换')}] 旋转变换: {'启用' if rotation_matrix is not None else '禁用'}")
+        print(f"[CoordTransform] originaltextcount: {len(tick_labels)}, crop offset: {crop_offset}")
+        print(f"[CoordTransform] perspective transform: {'enabled' if perspective_matrix is not None else 'disabled'}")
+        print(f"[CoordTransform] rotation transform: {'enabled' if rotation_matrix is not None else 'disabled'}")
         
         transformed_labels = []
         for label in tick_labels:
@@ -3543,9 +3542,9 @@ class CoordinateRecognizer:
             
             transformed_labels.append(transformed_label)
             
-            print(f"  标签'{label['text']}': ({center_x:.1f}, {center_y:.1f}) -> ({new_center_x:.1f}, {new_center_y:.1f})")
+            print(f"  label'{label['text']}': ({center_x:.1f}, {center_y:.1f}) -> ({new_center_x:.1f}, {new_center_y:.1f})")
         
-        print(f"[{_lt('坐标变换')}] 变换完成")
+        print(f"[CoordTransform] textComplete")
         return transformed_labels
     
     def inverse_transform_points(self, points: List[Dict], 
@@ -3573,10 +3572,10 @@ class CoordinateRecognizer:
         if not points:
             return points
         
-        print(f"[{_lt('逆变换')}] 交点数量: {len(points)}, 裁剪偏移: {crop_offset}")
-        print(f"[{_lt('逆变换')}] 旋转逆变换: {'启用' if rotation_matrix is not None else '禁用'}")
-        print(f"[{_lt('逆变换')}] 透视逆变换: {'启用' if perspective_matrix is not None else '禁用'}")
-        print(f"[{_lt('逆变换')}] AI增强逆变换: {'启用' if ai_transform_params is not None else '禁用'}")
+        print(f"[InvTransform] intersectioncount: {len(points)}, crop offset: {crop_offset}")
+        print(f"[InvTransform] text: {'enabled' if rotation_matrix is not None else 'disabled'}")
+        print(f"[InvTransform] text: {'enabled' if perspective_matrix is not None else 'disabled'}")
+        print(f"[InvTransform] AIEnhancetext: {'enabled' if ai_transform_params is not None else 'disabled'}")
         
         # 准备逆变换矩阵
         M_inv = None
@@ -3656,10 +3655,10 @@ class CoordinateRecognizer:
             
             transformed_points.append(transformed_pt)
             
-            print(f"  交点({pt['real_x_rounded']}, {pt['real_y_rounded']}): "
+            print(f"  intersection({pt['real_x_rounded']}, {pt['real_y_rounded']}): "
                   f"校正图({px}, {py}) -> 原图({original_px}, {original_py})")
         
-        print(f"[{_lt('逆变换')}] 变换完成")
+        print(f"[InvTransform] textComplete")
         return transformed_points
 
     # ------------------------------------------------------------------
@@ -3759,11 +3758,11 @@ class CoordinateRecognizer:
         try:
             # 1. 获取刻度标签（优先使用传入的，否则调用OCR OCR）
             if x_tick_labels is not None and y_tick_labels is not None:
-                print("使用提供的刻度标签信息（跳过OCR OCR）...")
+                print("textlabeltext (textOCR OCR)...")
                 
                 # 如果提供了旋转矩阵，需要变换刻度坐标
                 if perspective_matrix is not None or rotation_matrix is not None:
-                    print("应用变换到刻度坐标...")
+                    print("textcoordinate...")
                     h, w = image.shape[:2]
                     x_tick_labels = self.transform_tick_labels_with_rotation(
                         x_tick_labels, rotation_matrix, original_size, (h, w), crop_offset, perspective_matrix
@@ -3777,7 +3776,7 @@ class CoordinateRecognizer:
                 ocr_result = None  # 不需要ocr_result
             else:
                 # 调用OCR
-                print("调用OCR...")
+                print("textOCR...")
                 ocr_result = self.call_ocr(image)
                 
                 if isinstance(ocr_result, str):
@@ -3788,33 +3787,33 @@ class CoordinateRecognizer:
             
             # 2. 提取刻度标签（仅当未提供时）
             if not use_provided_labels:
-                print("提取刻度标签...")
+                print("textlabel...")
                 x_tick_labels, y_tick_labels = self.extract_tick_labels(ocr_result)
                 
                 # 过滤OCR识别错误的标签
-                print("\n过滤OCR识别错误的标签...")
+                print("\nfilterOCRtextlabel...")
                 x_tick_labels = self._filter_ocr_labels(x_tick_labels, 'x')
                 y_tick_labels = self._filter_ocr_labels(y_tick_labels, 'y')
-                print(f"\n过滤后：X轴{len(x_tick_labels)}个标签，Y轴{len(y_tick_labels)}个标签")
+                print(f"\nfilterafter: X-axis{len(x_tick_labels)}textlabel, Y-axis{len(y_tick_labels)}textlabel")
             else:
-                print("使用提供的刻度标签（已在阶段0完成过滤和坐标变换）...")
+                print("textlabel (text0Completefiltertextcoordinatetext)...")
             
-            print(f"找到 {len(x_tick_labels)} 个X轴刻度标签")
-            print(f"找到 {len(y_tick_labels)} 个Y轴刻度标签")
+            print(f"Found {len(x_tick_labels)} textX-axistextlabel")
+            print(f"Found {len(y_tick_labels)} textY-axistextlabel")
             
             if len(x_tick_labels) < 2 or len(y_tick_labels) < 2:
                 result['error'] = f"刻度标签不足：X轴{len(x_tick_labels)}个，Y轴{len(y_tick_labels)}个（至少需要各2个）"
                 return result
             
             # 3. 推测坐标轴位置（从网格线中选择）
-            print("推测坐标轴位置...")
+            print("textaxisposition...")
             axes_info = self.infer_axes_position(x_tick_labels, y_tick_labels, 
                                                 grid_h_lines, grid_v_lines)
             self.axis_info = axes_info
             result['axes_info'] = axes_info
             
             # 4. 建立坐标映射
-            print("建立坐标映射...")
+            print("textcoordinatetext...")
             coordinate_mapping = self.build_coordinate_mapping(
                 x_tick_labels, y_tick_labels, axes_info,
                 grid_h_lines, grid_v_lines
@@ -3822,7 +3821,7 @@ class CoordinateRecognizer:
             self.coordinate_mapping = coordinate_mapping
             
             # 5. 提取曲线
-            print("提取曲线...")
+            print("textcurve...")
             curve_binary, intermediates = self.extract_curve(
                 image, grid_h_lines, grid_v_lines, ocr_result, erase_thickness
             )
@@ -3833,7 +3832,7 @@ class CoordinateRecognizer:
             result['intermediate_connected'] = intermediates.get('connected')
             
             # 6. 可视化网格线坐标映射
-            print("生成网格线坐标映射图...")
+            print("textgrid linecoordinatetext...")
             grid_coord_vis = self.visualize_grid_coordinates(
                 image, grid_h_lines, grid_v_lines, 
                 x_tick_labels, y_tick_labels, axes_info
@@ -3841,18 +3840,18 @@ class CoordinateRecognizer:
             result['grid_coord_visualization'] = grid_coord_vis
             
             # 7. 查找交点
-            print("查找交点...")
+            print("textintersection...")
             intersections_raw = self.find_line_intersections(
                 curve_binary, grid_h_lines, grid_v_lines, axes_info, tolerance
             )
             
-            print(f"找到 {len(intersections_raw)} 个交点")
+            print(f"Found {len(intersections_raw)} textintersection")
             
             # 保存原始交点（用于对比）
             result['intersections_raw'] = intersections_raw
             
             # 7.5. 准备推理交点（只做轻量清洗，不做可视化稀疏化）
-            print("准备推理交点...")
+            print("textintersection...")
             self._last_curve_binary = curve_binary
             intersections_reasoning = self._prepare_reasoning_intersections(
                 intersections_raw
@@ -3860,7 +3859,7 @@ class CoordinateRecognizer:
             result['reasoning_intersections'] = intersections_reasoning
             result['reasoning_debug'] = self._last_reasoning_debug
             dbg = self._last_reasoning_debug
-            print(f"推理交点: {dbg.get('final_count', '?')} 个 "
+            print(f"textintersection: {dbg.get('final_count', '?')} text "
                   f"(种子={dbg.get('integer_seed_count', '?')}, "
                   f"rescue={dbg.get('rescued_count', '?')}, "
                   f"gap_fill={dbg.get('gap_filled_count', '?')}, "
@@ -3870,7 +3869,7 @@ class CoordinateRecognizer:
             # 之前这里会为了可视化稀疏化/筛选点集，导致一些真实交点在
             # Stage 2 最终输出和标注图里被移除。当前改为直接保留原始交点，
             # 只使用 find_line_intersections() 的检测结果，不再做展示层删点。
-            print("跳过关键交点过滤，直接保留原始交点...")
+            print("textintersectionfilter, textKeeporiginalintersection...")
             intersections_filtered = intersections_raw
             result['intersections'] = intersections_filtered
 
@@ -3878,7 +3877,7 @@ class CoordinateRecognizer:
             result['visual_facts'] = None
 
             # 8. 可视化最终结果
-            print("生成可视化结果...")
+            print("text...")
             annotated_image = self.visualize_result(image, axes_info, intersections_filtered)
             result['annotated_image'] = annotated_image
             

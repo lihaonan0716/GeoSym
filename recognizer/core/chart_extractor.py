@@ -50,7 +50,6 @@ from pathlib import Path as _Path
 _exp_root = _Path(__file__).resolve().parent.parent.parent
 if str(_exp_root) not in _sys.path:
     _sys.path.insert(0, str(_exp_root))
-from i18n import log_tag as _lt  # noqa: E402
 
 _API_KEYS_PATH = _exp_root / "config" / "api_keys.yaml"
 
@@ -71,13 +70,13 @@ def _load_gemini_api_key() -> str:
 
 class CoordinateLabel(BaseModel):
     """单个坐标标签"""
-    key: str = Field(description="坐标刻度标签编号，如 'X1', 'X2', 'Y1', 'Y2' 等")
-    text: str = Field(description="识别到的X轴、Y轴坐标刻度标签数值，如 '1/2', 'π', '-3', '0.5', '-1.5'")
+    key: str = Field(description="Coordinate tick label identifier, such as 'X1', 'X2', 'Y1', 'Y2' text")
+    text: str = Field(description="Recognized X/Y-axis tick-label value, such as '1/2', 'π', '-3', '0.5', '-1.5'")
 
 class CoordinateRecognition(BaseModel):
     """坐标识别结果"""
-    x_labels: List[CoordinateLabel] = Field(description="X轴坐标刻度标签列表")
-    y_labels: List[CoordinateLabel] = Field(description="Y轴坐标刻度标签列表")
+    x_labels: List[CoordinateLabel] = Field(description="X-axis coordinate tick label list")
+    y_labels: List[CoordinateLabel] = Field(description="Y-axis coordinate tick label list")
 
 
 # ==================== ChartExtractor类 ====================
@@ -183,7 +182,7 @@ class ChartExtractor:
             
             # 打印原始图片信息
             h, w = image.shape[:2]
-            print(f"[Chart提取] 原始图片尺寸: {w}x{h}, 通道数: {image.shape[2] if len(image.shape) > 2 else 1}")
+            print(f"[Charttext] Original image size: {w}x{h}, channels: {image.shape[2] if len(image.shape) > 2 else 1}")
             
             # 图片预处理：如果超过1920x1080则缩放
             MAX_WIDTH = 1920
@@ -199,16 +198,16 @@ class ChartExtractor:
             #     new_w = int(w * scale)
             #     new_h = int(h * scale)
                 
-            #     print(f"[Chart提取] 图片过大，缩放到: {new_w}x{new_h} (缩放比例: {scale:.2f})")
+            #     print(f"[Charttext] imagetext, text: {new_w}x{new_h} (text: {scale:.2f})")
             #     processed_image = cv2.resize(image, (new_w, new_h), interpolation=cv2.INTER_AREA)
             # else:
-            #     print(f"[Chart提取] 图片尺寸符合要求，无需缩放")
+            #     print(f"[Charttext] imagetext, text")
             
             # 使用JPG格式保存（有损压缩）
             _tmp = tempfile.NamedTemporaryFile(suffix='.jpg', delete=False)
             temp_path = _tmp.name
             _tmp.close()
-            print(f"[Chart提取] 临时文件路径: {temp_path}")
+            print(f"[Charttext] Temporary file path: {temp_path}")
             
             # 保存为JPG格式，质量参数100
             save_success = cv2.imwrite(temp_path, processed_image, [cv2.IMWRITE_JPEG_QUALITY, 100])
@@ -222,7 +221,7 @@ class ChartExtractor:
                 return result
             
             file_size = os.path.getsize(temp_path)
-            print(f"[Chart提取] 临时文件大小: {file_size} 字节")
+            print(f"[Charttext] Temporary file size: {file_size} bytes")
             
             if file_size == 0:
                 result['error'] = f"临时文件为空: {temp_path}"
@@ -230,12 +229,12 @@ class ChartExtractor:
                     os.remove(temp_path)
                 return result
             
-            print("[Chart提取] 调用OCR识别题目图片...")
+            print("[Charttext] Calling OCR on the problem image...")
 
             # 2. 调用OCR
             try:
                 base64_data = self._image_to_base64(temp_path)
-                print(f"[Chart提取] Base64编码长度: {len(base64_data)} 字符")
+                print(f"[Charttext] Base64 length: {len(base64_data)} text")
                 ocr_result = self.ocr_tool.ocr_image(f"data:image/jpeg;base64,{base64_data}")
 
             except Exception as e:
@@ -250,13 +249,13 @@ class ChartExtractor:
             
             # 打印OCR结果基本信息
             if ocr_result:
-                print(f"[Chart提取] OCR返回的键: {list(ocr_result.keys())}")
+                print(f"[Charttext] OCR result keys: {list(ocr_result.keys())}")
                 if 'line_data' in ocr_result:
-                    print(f"[Chart提取] line_data 项数: {len(ocr_result['line_data'])}")
+                    print(f"[Charttext] line_data item count: {len(ocr_result['line_data'])}")
                 else:
-                    print("[Chart提取] WARNING: OCR结果中没有 line_data 字段")
+                    print("[Charttext] WARNING: OCR result has no line_data field")
             else:
-                print("[Chart提取] ⚠️ OCR返回结果为空")
+                print("[Charttext] ⚠️ OCR result is empty")
             
             if not ocr_result or 'line_data' not in ocr_result:
                 result['error'] = "OCR识别失败或未返回line_data"
@@ -305,7 +304,7 @@ class ChartExtractor:
         
         # 打印原始图片信息
         h, w = image.shape[:2]
-        print(f"[Chart提取] 原始图片尺寸: {w}x{h}, 通道数: {image.shape[2] if len(image.shape) > 2 else 1}")
+        print(f"[Charttext] Original image size: {w}x{h}, channels: {image.shape[2] if len(image.shape) > 2 else 1}")
         
         # 验证OCR结果
         if not ocr_result or 'line_data' not in ocr_result:
@@ -321,7 +320,7 @@ class ChartExtractor:
             'debug_image': None
         }
         
-        print(f"[Chart提取] OCR结果包含 {len(ocr_result['line_data'])} 个line_data项")
+        print(f"[Charttext] OCR result contains {len(ocr_result['line_data'])} line_data items")
         
         # 调用主流程方法处理
         return self._process_chart_with_ocr_result(
@@ -342,14 +341,14 @@ class ChartExtractor:
             旋转后的图片（如果需要旋转）
         """
         auto_rotate_degrees = ocr_result.get('auto_rotate_degrees', 0)
-        print(f"[Chart提取] OCR自动旋转角度: {auto_rotate_degrees}度")
+        print(f"[Charttext] OCR auto-rotation angle: {auto_rotate_degrees}text")
         
         if auto_rotate_degrees == 0:
             return image
         
-        print(f"[Chart提取] 检测到图片被OCR自动旋转了{auto_rotate_degrees}度，正在旋转原始图片...")
+        print(f"[Charttext] Detected OCR auto-rotation by{auto_rotate_degrees}text, rotating original image...")
         original_shape = image.shape[:2]
-        print(f"[Chart提取] 旋转前图片尺寸: {original_shape[1]}x{original_shape[0]} (宽x高)")
+        print(f"[Charttext] Image size before rotation: {original_shape[1]}x{original_shape[0]} (textxtext)")
         
         # 根据旋转角度选择合适的旋转方法
         if auto_rotate_degrees == 90:
@@ -361,20 +360,20 @@ class ChartExtractor:
             # 逆时针270度 = OpenCV的顺时针90度
             rotated_image = cv2.rotate(image, cv2.ROTATE_90_COUNTERCLOCKWISE)
         else:
-            print(f"[Chart提取] ⚠️ 不支持的旋转角度: {auto_rotate_degrees}度，跳过旋转")
+            print(f"[Charttext] ⚠️ textsupportstextangle: {auto_rotate_degrees}text, skipping rotation")
             return image
         
         rotated_shape = rotated_image.shape[:2]
-        print(f"[Chart提取] 旋转后图片尺寸: {rotated_shape[1]}x{rotated_shape[0]} (宽x高)")
+        print(f"[Charttext] Image size after rotation: {rotated_shape[1]}x{rotated_shape[0]} (textxtext)")
         
         # 验证旋转后的尺寸是否与OCR返回的尺寸一致
         ocr_width = ocr_result.get('image_width', 0)
         ocr_height = ocr_result.get('image_height', 0)
         if ocr_width > 0 and ocr_height > 0:
             if rotated_shape[1] != ocr_width or rotated_shape[0] != ocr_height:
-                print(f"[Chart提取] ⚠️ 旋转后尺寸({rotated_shape[1]}x{rotated_shape[0]}) 与OCR尺寸({ocr_width}x{ocr_height})不匹配")
+                print(f"[Charttext] ⚠️ textaftertext({rotated_shape[1]}x{rotated_shape[0]}) textOCRtext({ocr_width}x{ocr_height})text")
             else:
-                print(f"[Chart提取] ✅ 旋转后尺寸与OCR尺寸匹配")
+                print(f"[Charttext] ✅ rotated size matches OCR dimensions")
         
         return rotated_image
     
@@ -396,26 +395,26 @@ class ChartExtractor:
         Raises:
             ValueError: 如果未找到chart或标签数量不足
         """
-        print("[Chart提取] 从line_data中查找chart并收集候选标签...")
+        print("[Charttext] Searching line_data for chart and collecting candidate labels...")
         
         # 从line_data中找到chart和所有候选标签
         chart_info = self._find_chart_in_line_data(ocr_result['line_data'])
         
         if not chart_info:
-            raise ValueError("未在图片中找到坐标系chart")
+            raise ValueError("No coordinate-system chart found in image")
         
-        print(f"[Chart提取] 找到chart: {chart_info['bbox']}")
+        print(f"[Charttext] Found chart: {chart_info['bbox']}")
         
         all_candidate_labels = chart_info.get('all_candidate_labels', [])
         label_type_counts = chart_info.get('label_type_counts', {})
         
-        print(f"[Chart提取] 候选标签类型统计: {label_type_counts}")
+        print(f"[Charttext] Candidate label type counts: {label_type_counts}")
         
         if len(all_candidate_labels) == 0:
-            raise ValueError("未找到任何候选刻度标签")
+            raise ValueError("No candidate tick labels found")
             
         # 位置聚类：分离X轴和Y轴标签
-        print("[Chart提取] 对候选标签进行位置聚类...")
+        print("[Charttext] Clustering candidate labels by position...")
         cluster_result = self._cluster_labels_by_position(
             all_candidate_labels,
             horizontal_tolerance,
@@ -425,14 +424,14 @@ class ChartExtractor:
         x_labels_raw = cluster_result['x_labels']
         y_labels_raw = cluster_result['y_labels']
         
-        print(f"[Chart提取] 聚类结果: X轴{len(x_labels_raw)}个, Y轴{len(y_labels_raw)}个")
+        print(f"[Charttext] Clustering result: X-axis{len(x_labels_raw)}text, Y-axis{len(y_labels_raw)}text")
             
         # 检查聚类结果
         if len(x_labels_raw) < 2:
-            raise ValueError(f"X轴刻度标签数量不足（需要≥2个，实际{len(x_labels_raw)}个）")
+            raise ValueError(f"X-axisNot enough tick labels (required≥2text, actual{len(x_labels_raw)}text)")
             
         if len(y_labels_raw) < 2:
-            raise ValueError(f"Y轴刻度标签数量不足（需要≥2个，实际{len(y_labels_raw)}个）")
+            raise ValueError(f"Y-axisNot enough tick labels (required≥2text, actual{len(y_labels_raw)}text)")
         
         return chart_info, cluster_result, all_candidate_labels, label_type_counts
     
@@ -453,7 +452,7 @@ class ChartExtractor:
         Returns:
             (chart_image, chart_bbox_tuple, x_labels_converted, y_labels_converted)
         """
-        print("[Chart提取] 裁剪chart区域...")
+        print("[Charttext] Cropping chart region...")
         
         # 裁剪chart区域
         x1 = int(chart_bbox['left'])
@@ -470,7 +469,7 @@ class ChartExtractor:
         
         chart_image = image[y1:y2, x1:x2].copy()
         
-        print(f"[Chart提取] Chart尺寸: {x2-x1}x{y2-y1}")
+        print(f"[Charttext] Chart size: {x2-x1}x{y2-y1}")
             
         # 转换刻度标签坐标（从相对原图转换为相对chart）
         x_labels_converted = []
@@ -518,7 +517,7 @@ class ChartExtractor:
             }
             y_labels_converted.append(converted_label)
 
-        print(f"[Chart提取] 转换后X轴标签: {len(x_labels_converted)}个, Y轴标签: {len(y_labels_converted)}个")
+        print(f"[Charttext] Converted X-axis labels: {len(x_labels_converted)}text, Y-axis labels: {len(y_labels_converted)}text")
 
         chart_bbox_tuple = (x1, y1, x2-x1, y2-y1)
         return chart_image, chart_bbox_tuple, x_labels_converted, y_labels_converted
@@ -541,14 +540,14 @@ class ChartExtractor:
         Raises:
             ValueError: 如果过滤后标签数量不足
         """
-        print("[Chart提取] 开始过滤OCR标签...")
+        print("[Charttext] Starting OCR label filtering...")
         
         x_labels_filtered = self._filter_ocr_labels(x_labels, 'x', interval_percentile)
         y_labels_filtered = self._filter_ocr_labels(y_labels, 'y', interval_percentile)
             
         # 检查过滤后的标签是否有效
         if len(x_labels_filtered) < 2 or len(y_labels_filtered) < 2:
-            raise ValueError(f"OCR标签过滤失败：X轴{len(x_labels_filtered)}个，Y轴{len(y_labels_filtered)}个（至少需要各2个且有不同值）")
+            raise ValueError(f"OCRlabelfilterFailed: X-axis{len(x_labels_filtered)}text, Y-axis{len(y_labels_filtered)}text (textrequiredtext2text)")
         
         return x_labels_filtered, y_labels_filtered
     
@@ -585,7 +584,7 @@ class ChartExtractor:
         Returns:
             (debug_info, debug_image)
         """
-        print("[Chart提取] 生成调试信息...")
+        print("[Charttext] Generating debug information...")
         
         debug_info = self._generate_debug_info(
                 all_candidate_labels, cluster_result, label_type_counts,
@@ -593,7 +592,7 @@ class ChartExtractor:
                 horizontal_tolerance, vertical_tolerance, interval_percentile
             )
             
-        print("[Chart提取] 生成可视化调试图片...")
+        print("[Charttext] Generating visual debug image...")
         debug_image = self._generate_debug_image(
                 image, chart_bbox, all_candidate_labels, x_labels_raw, y_labels_raw, x_labels_filtered, y_labels_filtered
             )
@@ -631,7 +630,7 @@ class ChartExtractor:
         for i, label in enumerate(y_labels_sorted, 1):
             label['key'] = f'Y{i}'  # 添加唯一标识
         
-        print(f"[Gemini输入] X轴标签数量: {len(x_labels_sorted)}, Y轴标签数量: {len(y_labels_sorted)}")
+        print(f"[Geminitext] X-axis label counttext: {len(x_labels_sorted)}, Y-axis label counttext: {len(y_labels_sorted)}")
         
         # 获取图片尺寸用于边界检测
         img_height, img_width = x_labels_annotated_image.shape[:2]
@@ -646,7 +645,7 @@ class ChartExtractor:
         font = cv2.FONT_HERSHEY_SIMPLEX
         padding = max(2, round(font_scale * 4))  # 增大padding
         
-        print(f"[Gemini输入] 自适应字体: base={base_font_scale:.2f}, final={font_scale:.2f}, thickness={font_thickness}")
+        print(f"[Geminitext] Adaptive font: base={base_font_scale:.2f}, final={font_scale:.2f}, thickness={font_thickness}")
         
         # 绘制X轴标签（绿色半透明）
         for i, label in enumerate(x_labels_sorted, 1):
@@ -783,7 +782,7 @@ class ChartExtractor:
         }
         
         try:
-            print("[Gemini识别] 开始使用Gemini识别坐标...")
+            print("[Geminitext] Starting Gemini coordinate recognition...")
             
             # 1. 生成标注图片
             x_labels_annotated_image, y_labels_annotated_image, x_labels_sorted, y_labels_sorted = self._generate_gemini_input_image(
@@ -845,7 +844,7 @@ class ChartExtractor:
                 "检查每个有编号和框的刻度标签值的原始OCR识别结果是否正确。"
             )
             
-            print("[Gemini识别] 发送请求到Gemini API...")
+            print("[Geminitext] Sending requesttextGemini API...")
             
             # 5. 调用 Gemini API（API Key + google-genai SDK）
             from google.genai import types as _gtypes
@@ -870,7 +869,7 @@ class ChartExtractor:
                 ),
             )
             
-            print("[Gemini识别] 收到响应")
+            print("[Geminitext] textResponse")
             
             # 6. 解析响应（抑制 SDK 的直接 print 输出）
             with _ctxlib.redirect_stderr(_io.StringIO()):
@@ -878,7 +877,7 @@ class ChartExtractor:
             recognition_result = CoordinateRecognition.model_validate_json(resp_text)
             gemini_debug_info['gemini_response'] = recognition_result.model_dump()
             
-            print(f"[Gemini识别] 解析结果: X轴{len(recognition_result.x_labels)}个, Y轴{len(recognition_result.y_labels)}个")
+            print(f"[Geminitext] Parsed result: X-axis{len(recognition_result.x_labels)}text, Y-axis{len(recognition_result.y_labels)}text")
             
             # 7. 创建OCR标签的key映射
             ocr_x_dict = {label['key'].upper(): label for label in x_labels_sorted}
@@ -888,10 +887,10 @@ class ChartExtractor:
             gemini_x_dict = {label.key.upper(): label for label in recognition_result.x_labels}
             gemini_y_dict = {label.key.upper(): label for label in recognition_result.y_labels}
             
-            print(f"[Gemini识别] OCR X轴keys: {list(ocr_x_dict.keys())}")
-            print(f"[Gemini识别] Gemini X轴keys: {list(gemini_x_dict.keys())}")
-            print(f"[Gemini识别] OCR Y轴keys: {list(ocr_y_dict.keys())}")
-            print(f"[Gemini识别] Gemini Y轴keys: {list(gemini_y_dict.keys())}")
+            print(f"[Geminitext] OCR X-axiskeys: {list(ocr_x_dict.keys())}")
+            print(f"[Geminitext] Gemini X-axiskeys: {list(gemini_x_dict.keys())}")
+            print(f"[Geminitext] OCR Y-axiskeys: {list(ocr_y_dict.keys())}")
+            print(f"[Geminitext] Gemini Y-axiskeys: {list(gemini_y_dict.keys())}")
             
             # 8. 基于key匹配更新标签值
             x_labels_corrected = []
@@ -927,9 +926,9 @@ class ChartExtractor:
                         x_labels_corrected.append(corrected_label)
                         
                         if is_modified:
-                            print(f"[Gemini识别] {key} 修正: '{ocr_text}'({ocr_value}) -> '{gemini_label.text}'({gemini_value})")
+                            print(f"[Geminitext] {key} corrected: '{ocr_text}'({ocr_value}) -> '{gemini_label.text}'({gemini_value})")
                     else:
-                        print(f"[Gemini识别] {key} 识别失败：value为None，丢弃")
+                        print(f"[Geminitext] {key} textFailed: valuetextNone, discarding")
                 else:
                     # Gemini未识别到这个标签
                     gemini_debug_info['ocr_vs_gemini'].append({
@@ -942,7 +941,7 @@ class ChartExtractor:
                         'is_modified': False,
                         'recognized': False
                     })
-                    print(f"[Gemini识别] {key} 未被Gemini识别，丢弃")
+                    print(f"[Geminitext] {key} not recognized by Gemini, discarding")
             
             # 处理Y轴标签
             y_labels_corrected = []
@@ -977,9 +976,9 @@ class ChartExtractor:
                         y_labels_corrected.append(corrected_label)
                         
                         if is_modified:
-                            print(f"[Gemini识别] {key} 修正: '{ocr_text}'({ocr_value}) -> '{gemini_label.text}'({gemini_value})")
+                            print(f"[Geminitext] {key} corrected: '{ocr_text}'({ocr_value}) -> '{gemini_label.text}'({gemini_value})")
                     else:
-                        print(f"[Gemini识别] {key} 识别失败：value为None，丢弃")
+                        print(f"[Geminitext] {key} textFailed: valuetextNone, discarding")
                 else:
                     # Gemini未识别到这个标签
                     gemini_debug_info['ocr_vs_gemini'].append({
@@ -992,22 +991,22 @@ class ChartExtractor:
                         'is_modified': False,
                         'recognized': False
                     })
-                    print(f"[Gemini识别] {key} 未被Gemini识别，丢弃")
+                    print(f"[Geminitext] {key} not recognized by Gemini, discarding")
             
             gemini_debug_info['success'] = True
-            print(f"[Gemini识别] ✅ 识别成功: X轴{len(x_labels_corrected)}个, Y轴{len(y_labels_corrected)}个")
+            print(f"[Geminitext] ✅ recognition succeeded: X-axis{len(x_labels_corrected)}text, Y-axis{len(y_labels_corrected)}text")
             
             return x_labels_corrected, y_labels_corrected, gemini_debug_info
             
         except Exception as e:
             import traceback
-            error_msg = f"Gemini识别失败: {str(e)}\n{traceback.format_exc()}"
-            print(f"[Gemini识别] ⚠️ {error_msg}")
+            error_msg = f"Gemini recognition failed: {str(e)}\n{traceback.format_exc()}"
+            print(f"[Geminitext] ⚠️ {error_msg}")
             gemini_debug_info['error'] = error_msg
             gemini_debug_info['success'] = False
             
             # Fallback到OCR值，但需要过滤掉value为None的标签
-            print(f"[Gemini识别] Fallback到OCR值，过滤无效标签...")
+            print(f"[Geminitext] FallbacktextOCRtext, filtertextlabel...")
             
             x_labels_filtered = []
             for label in x_labels:
@@ -1018,7 +1017,7 @@ class ChartExtractor:
                     label_copy['value'] = value
                     x_labels_filtered.append(label_copy)
                 else:
-                    print(f"[Gemini识别] Fallback时过滤X轴标签: {label['text']} (value=None)")
+                    print(f"[Geminitext] FallbacktextfilterX-axislabel: {label['text']} (value=None)")
             
             y_labels_filtered = []
             for label in y_labels:
@@ -1029,9 +1028,9 @@ class ChartExtractor:
                     label_copy['value'] = value
                     y_labels_filtered.append(label_copy)
                 else:
-                    print(f"[Gemini识别] Fallback时过滤Y轴标签: {label['text']} (value=None)")
+                    print(f"[Geminitext] FallbacktextfilterY-axis labels: {label['text']} (value=None)")
             
-            print(f"[Gemini识别] Fallback结果: X轴{len(x_labels_filtered)}个, Y轴{len(y_labels_filtered)}个")
+            print(f"[Geminitext] Fallbacktext: X-axis{len(x_labels_filtered)}text, Y-axis{len(y_labels_filtered)}text")
             
             return x_labels_filtered, y_labels_filtered, gemini_debug_info
     
@@ -1082,7 +1081,7 @@ class ChartExtractor:
                     self._extract_and_cluster_labels(ocr_result, horizontal_tolerance, vertical_tolerance)
             except ValueError as e:
                 result['error'] = str(e)
-                print(f"[Chart提取] 标签提取/聚类失败: {result['error']}")
+                print(f"[Charttext] labeltext/clusterFailed: {result['error']}")
                 # 如果失败，尝试生成部分调试信息
                 if 'chart_info' in locals():
                     result['debug_info'] = {
@@ -1103,18 +1102,18 @@ class ChartExtractor:
             # 步骤3.5: Gemini坐标识别（可选）
             if gemini_enabled:
                 try:
-                    print("[Chart提取] 步骤3.5: 使用Gemini识别坐标...")
+                    print("[Charttext] text3.5: textGeminitextcoordinate...")
                     x_labels_to_filter, y_labels_to_filter, gemini_debug_info = \
                         self._recognize_coordinates_with_gemini(
                             chart_image, x_labels_converted, y_labels_converted
                         )
                     result['gemini_debug_info'] = gemini_debug_info
                 except (FileNotFoundError, ValueError) as e:
-                    print(f"[Chart提取] ⚠️ Gemini凭据未配置，跳过: {e}")
+                    print(f"[Charttext] ⚠️ Geminicredentials not configured, skipping: {e}")
                     gemini_enabled = False
             
             if not gemini_enabled:
-                print("[Chart提取] 跳过Gemini识别，使用OCR原始值")
+                print("[Charttext] Skipping Gemini recognition; using raw OCR values")
                 x_labels_to_filter = []
                 for label in x_labels_converted:
                     value = self._parse_label_value(label['text'])
@@ -1131,7 +1130,7 @@ class ChartExtractor:
                         label_copy['value'] = value
                         y_labels_to_filter.append(label_copy)
                 
-                print(f"[Chart提取] OCR标签: X轴{len(x_labels_to_filter)}个, Y轴{len(y_labels_to_filter)}个")
+                print(f"[Charttext] OCRlabel: X-axis{len(x_labels_to_filter)}text, Y-axis{len(y_labels_to_filter)}text")
             
             # 步骤4: 过滤并验证标签
             try:
@@ -1141,7 +1140,7 @@ class ChartExtractor:
                 x_labels_filtered = x_labels_raw
                 y_labels_filtered = y_labels_raw
                 result['error'] = str(e)
-                print(f"[Chart提取] 标签过滤失败: {result['error']}")
+                print(f"[Charttext] labelfilterFailed: {result['error']}")
                 try:
                     debug_info, debug_image = self._generate_debug_outputs(
                         image, chart_bbox, all_candidate_labels, cluster_result, label_type_counts,
@@ -1180,7 +1179,7 @@ class ChartExtractor:
         except Exception as e:
             import traceback
             result['error'] = f"处理失败: {str(e)}\n{traceback.format_exc()}"
-            print(f"[Chart提取] 处理异常: {result['error']}")
+            print(f"[Charttext] Processing exception: {result['error']}")
             return result
     
     # ==================== 辅助方法 ====================
@@ -1414,7 +1413,7 @@ class ChartExtractor:
         Returns:
             chart信息字典，包含bbox和所有候选标签
         """
-        print(f"[Chart提取] 开始扫描 line_data 中的 chart，候选项数: {len(line_data)}")
+        print(f"[Charttext] text line_data text chart, candidateitem count: {len(line_data)}")
         # 1. 优先找到 type="chart" 且 subtype="analytical" 的元素。
         #    如果没有，再保守地回退到 subtype="line" 且带有 children/included 的 chart。
         chart_item = None
@@ -1455,7 +1454,7 @@ class ChartExtractor:
                 for item in line_data
                 if item.get('type') == 'chart'
             ]
-            print(f"[Chart提取] 未找到 analytical chart。chart 类元素: {chart_like}")
+            print(f"[Charttext] No analytical chart found.chart text: {chart_like}")
             return None
         
         # 2. 获取chart的bbox和children_ids
@@ -1502,14 +1501,14 @@ class ChartExtractor:
             if visited is None:
                 visited = set()
             if item_id in visited:
-                print(f"[Chart提取] ⚠️ 检测到 children_ids 循环引用，跳过 item_id={item_id}, type={original_type}")
+                print(f"[Charttext] ⚠️ Detected children_ids cycle, skipping item_id={item_id}, type={original_type}")
                 return []
             visited = set(visited)
             visited.add(item_id)
 
             item = id_to_item.get(item_id)
             if not item:
-                print(f"[Chart提取] ⚠️ children item 缺失: id={item_id}, type={original_type}")
+                print(f"[Charttext] ⚠️ children item missing: id={item_id}, type={original_type}")
                 return []
             
             # 获取cnt，如果没有则使用父级的
@@ -1537,7 +1536,7 @@ class ChartExtractor:
             return []
         
         if children_ids:
-            print(f"[Chart提取] 找到chart，children_ids数量: {len(children_ids)}")
+            print(f"[Charttext] Found chart, children_ids count: {len(children_ids)}")
             for child_id in children_ids:
                 child = id_to_item.get(child_id)
                 if not child:
@@ -1554,13 +1553,13 @@ class ChartExtractor:
                     label_type_counts['other'] += 1
         else:
             # Fallback: chart没有children_ids，尝试从新API字段中提取标签
-            print("[Chart提取] ⚠️ Chart没有children_ids，尝试从新API字段提取标签...")
-            print(f"[Chart提取] chart_item keys: {list(chart_item.keys())}")
+            print("[Charttext] ⚠️ Chart has no children_ids; trying newer API fields...")
+            print(f"[Charttext] chart_item keys: {list(chart_item.keys())}")
             
             # --- 策略A: 从 'included' 字段提取（新版OCR可能把子元素放在这里） ---
             included = chart_item.get('included', [])
             if included:
-                print(f"[Chart提取] 发现 'included' 字段，包含 {len(included)} 个子元素")
+                print(f"[Charttext] Found 'included' field, contains {len(included)} text")
                 # included 可能是 list[dict]，每个dict类似于 line_data item
                 for inc_item in included:
                     if isinstance(inc_item, dict):
@@ -1587,15 +1586,15 @@ class ChartExtractor:
                 chart_data = chart_item.get('data', [])
                 error_id = chart_item.get('error_id', '')
                 if conv_output:
-                    print(f"[Chart提取] conversion_output (前500字符): {str(conv_output)[:500]}")
+                    print(f"[Charttext] conversion_output (first 500 chars): {str(conv_output)[:500]}")
                 if chart_data:
-                    print(f"[Chart提取] data字段: {str(chart_data)[:500]}")
+                    print(f"[Charttext] datafield: {str(chart_data)[:500]}")
                 if error_id:
-                    print(f"[Chart提取] error_id: {error_id}")
+                    print(f"[Charttext] error_id: {error_id}")
             
             # --- 策略C: 扫描line_data中所有同级标签元素 ---
             if not all_candidate_labels:
-                print("[Chart提取] 尝试从line_data同级元素收集标签...")
+                print("[Charttext] Trying to collect labels from line_data siblings...")
                 for item in line_data:
                     if item is chart_item:
                         continue
@@ -1623,7 +1622,7 @@ class ChartExtractor:
             
             # --- 策略D: 宽松搜索所有有text+cnt的非chart元素 ---
             if not all_candidate_labels:
-                print("[Chart提取] 仍未找到标签，尝试宽松搜索所有有text+cnt的元素...")
+                print("[Charttext] No labels found yet; trying relaxed search for text+cnt elements...")
                 for item in line_data:
                     if item is chart_item:
                         continue
@@ -1637,18 +1636,18 @@ class ChartExtractor:
                             label_type_counts['other'] += 1
             
             if not all_candidate_labels:
-                print("[Chart提取] ⚠️ 所有策略均未找到任何标签")
+                print("[Charttext] ⚠️ No labels found by any strategy")
                 # Dump full line_data structure for debugging
                 import json
                 for i, item in enumerate(line_data):
-                    print(f"[Chart提取] line_data[{i}]: keys={list(item.keys())}, type={item.get('type')}, "
+                    print(f"[Charttext] line_data[{i}]: keys={list(item.keys())}, type={item.get('type')}, "
                           f"subtype={item.get('subtype')}, has_text={bool(item.get('text'))}, "
                           f"has_cnt={bool(item.get('cnt'))}, has_included={bool(item.get('included'))}, "
                           f"has_children_ids={bool(item.get('children_ids'))}")
                 return None
         
-        print(f"[Chart提取] 收集到的label类型统计: {label_type_counts}")
-        print(f"[Chart提取] 总候选label数量: {len(all_candidate_labels)}")
+        print(f"[Charttext] Collected label type counts: {label_type_counts}")
+        print(f"[Charttext] Total candidate label count: {len(all_candidate_labels)}")
         
         # 5. 将cnt格式转换为bbox格式
         # cnt是[[x1,y1], [x2,y2], [x3,y3], [x4,y4]]格式
@@ -1690,8 +1689,8 @@ class ChartExtractor:
         Returns:
             包含x_labels和y_labels的字典
         """
-        print(f"\n[{_lt('位置聚类')}] 开始对{len(labels)}个候选label进行聚类...")
-        print(f"[{_lt('位置聚类')}] 容差参数: 水平={horizontal_tolerance}, 垂直={vertical_tolerance}")
+        print(f"\n[PosClustering] Starting clustering for{len(labels)}candidate labels...")
+        print(f"[PosClustering] Tolerance parameters: horizontal={horizontal_tolerance}, vertical={vertical_tolerance}")
         
         # 1. 数值过滤 + 计算中心点
         numeric_labels = []
@@ -1726,23 +1725,23 @@ class ChartExtractor:
                     'original_type': label.get('original_type', 'unknown')
                 })
             else:
-                print(f"  [{_lt('数值过滤')}] 排除非数值label: '{text}' (repr={repr(label.get('text',''))})")
+                print(f"  [NumFilter] Excluding non-numeric label: '{text}' (repr={repr(label.get('text',''))})")
         
-        print(f"[{_lt('位置聚类')}] 数值过滤后: {len(numeric_labels)}个label")
+        print(f"[PosClustering] After numeric filtering: {len(numeric_labels)}textlabel")
         
         if len(numeric_labels) < 4:  # 至少需要X轴2个+Y轴2个
-            print(f"[{_lt('位置聚类')}] ⚠️ 数值label不足4个，无法聚类")
+            print(f"[PosClustering] ⚠️ Fewer than 4 numeric labels; cannot cluster")
             return {'x_labels': [], 'y_labels': [], 'all_numeric': numeric_labels}
         
         # 2. 水平聚类（X轴候选）：按center_y聚类
-        print(f"\n[{_lt('位置聚类')}] 开始水平聚类（X轴候选）...")
+        print(f"\n[PosClustering] Starting horizontal clustering (X-axiscandidate)...")
         
         # 计算label高度中位数（用于设置阈值）
         heights = [l['bbox']['bottom'] - l['bbox']['top'] for l in numeric_labels]
         height_median = np.median(heights)
         horizontal_threshold = horizontal_tolerance * height_median
         
-        print(f"  标签高度中位数: {height_median:.1f}, 阈值: {horizontal_threshold:.1f}")
+        print(f"  labelheightmedian: {height_median:.1f}, threshold: {horizontal_threshold:.1f}")
         
         # 按center_y排序
         sorted_by_y = sorted(numeric_labels, key=lambda l: l['center_y'])
@@ -1766,24 +1765,24 @@ class ChartExtractor:
             horizontal_clusters.append(cluster)
             i = j
         
-        print(f"  找到{len(horizontal_clusters)}个水平聚类")
+        print(f"  Found{len(horizontal_clusters)}texthorizontal clusters")
         for idx, cluster in enumerate(horizontal_clusters):
             y_values = [l['center_y'] for l in cluster]
-            print(f"    聚类{idx}: {len(cluster)}个label, Y范围={min(y_values):.1f}-{max(y_values):.1f}")
+            print(f"    cluster{idx}: {len(cluster)}textlabel, Ytext={min(y_values):.1f}-{max(y_values):.1f}")
         
         # 选择最大的聚类作为X轴
         x_axis_cluster = max(horizontal_clusters, key=len) if horizontal_clusters else []
-        print(f"  选择最大聚类作为X轴: {len(x_axis_cluster)}个label")
+        print(f"  Selecting largest cluster as X axis: {len(x_axis_cluster)}textlabel")
         
         # 3. 垂直聚类（Y轴候选）：按center_x聚类
-        print(f"\n[{_lt('位置聚类')}] 开始垂直聚类（Y轴候选）...")
+        print(f"\n[PosClustering] Starting vertical clustering (Y-axiscandidate)...")
         
         # 计算label宽度中位数（用于设置阈值）
         widths = [l['bbox']['right'] - l['bbox']['left'] for l in numeric_labels]
         width_median = np.median(widths)
         vertical_threshold = vertical_tolerance * width_median
         
-        print(f"  标签宽度中位数: {width_median:.1f}, 阈值: {vertical_threshold:.1f}")
+        print(f"  labelwidthmedian: {width_median:.1f}, threshold: {vertical_threshold:.1f}")
         
         # 按right边界排序（用于Y轴聚类，避免负号导致的中心偏移）
         sorted_by_x = sorted(numeric_labels, key=lambda l: l['bbox']['right'])
@@ -1807,19 +1806,19 @@ class ChartExtractor:
             vertical_clusters.append(cluster)
             i = j
         
-        print(f"  找到{len(vertical_clusters)}个垂直聚类")
+        print(f"  Found{len(vertical_clusters)}textvertical clusters")
         for idx, cluster in enumerate(vertical_clusters):
             x_values = [l['bbox']['right'] for l in cluster]
-            print(f"    聚类{idx}: {len(cluster)}个label, Right范围={min(x_values):.1f}-{max(x_values):.1f}")
+            print(f"    cluster{idx}: {len(cluster)}textlabel, Righttext={min(x_values):.1f}-{max(x_values):.1f}")
         
         # 选择最大的聚类作为Y轴
         y_axis_cluster = max(vertical_clusters, key=len) if vertical_clusters else []
-        print(f"  选择最大聚类作为Y轴: {len(y_axis_cluster)}个label")
+        print(f"  Selecting largest cluster as Y axis: {len(y_axis_cluster)}textlabel")
         
-        print(f"\n[{_lt('位置聚类')}] 聚类完成: X轴{len(x_axis_cluster)}个, Y轴{len(y_axis_cluster)}个")
+        print(f"\n[PosClustering] Clustering complete: X-axis{len(x_axis_cluster)}text, Y-axis{len(y_axis_cluster)}text")
         
         # 4. 处理重复label（同时出现在X轴和Y轴）
-        print(f"\n[{_lt('位置聚类')}] 检查并处理重复label...")
+        print(f"\n[PosClustering] Checking and handling duplicate labels...")
         
         # 创建label的唯一标识（使用center坐标）
         def make_label_key(label):
@@ -1832,14 +1831,14 @@ class ChartExtractor:
         duplicate_keys = set(x_keys.keys()) & set(y_keys.keys())
         
         if duplicate_keys:
-            print(f"  发现{len(duplicate_keys)}个重复label，需要分配到正确的轴")
+            print(f"  Found{len(duplicate_keys)}textduplicate labels, requiredtext")
             
             # 计算X轴和Y轴的平均中心位置
             x_axis_center_y = np.mean([l['center_y'] for l in x_axis_cluster])
             y_axis_center_x = np.mean([l['center_x'] for l in y_axis_cluster])
             
-            print(f"  X轴平均center_y: {x_axis_center_y:.1f}")
-            print(f"  Y轴平均center_x: {y_axis_center_x:.1f}")
+            print(f"  X-axisaverage center_y: {x_axis_center_y:.1f}")
+            print(f"  Y-axisaverage center_x: {y_axis_center_x:.1f}")
             
             for key in duplicate_keys:
                 label = x_keys[key]  # 从任一个取都一样
@@ -1850,11 +1849,11 @@ class ChartExtractor:
                 if original_type == 'x_axis_tick_label':
                     # 保留在X轴，从Y轴移除
                     y_keys.pop(key)
-                    print(f"    label '{text}' 根据类型({original_type})分配到X轴")
+                    print(f"    label '{text}' assigned by type({original_type})textX-axis")
                 elif original_type == 'y_axis_tick_label':
                     # 保留在Y轴，从X轴移除
                     x_keys.pop(key)
-                    print(f"    label '{text}' 根据类型({original_type})分配到Y轴")
+                    print(f"    label '{text}' assigned by type({original_type})textY-axis")
                 else:
                     # 策略2: 对于其他类型，根据距离判断
                     dist_to_x = abs(label['center_y'] - x_axis_center_y)
@@ -1863,19 +1862,19 @@ class ChartExtractor:
                     if dist_to_x < dist_to_y:
                         # 更接近X轴，从Y轴移除
                         y_keys.pop(key)
-                        print(f"    label '{text}' (类型={original_type}) 根据距离分配到X轴 (距离={dist_to_x:.1f} < {dist_to_y:.1f})")
+                        print(f"    label '{text}' (text={original_type}) assigned to X axis by distance (text={dist_to_x:.1f} < {dist_to_y:.1f})")
                     else:
                         # 更接近Y轴，从X轴移除
                         x_keys.pop(key)
-                        print(f"    label '{text}' (类型={original_type}) 根据距离分配到Y轴 (距离={dist_to_y:.1f} <= {dist_to_x:.1f})")
+                        print(f"    label '{text}' (text={original_type}) assigned to Y axis by distance (text={dist_to_y:.1f} <= {dist_to_x:.1f})")
             
             # 更新聚类结果
             x_axis_cluster = list(x_keys.values())
             y_axis_cluster = list(y_keys.values())
             
-            print(f"  去重后: X轴{len(x_axis_cluster)}个, Y轴{len(y_axis_cluster)}个")
+            print(f"  After deduplication: X-axis{len(x_axis_cluster)}text, Y-axis{len(y_axis_cluster)}text")
         else:
-            print(f"  没有发现重复label")
+            print(f"  textFoundduplicate labels")
         
         return {
             'x_labels': x_axis_cluster,
@@ -2133,8 +2132,8 @@ class ChartExtractor:
         if len(labels) < 2:
             return labels
         
-        print(f"\n[OCR标签过滤-{axis.upper()}轴] 开始过滤...")
-        print(f"  原始标签数: {len(labels)}")
+        print(f"\n[OCRlabelfilter-{axis.upper()}text] Starting filtering...")
+        print(f"  Original label count: {len(labels)}")
         
         # 0. 位置聚类过滤：删除不在主流位置线上的标签
         if axis == 'x':
@@ -2159,8 +2158,8 @@ class ChartExtractor:
         size_median = np.median(sizes)
         position_threshold = 1.5 * size_median  # 允许偏离1.5倍标签尺寸
         
-        print(f"  位置聚类过滤（{position_name}）：")
-        print(f"    中位数: {position_median:.1f}, 阈值: ±{position_threshold:.1f}")
+        print(f"  Position-cluster filtering ({position_name}): ")
+        print(f"    median: {position_median:.1f}, threshold: ±{position_threshold:.1f}")
         
         # 过滤偏离主流位置的标签
         clustered_labels = []
@@ -2169,27 +2168,27 @@ class ChartExtractor:
             deviation = abs(pos - position_median)
             if deviation <= position_threshold:
                 clustered_labels.append(l)
-                print(f"    [OK] 保留: 值={l['value']}, {position_name}={pos:.1f}, 偏离={deviation:.1f}")
+                print(f"    [OK] Keep: text={l['value']}, {position_name}={pos:.1f}, deviation={deviation:.1f}")
             else:
-                print(f"    [RM] 删除: 值={l['value']}, {position_name}={pos:.1f}, 偏离={deviation:.1f} (超出阈值)")
+                print(f"    [RM] text: text={l['value']}, {position_name}={pos:.1f}, deviation={deviation:.1f} (texthreshold)")
         
-        print(f"  位置聚类后: {len(clustered_labels)}个标签")
+        print(f"  positionclusterafter: {len(clustered_labels)}textlabel")
         
         if len(clustered_labels) < 2:
-            print(f"  ⚠️ 过滤后标签不足2个，返回聚类结果")
+            print(f"  ⚠️ filterafterlabeltext2text, textClustering result")
             return clustered_labels
         
         # 1. 按位置排序
         if axis == 'x':
             # X轴：从左到右排序
             sorted_labels = sorted(clustered_labels, key=lambda l: l['center_x'])
-            print(f"  排序方向: 从左到右（按center_x）")
+            print(f"  Sort direction: left to right (textcenter_x)")
         else:
             # Y轴：从上到下排序
             sorted_labels = sorted(clustered_labels, key=lambda l: l['center_y'])
-            print(f"  排序方向: 从上到下（按center_y）")
+            print(f"  Sort direction: top to bottom (textcenter_y)")
         
-        print(f"  排序后的值序列: {[l['value'] for l in sorted_labels]}")
+        print(f"  textaftertext: {[l['value'] for l in sorted_labels]}")
         
         # 2. 间隔过滤：基于比率一致性删除异常间隔的两端（包括重复值异常）
         # 确定使用哪个位置坐标
@@ -2199,7 +2198,7 @@ class ChartExtractor:
             pos_key = 'center_y'  # Y轴标签按垂直位置排序
         
         if len(sorted_labels) < 3:
-            print(f"  标签数量不足3个，跳过间隔过滤")
+            print(f"  Fewer than 3 labels; skipping interval filtering")
         else:
             # 2.1 计算相邻标签的数值间隔和像素间隔
             value_intervals = []  # 数值间隔
@@ -2214,11 +2213,11 @@ class ChartExtractor:
                 pixel_diff = abs(sorted_labels[i + 1][pos_key] - sorted_labels[i][pos_key])
                 pixel_intervals.append(pixel_diff)
             
-            print(f"  数值间隔序列: {[f'{v:.1f}' for v in value_intervals]}")
-            print(f"  像素间隔序列: {[f'{p:.1f}' for p in pixel_intervals]}")
+            print(f"  Value interval sequence: {[f'{v:.1f}' for v in value_intervals]}")
+            print(f"  Pixel interval sequence: {[f'{p:.1f}' for p in pixel_intervals]}")
             
             # 2.2 基于比率一致性的检查：找到大多数比率一致的间隔
-            print(f"\n  === 比率一致性检查 ===")
+            print(f"\n  === Ratio consistency check ===")
             
             # 计算每个间隔的像素/数值比率（px per unit）
             ratios = []
@@ -2229,12 +2228,12 @@ class ChartExtractor:
                 if value_interval > 0:
                     ratio = pixel_interval / value_interval
                     ratios.append(ratio)
-                    print(f"  间隔{i}: [{sorted_labels[i]['value']}]→[{sorted_labels[i+1]['value']}] "
+                    print(f"  text{i}: [{sorted_labels[i]['value']}]->[{sorted_labels[i+1]['value']}] "
                           f"像素={pixel_interval:.1f}px, 数值={value_interval:.1f}, 比率={ratio:.2f} px/unit")
                 else:
                     # 数值间隔为0（重复值），视为潜在异常
                     ratios.append(None)
-                    print(f"  间隔{i}: [{sorted_labels[i]['value']}]→[{sorted_labels[i+1]['value']}] "
+                    print(f"  text{i}: [{sorted_labels[i]['value']}]->[{sorted_labels[i+1]['value']}] "
                           f"数值间隔为0（重复值），标记为潜在异常")
             
             # 过滤掉None值，得到有效比率
@@ -2244,17 +2243,17 @@ class ChartExtractor:
             abnormal_intervals = []
             
             if len(valid_ratios) < 2:
-                print(f"  ⚠️ 有效比率不足2个，跳过比率检查")
+                print(f"  ⚠️ Fewer than 2 valid ratios; skipping ratio check")
             else:
                 # 多轮聚类：找到大多数一致的比率
-                print(f"\n  === 多轮聚类找主流比率 ===")
+                print(f"\n  === Multi-pass clustering for dominant ratio ===")
                 
                 # 计算比率的中位数和标准差
                 ratio_median = np.median(valid_ratios)
                 ratio_std = np.std(valid_ratios)
                 
-                print(f"  初始比率中位数: {ratio_median:.2f} px/unit")
-                print(f"  初始比率标准差: {ratio_std:.2f}")
+                print(f"  textmedian: {ratio_median:.2f} px/unit")
+                print(f"  Initial ratio standard deviation: {ratio_std:.2f}")
                 
                 # 使用RANSAC思想：反复采样，找最大一致集
                 max_inlier_count = 0
@@ -2281,9 +2280,9 @@ class ChartExtractor:
                         inlier_ratios = [ratios[idx] for idx in inlier_indices]
                         best_ratio_median = np.median(inlier_ratios)
                 
-                print(f"\n  找到最大一致集: {max_inlier_count}/{len(valid_ratios)}个间隔")
-                print(f"  主流比率: {best_ratio_median:.2f} px/unit")
-                print(f"  一致集间隔索引: {best_inlier_indices}")
+                print(f"\n  Foundtext: {max_inlier_count}/{len(valid_ratios)}text")
+                print(f"  Dominant ratio: {best_ratio_median:.2f} px/unit")
+                print(f"  Inlier interval indices: {best_inlier_indices}")
                 
                 # 标记异常间隔（不在一致集中的，包括重复值）
                 for idx in range(len(ratios)):
@@ -2297,8 +2296,8 @@ class ChartExtractor:
                             pixel_intervals[idx],
                             f"重复值异常: 数值间隔为0"
                         ))
-                        print(f"  ⚠️ 异常间隔{idx}: [{sorted_labels[idx]['value']}]→[{sorted_labels[idx+1]['value']}]")
-                        print(f"      原因: 重复值（数值间隔为0）")
+                        print(f"  ⚠️ Exceptiontext{idx}: [{sorted_labels[idx]['value']}]->[{sorted_labels[idx+1]['value']}]")
+                        print(f"      reason: duplicate value (value interval is zero)")
                     elif idx not in best_inlier_indices:
                         # 比率异常
                         deviation = abs(ratio - best_ratio_median) / best_ratio_median
@@ -2310,8 +2309,8 @@ class ChartExtractor:
                             f"比率异常: {ratio:.2f} px/unit (偏离主流{deviation*100:.1f}%)"
                         ))
                         
-                        print(f"  ⚠️ 异常间隔{idx}: [{sorted_labels[idx]['value']}]→[{sorted_labels[idx+1]['value']}]")
-                        print(f"      比率={ratio:.2f} px/unit, 主流={best_ratio_median:.2f}, 偏离={deviation*100:.1f}%")
+                        print(f"  ⚠️ Exceptiontext{idx}: [{sorted_labels[idx]['value']}]->[{sorted_labels[idx+1]['value']}]")
+                        print(f"      text={ratio:.2f} px/unit, text={best_ratio_median:.2f}, deviation={deviation*100:.1f}%")
             
             # 2.3 删除异常间隔的两端标签
             keep_flags = [True] * len(sorted_labels)
@@ -2320,36 +2319,36 @@ class ChartExtractor:
                 # 异常间隔表示这段有问题，两端标签都可能有误，全部删除
                 if keep_flags[i]:
                     keep_flags[i] = False
-                    print(f"  [RM] 删除标签 {sorted_labels[i]['value']} (位置{i}, 异常间隔的左端)")
-                    print(f"      原因: {reason}")
+                    print(f"  [RM] Removed label {sorted_labels[i]['value']} (position{i}, Exceptiontext)")
+                    print(f"      reason: {reason}")
                 if keep_flags[j]:
                     keep_flags[j] = False
-                    print(f"  [RM] 删除标签 {sorted_labels[j]['value']} (位置{j}, 异常间隔的右端)")
-                    print(f"      原因: {reason}")
+                    print(f"  [RM] Removed label {sorted_labels[j]['value']} (position{j}, Exceptiontext)")
+                    print(f"      reason: {reason}")
             
             # 应用过滤
             sorted_labels = [label for i, label in enumerate(sorted_labels) if keep_flags[i]]
             
             # 检查过滤后的标签数量
             if len(sorted_labels) < 2:
-                print(f"  ⚠️ 间隔过滤后标签不足2个，返回原始标签")
+                print(f"  ⚠️ textfilterafterlabeltext2text, textoriginallabel")
                 return labels
             
             # 检查是否至少有2个不同的值
             unique_values_after_interval = set(l['value'] for l in sorted_labels)
             if len(unique_values_after_interval) < 2:
-                print(f"  ❌ 间隔过滤后只剩{len(unique_values_after_interval)}个不同的值，OCR识别失败")
-                print(f"  当前保留的值: {list(unique_values_after_interval)}")
+                print(f"  ❌ textfilteraftertext{len(unique_values_after_interval)}text, OCRtextFailed")
+                print(f"  Currently retained values: {list(unique_values_after_interval)}")
                 return []  # 返回空列表表示失败
             
-            print(f"  间隔过滤后: {len(sorted_labels)}个标签，{len(unique_values_after_interval)}个不同值")
-            print(f"  过滤后的值序列: {[l['value'] for l in sorted_labels]}")
+            print(f"  textfilterafter: {len(sorted_labels)}textlabel, {len(unique_values_after_interval)}text")
+            print(f"  filteraftertext: {[l['value'] for l in sorted_labels]}")
         
         # 3. 单调性检查：按位置排序后，值应该是单调的（X轴递增，Y轴递减），允许重复值
         if len(sorted_labels) < 3:
-            print(f"\n  标签数量不足3个，跳过单调性检查")
+            print(f"\n  labelcounttext3text, textMonotonicity check")
         else:
-            print(f"\n  === 单调性检查 ===")
+            print(f"\n  === Monotonicity check ===")
             
             # 3.1 计算相邻差值，判断主流趋势
             diffs = []
@@ -2357,7 +2356,7 @@ class ChartExtractor:
                 diff = sorted_labels[i + 1]['value'] - sorted_labels[i]['value']
                 diffs.append(diff)
             
-            print(f"  相邻差值: {[f'{d:.1f}' for d in diffs]}")
+            print(f"  Adjacent differences: {[f'{d:.1f}' for d in diffs]}")
             
             # 统计正负趋势
             positive_count = sum(1 for d in diffs if d > 0)
@@ -2375,8 +2374,8 @@ class ChartExtractor:
                 is_good_trend = lambda d: d <= 0  # 允许0（重复值）
                 is_bad_trend = lambda d: d > 0    # 只有正值才是坏趋势
             
-            print(f"  期望趋势: {expected_trend}（允许重复值）")
-            print(f"  正向差值数: {positive_count}, 负向差值数: {negative_count}")
+            print(f"  Expected trend: {expected_trend} (textduplicate value)")
+            print(f"  positive difference count: {positive_count}, negative difference count: {negative_count}")
             
             # 3.2 反复删除不符合主流趋势的点
             max_iterations = 10
@@ -2424,35 +2423,35 @@ class ChartExtractor:
                         # 选择改善度更高的方案
                         if score_remove_i > score_remove_i_plus_1:
                             removed_label = sorted_labels.pop(i)
-                            print(f"  迭代{iteration}: 删除标签 {removed_label['value']} (位置{i}, 破坏{expected_trend}趋势)")
+                            print(f"  iteration{iteration}: Removed label {removed_label['value']} (position{i}, breaks{expected_trend}trend)")
                         else:
                             removed_label = sorted_labels.pop(i + 1)
-                            print(f"  迭代{iteration}: 删除标签 {removed_label['value']} (位置{i+1}, 破坏{expected_trend}趋势)")
+                            print(f"  iteration{iteration}: Removed label {removed_label['value']} (position{i+1}, breaks{expected_trend}trend)")
                         
                         removed_in_this_iteration = True
                         break  # 删除一个后重新开始
                 
                 if not removed_in_this_iteration:
-                    print(f"  单调性检查完成（迭代{iteration}次）")
+                    print(f"  Monotonicity checkComplete (iteration{iteration}text)")
                     break
             
             if len(sorted_labels) < 2:
-                print(f"  ⚠️ 单调性过滤后标签不足2个，返回原始标签")
+                print(f"  ⚠️ textfilterafterlabeltext2text, textoriginallabel")
                 return labels
             
             # 检查是否至少有2个不同的值
             unique_values_after_monotone = set(l['value'] for l in sorted_labels)
             if len(unique_values_after_monotone) < 2:
-                print(f"  ❌ 单调性过滤后只剩{len(unique_values_after_monotone)}个不同的值，OCR识别失败")
-                print(f"  当前保留的值: {list(unique_values_after_monotone)}")
+                print(f"  ❌ textfilteraftertext{len(unique_values_after_monotone)}text, OCRtextFailed")
+                print(f"  Currently retained values: {list(unique_values_after_monotone)}")
                 return []  # 返回空列表表示失败
             
-            print(f"  单调性过滤后: {len(sorted_labels)}个标签，{len(unique_values_after_monotone)}个不同值")
-            print(f"  过滤后的值序列: {[l['value'] for l in sorted_labels]}")
+            print(f"  textfilterafter: {len(sorted_labels)}textlabel, {len(unique_values_after_monotone)}text")
+            print(f"  filteraftertext: {[l['value'] for l in sorted_labels]}")
         
         # 4. 处理重复值（基于间隔一致性）
         if len(sorted_labels) >= 3:
-            print(f"\n  检查重复值...")
+            print(f"\n  textduplicate value...")
             deduplicated = []
             i = 0
             removed_duplicates = 0
@@ -2469,7 +2468,7 @@ class ChartExtractor:
                 
                 if len(duplicates) > 1:
                     # 有重复值，需要选择保留哪个
-                    print(f"    发现重复值: {current_label['value']} ({len(duplicates)}个)")
+                    print(f"    Foundduplicate value: {current_label['value']} ({len(duplicates)}text)")
                     
                     # 获取位置坐标key
                     if axis == 'x':
@@ -2492,7 +2491,7 @@ class ChartExtractor:
                             spacing = abs(non_duplicate_labels[k + 1][pos_key] - non_duplicate_labels[k][pos_key])
                             pixel_spacings.append(spacing)
                         avg_pixel_spacing = np.mean(pixel_spacings)
-                        print(f"      平均像素间距（参考）: {avg_pixel_spacing:.1f}")
+                        print(f"      Average pixel spacing (reference): {avg_pixel_spacing:.1f}")
                     
                     # 对每个候选计算得分（基于像素位置的均匀性）
                     best_candidate = None
@@ -2534,7 +2533,7 @@ class ChartExtractor:
                         else:
                             score = 0
                         
-                        print(f"      候选 值={candidate['value']}, 位置={candidate_pos:.1f}, 像素间距={[f'{x:.1f}' for x in pixel_intervals]}, 得分={score:.2f}")
+                        print(f"      candidate text={candidate['value']}, position={candidate_pos:.1f}, pixel intervals={[f'{x:.1f}' for x in pixel_intervals]}, score={score:.2f}")
                         
                         if score > best_score:
                             best_score = score
@@ -2543,7 +2542,7 @@ class ChartExtractor:
                     # 保留最佳候选
                     deduplicated.append(best_candidate)
                     pos = best_candidate[pos_key]
-                    print(f"    [OK] 保留: 值={best_candidate['value']}, 位置={pos:.1f}")
+                    print(f"    [OK] Keep: text={best_candidate['value']}, position={pos:.1f}")
                     removed_duplicates += len(duplicates) - 1
                 else:
                     # 没有重复，直接添加
@@ -2552,23 +2551,23 @@ class ChartExtractor:
                 i = j  # 跳到下一组
             
             if removed_duplicates > 0:
-                print(f"  重复值处理: 删除了{removed_duplicates}个重复标签")
+                print(f"  duplicate valuetext: removed{removed_duplicates}duplicate labels")
                 sorted_labels = deduplicated
-                print(f"  去重后的值序列: {[l['value'] for l in sorted_labels]}")
+                print(f"  After deduplicationtext: {[l['value'] for l in sorted_labels]}")
         
         # 最后检查：必须至少有2个不同的值
         unique_values = set(l['value'] for l in sorted_labels)
         if len(unique_values) < 2:
-            print(f"\n[OCR标签过滤-{axis.upper()}轴] ❌ 过滤后只有{len(unique_values)}个不同的值，OCR识别失败")
-            print(f"  当前保留的值: {list(unique_values)}")
-            print(f"  至少需要2个不同的值才能建立坐标映射")
+            print(f"\n[OCRlabelfilter-{axis.upper()}text] ❌ filteraftertext{len(unique_values)}text, OCRtextFailed")
+            print(f"  Currently retained values: {list(unique_values)}")
+            print(f"  textrequired2textcoordinatetext")
             return []  # 返回空列表表示失败
         
-        print(f"\n[OCR标签过滤-{axis.upper()}轴] 完成")
-        print(f"  最终保留: {len(sorted_labels)}个标签")
-        print(f"  不同值数量: {len(unique_values)}个")
-        print(f"  最终值序列: {[l['value'] for l in sorted_labels]}")
-        print(f"  最终bbox序列: {[l['bbox'] for l in sorted_labels]}")
+        print(f"\n[OCRlabelfilter-{axis.upper()}text] Complete")
+        print(f"  finalKeep: {len(sorted_labels)}textlabel")
+        print(f"  Distinct value count: {len(unique_values)}text")
+        print(f"  Final value sequence: {[l['value'] for l in sorted_labels]}")
+        print(f"  Final bbox sequence: {[l['bbox'] for l in sorted_labels]}")
         
         return sorted_labels
 

@@ -1,0 +1,47 @@
+schema_version: geosym_paper_results_sources_v1
+exports:
+  current:
+    description: Paper-facing source registry for reproducible result export.
+    raw_data_manifests:
+      - name: geosym_bench_raw
+        path: dataset/raw/geosym_bench/manifest.json
+        required: true
+        role: Canonical raw GeoSym-Bench source manifest.
+      - name: plotqa_official_raw
+        path: dataset/raw/plotqa/official/manifest.json
+        required: true
+        role: Canonical raw PlotQA source manifest.
+    source_artifacts:
+      geosym_bench_controlled:
+        path: outputs/paper_level_evidence_package/geosym_bench_controlled/post_remediation_e5_backfill_full_240_final_analysis.json
+        required: true
+        role: Controlled synthetic benchmark evidence package.
+      plotqa_public_500:
+        path: outputs/paper_level_evidence_package/plotqa_public_500/pre_execution_audit.json
+        required: true
+        role: Public PlotQA confirmation evidence package.
+      m1m2_stress_128:
+        path: outputs/paper_level_evidence_package/m1m2_stress_128/pre_execution_audit.json
+        required: true
+        role: Direct fusion attribution stress evidence package.
+      open_repro_sensitivity:
+        path: outputs/paper_level_evidence_package/open_repro_sensitivity/summary.json
+        required: true
+        role: Open-backbone reproducibility sensitivity audit.
+      specialized_chart_model_anchor:
+        path: outputs/paper_level_evidence_package/specialized_chart_model_anchor/summary.json
+        required: true
+        role: Specialized chart-model comparison anchor audit.
+      fusion_diagnostics:
+        path: outputs/paper_level_evidence_package/fusion_diagnostics/fusion_positioning_audit.json
+        required: true
+        role: Fusion-claim boundary and positioning audit.
+    tables:
+      source_artifacts:
+        output: tables/source_artifacts.csv
+        role: Machine-readable inventory of source paths, hashes, and readiness.
+    claims:
+      claim_matrix:
+        output: claims/claim_matrix.json
+        required: true
+        role: Claim-to-artifact traceability matrix assembled from the registry.

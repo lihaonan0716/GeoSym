@@ -29,33 +29,33 @@ class ReplicateAdapter(BaseModelAdapter):
             timeout = self.config.get('timeout', 120)
             
             if not api_token:
-                return self._create_error_result('未配置 Replicate API Token')
+                return self._create_error_result('Replicate API token is not configured')
             
-            print(f"[Replicate/{model_path}] 开始处理图像...")
+            print(f"[Replicate/{model_path}] textprocessing image...")
             
             # 步骤1: 上传图像到Replicate
-            print(f"[Replicate/{model_path}] 步骤1: 上传图像...")
+            print(f"[Replicate/{model_path}] Step 1: uploading image...")
             image_url = self._upload_image(image, api_token)
             if not image_url:
-                return self._create_error_result('图像上传失败')
+                return self._create_error_result('Image upload failed')
             
-            print(f"[Replicate/{model_path}] 图像上传成功: {image_url}")
+            print(f"[Replicate/{model_path}] Image uploaded successfully: {image_url}")
             
             # 步骤2: 调用Replicate API
-            print(f"[Replicate/{model_path}] 步骤2: 调用API进行处理...")
+            print(f"[Replicate/{model_path}] Step 2: calling API...")
             output_url, logs = self._call_api(image_url, prompt, api_token, model_path, timeout)
             if not output_url:
-                return self._create_error_result('API调用失败', logs)
+                return self._create_error_result('API call failed', logs)
             
-            print(f"[Replicate/{model_path}] API处理成功: {output_url}")
+            print(f"[Replicate/{model_path}] API processing succeeded: {output_url}")
             
             # 步骤3: 下载处理后的图像
-            print(f"[Replicate/{model_path}] 步骤3: 下载处理后的图像...")
+            print(f"[Replicate/{model_path}] Step 3: downloading processed image...")
             processed_image = self._download_image(output_url)
             if processed_image is None:
-                return self._create_error_result('图像下载失败', logs)
+                return self._create_error_result('Image download failed', logs)
             
-            print(f"[Replicate/{model_path}] ✅ 处理完成！")
+            print(f"[Replicate/{model_path}] ✅ Processing complete！")
             
             return self._create_success_result(
                 processed_image,
@@ -65,7 +65,7 @@ class ReplicateAdapter(BaseModelAdapter):
         except Exception as e:
             import traceback
             error_detail = traceback.format_exc()
-            print(f"[ReplicateAdapter] 处理异常: {str(e)}")
+            print(f"[ReplicateAdapter] Processing exception: {str(e)}")
             print(error_detail)
             
             return self._create_error_result(
@@ -79,7 +79,7 @@ class ReplicateAdapter(BaseModelAdapter):
             # 将OpenCV图像转换为JPEG字节
             success, encoded_image = cv2.imencode('.jpg', image)
             if not success:
-                print("[ReplicateAdapter] 图像编码失败")
+                print("[ReplicateAdapter] Image encoding failed")
                 return None
             
             image_bytes = encoded_image.tobytes()
@@ -101,8 +101,8 @@ class ReplicateAdapter(BaseModelAdapter):
             )
             
             if response.status_code != 201:
-                print(f"[ReplicateAdapter] 上传失败: {response.status_code}")
-                print(f"[ReplicateAdapter] 响应: {response.text}")
+                print(f"[ReplicateAdapter] Upload failed: {response.status_code}")
+                print(f"[ReplicateAdapter] Response: {response.text}")
                 return None
             
             result = response.json()
@@ -111,7 +111,7 @@ class ReplicateAdapter(BaseModelAdapter):
             return image_url
             
         except Exception as e:
-            print(f"[ReplicateAdapter] 上传异常: {str(e)}")
+            print(f"[ReplicateAdapter] Upload exception: {str(e)}")
             return None
     
     def _call_api(self, image_url, prompt, api_token, model_path, timeout):
@@ -138,7 +138,7 @@ class ReplicateAdapter(BaseModelAdapter):
             }
             
             api_url = f'https://api.replicate.com/v1/models/{model_path}/predictions'
-            print(f"[ReplicateAdapter] 调用模型: {model_path}")
+            print(f"[ReplicateAdapter] Calling model: {model_path}")
             
             response = requests.post(
                 api_url,
@@ -148,7 +148,7 @@ class ReplicateAdapter(BaseModelAdapter):
             )
             
             if response.status_code not in [200, 201]:
-                error_msg = f"API调用失败: {response.status_code} - {response.text}"
+                error_msg = f"API call failed: {response.status_code} - {response.text}"
                 print(f"[ReplicateAdapter] {error_msg}")
                 return None, error_msg
             
@@ -166,11 +166,11 @@ class ReplicateAdapter(BaseModelAdapter):
                 return None, error
             
         except requests.Timeout:
-            error_msg = f"API调用超时（{timeout}秒）"
+            error_msg = f"API call timed out ({timeout}s)"
             print(f"[ReplicateAdapter] {error_msg}")
             return None, error_msg
         except Exception as e:
-            error_msg = f"API调用异常: {str(e)}"
+            error_msg = f"API call exception: {str(e)}"
             print(f"[ReplicateAdapter] {error_msg}")
             return None, error_msg
     
@@ -180,7 +180,7 @@ class ReplicateAdapter(BaseModelAdapter):
             response = requests.get(url, timeout=30)
             
             if response.status_code != 200:
-                print(f"[ReplicateAdapter] 下载失败: {response.status_code}")
+                print(f"[ReplicateAdapter] Download failed: {response.status_code}")
                 return None
             
             # 将字节转换为OpenCV图像
@@ -188,12 +188,12 @@ class ReplicateAdapter(BaseModelAdapter):
             image = cv2.imdecode(image_array, cv2.IMREAD_COLOR)
             
             if image is None:
-                print("[ReplicateAdapter] 图像解码失败")
+                print("[ReplicateAdapter] imagedecode failed")
                 return None
             
             return image
             
         except Exception as e:
-            print(f"[ReplicateAdapter] 下载异常: {str(e)}")
+            print(f"[ReplicateAdapter] Download exception: {str(e)}")
             return None
 

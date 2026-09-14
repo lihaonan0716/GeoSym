@@ -11,7 +11,6 @@ import os
 from openai import OpenAI
 
 from .base import BaseLLMAdapter
-from i18n import t, get_lang
 
 class OpenAIAdapter(BaseLLMAdapter):
     """
@@ -31,7 +30,7 @@ class OpenAIAdapter(BaseLLMAdapter):
     def _get_client(self) -> OpenAI:
         if self._client is None:
             if not self.api_key:
-                raise ValueError(t("eval_openai_key_missing", get_lang()))
+                raise ValueError('OpenAI API key not provided. Please set api_key.')
             base_url = self.base_url or os.environ.get("GEOSYM_OPENAI_BASE_URL", "")
             if not base_url:
                 raise ValueError("OpenAI-compatible base URL not configured for GPT model")

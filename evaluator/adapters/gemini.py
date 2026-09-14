@@ -27,7 +27,6 @@ from google import genai
 from google.genai import types
 
 from .base import BaseLLMAdapter
-from i18n import t, get_lang
 
 
 class GeminiAdapter(BaseLLMAdapter):
@@ -52,7 +51,7 @@ class GeminiAdapter(BaseLLMAdapter):
     def _get_client(self) -> genai.Client:
         if self._client is None:
             if not self.api_key:
-                raise ValueError(t("eval_gemini_key_missing", get_lang()))
+                raise ValueError('Gemini API key not provided. Get one at https://aistudio.google.com/apikey')
             self._client = genai.Client(api_key=self.api_key)
         return self._client
 
@@ -93,7 +92,7 @@ class GeminiAdapter(BaseLLMAdapter):
         result_text = self._extract_text(response)
         if not result_text:
             debug_info = self._debug_response(response)
-            return t("eval_gemini_empty_response", get_lang()).format(detail=debug_info)
+            return '[Empty response from Gemini] {detail}'.format(detail=debug_info)
 
         return result_text
 

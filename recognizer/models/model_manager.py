@@ -59,11 +59,11 @@ class ModelManager:
                 enabled = model_config.get('enabled', True)
                 
                 if not model_id:
-                    logger.warning("发现无效的模型配置（缺少 id）")
+                    logger.warning("Invalid model configuration found (missing id)")
                     continue
                 
                 if not enabled:
-                    logger.debug("跳过已禁用的模型: %s", model_id)
+                    logger.debug("Skipping disabled model: %s", model_id)
                     continue
                 
                 # 存储模型配置
@@ -76,20 +76,20 @@ class ModelManager:
                 if adapter_class:
                     adapter_config = model_config.get('config', {})
                     self.adapters[model_id] = adapter_class(adapter_config)
-                    logger.debug("加载模型: %s (%s)", model_id, model_config.get('name'))
+                    logger.debug("Loading model: %s (%s)", model_id, model_config.get('name'))
                 else:
-                    logger.warning("不支持的提供商: %s (模型: %s)", provider, model_id)
+                    logger.warning("Unsupported provider: %s (model: %s)", provider, model_id)
             
-            logger.debug("共加载 %d 个模型", len(self.models))
+            logger.debug("Loaded %d models", len(self.models))
             
         except FileNotFoundError:
-            logger.error("配置文件不存在: %s", self.config_path)
+            logger.error("Configuration file not found: %s", self.config_path)
             raise
         except yaml.YAMLError as e:
-            logger.error("配置文件解析失败: %s", e)
+            logger.error("Failed to parse configuration file: %s", e)
             raise
         except Exception as e:
-            logger.error("加载配置失败: %s", e)
+            logger.error("Failed to load configuration: %s", e)
             raise
     
     def get_available_models(self):
@@ -179,12 +179,12 @@ class ModelManager:
         try:
             min_size = min(original_height, original_width)
             square_image = cv2.resize(image, (min_size, min_size), interpolation=cv2.INTER_LINEAR)
-            logger.debug("图片已从 %dx%d 拉伸为 %dx%d", original_width, original_height, min_size, min_size)
+            logger.debug("Image resized from %dx%d to %dx%d", original_width, original_height, min_size, min_size)
         except Exception as e:
-            logger.warning("图片拉伸失败，使用原图: %s", e)
+            logger.warning("Image resize failed; using original image: %s", e)
             square_image = image
         
-        logger.debug("使用模型 %s 处理图像...", model_id)
+        logger.debug("Using model %s processing image...", model_id)
         result = adapter.process_image(square_image, prompt)
         
         # 如果处理成功且返回了图片，将图片拉伸回原始尺寸
@@ -198,9 +198,9 @@ class ModelManager:
                     interpolation=cv2.INTER_LINEAR
                 )
                 result['processed_image'] = restored_image
-                logger.debug("图片已恢复为原始尺寸 %dx%d", original_width, original_height)
+                logger.debug("Image restored to original size %dx%d", original_width, original_height)
             except Exception as e:
-                logger.warning("图片尺寸恢复失败: %s", e)
+                logger.warning("Failed to restore image size: %s", e)
                 # 如果恢复失败，保持处理后的正方形图片
         
         return result
@@ -210,18 +210,18 @@ class ModelManager:
         self.models = {}
         self.adapters = {}
         self._load_config()
-        logger.debug("配置已重新加载")
+        logger.debug("Configuration reloaded")
 
 
 # 测试代码
 if __name__ == "__main__":
     manager = ModelManager()
     
-    print("\n可用模型:")
+    print("\nAvailable models:")
     for model_id, model_name in manager.get_available_models().items():
         print(f"  - {model_id}: {model_name}")
     
-    print("\n默认Prompts:")
+    print("\nDefault prompts:")
     for model_id in manager.get_available_models().keys():
         prompt = manager.get_default_prompt(model_id)
         print(f"\n{model_id}:")

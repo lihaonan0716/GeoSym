@@ -51,7 +51,7 @@ from api.api_models import (
 # 创建FastAPI应用
 app = FastAPI(
     title="坐标系识别API",
-    description="从题目图片中提取坐标系、识别曲线并计算交点坐标",
+    description="Extract coordinate systems, recognize curves, and compute intersection coordinates from problem images",
     version="1.0.0",
     docs_url="/docs",
     redoc_url="/redoc"
@@ -123,7 +123,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 @app.exception_handler(Exception)
 async def general_exception_handler(request: Request, exc: Exception):
     """通用异常处理"""
-    print(f"[API异常] {str(exc)}")
+    print(f"[APIException] {str(exc)}")
     import traceback
     traceback.print_exc()
     
@@ -227,7 +227,7 @@ async def recognize_coordinates(request: RecognizeCoordinatesRequest):
     request_id = generate_request_id()
     
     try:
-        print(f"\n[API] 收到识别请求: {request_id}")
+        print(f"\n[API] text: {request_id}")
         
         # 提取配置
         config_dict = {}
@@ -369,7 +369,7 @@ async def recognize_coordinates(request: RecognizeCoordinatesRequest):
         )
         
     except Exception as e:
-        print(f"[API] 处理异常: {str(e)}")
+        print(f"[API] Processing exception: {str(e)}")
         import traceback
         traceback.print_exc()
         
