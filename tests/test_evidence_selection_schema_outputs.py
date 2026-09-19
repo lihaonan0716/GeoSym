@@ -74,10 +74,13 @@ def test_schema_outputs_preserve_lineage_and_do_not_modify_default(tmp_path: Pat
     assert result["paid_calls_executed"] == 0
     assert result["default_path_modified"] is False
     assert result["summary"]["protected_default_output_changes"] == 0
-    assert result["summary"]["suppressed_fact_count"] == 50
+    # These fixtures carry no OCR row, so the M0' chain cannot fit an axis and
+    # M2' withholds the whole record rather than injecting unverifiable values.
+    # Both facts per sample are therefore suppressed, not just the sliver.
+    assert result["summary"]["suppressed_fact_count"] == 100
     first = result["outputs"][0]
-    assert first["selected_evidence_set"]["selected_fact_ids"] == ["s00_good"]
-    assert first["selected_evidence_set"]["suppressed_fact_ids"] == ["s00_sliver"]
+    assert first["selected_evidence_set"]["selected_fact_ids"] == []
+    assert first["selected_evidence_set"]["suppressed_fact_ids"] == ["s00_good", "s00_sliver"]
     assert first["decision_audit"]["protected_default_output_changed"] is False
 
 

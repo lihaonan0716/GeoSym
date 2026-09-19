@@ -32,7 +32,6 @@ from scripts.run_plotqa_locate import (  # noqa: E402
     CONDITIONS,
     answer_prompt,
     corrected_numeric_prediction_from_response,
-    deterministic_prediction_from_measured,
     measured_prompt_facts,
     prompt_hashes,
 )
@@ -43,8 +42,24 @@ from scripts.run_public_benchmark_pilot import AttemptCounter, extract_predictio
 PAPER_SAMPLE_COUNT = 500
 PAPER_LLM_ATTEMPT_CAP = 1500
 PAPER_OCR_ATTEMPT_CAP = 0
+# Frozen PaddleOCR boxes for the 500-sample roster. Read from disk by the M0'
+# chain; no OCR inference runs on the answering path.
+DEFAULT_OCR_PATH = (
+    ROOT / "outputs" / "paper_level_evidence_package" / "plotqa_public_500"
+    / "openocr_survey_paddleocr" / "raw_ocr.json"
+)
 COMPLETION_GATE = 490
 PER_CALL_TIMEOUT_SECONDS = 90.0
+GLM_DISPLAY_NAME = "GLM-4.6V"
+GLM_API_MODEL_ID = "glm-4.6v"
+# GLM-4.6V spends its token budget on internal thinking before emitting visible
+# text. At 4096 the GeoSym-Bench run returned finish_reason='length' with an
+# EMPTY body on 90.9% of truncated calls, which scores as a failure and confounds
+# every condition mean. See docs/GLM46V_240X7_RERUN_PLAN_2026-09-17.md section 1.
+GLM_MAX_TOKENS = 16384
+# The GeoSym-Bench pilot lost ~17% of calls to APITimeoutError at 180s, with the
+# failures tracking problem difficulty. Same backbone, same constraint here.
+GLM_TIMEOUT_SECONDS = 600.0
 CONFIRMATION_STATUSES = {
     "track_c_plotqa_500_confirmation_completed",
     "track_c_plotqa_500_confirmation_completed_no_public_benefit_claim",
@@ -69,6 +84,8 @@ def build_plan(
     stage1_status_path: Path,
     output_dir: Path,
     public_baseline_result_path: Path | None = None,
+    reasoning_model: str | None = None,
+    per_call_timeout_seconds: float = PER_CALL_TIMEOUT_SECONDS,
 ) -> dict[str, Any]:
     plotqa_plan = load_json(plotqa_plan_path)
     measured_records = as_records_by_id(measured_records_path)
@@ -109,6 +126,21 @@ def build_plan(
     else:
         cached_conditions = []
     frozen = plotqa_plan.get("frozen_before_paid_run") or {}
+    source_model_provenance = dict(frozen.get("model_provenance", {}))
+    display_name = reasoning_model or source_model_provenance.get("display_name")
+    if reasoning_model == GLM_DISPLAY_NAME:
+        model_provenance = {
+            "display_name": GLM_DISPLAY_NAME,
+            "api_model_id": GLM_API_MODEL_ID,
+            "adapter": "evaluator.adapters.glm.GLMAdapter",
+            "timeout_seconds": per_call_timeout_seconds,
+            "hard_timeout_seconds": per_call_timeout_seconds,
+            "max_tokens": GLM_MAX_TOKENS,
+            "temperature": 0.0,
+            "sdk_retries": 0,
+        }
+    else:
+        model_provenance = source_model_provenance
     plan = {
         "schema_version": "plotqa_measured_public_500_confirmation_plan_v1",
         "created_at_utc": utc_now(),
@@ -136,8 +168,16 @@ def build_plan(
                 "available": public_baseline_result_path is not None and public_baseline_result_path.exists(),
             },
         },
-        "model_provenance": frozen.get("model_provenance", {}),
-        "reasoning_model": frozen.get("reasoning_model"),
+        "model_provenance": model_provenance,
+        "reasoning_model": display_name,
+        "per_call_timeout_seconds": per_call_timeout_seconds,
+        "hard_timeout_seconds": per_call_timeout_seconds,
+        "glm_environment": {
+            "GEOSYM_GLM_TIMEOUT_SECONDS": str(int(GLM_TIMEOUT_SECONDS)) if reasoning_model == GLM_DISPLAY_NAME else None,
+            "GEOSYM_GLM_MAX_TOKENS": str(GLM_MAX_TOKENS) if reasoning_model == GLM_DISPLAY_NAME else None,
+            "GEOSYM_GLM_MAX_RETRIES": "0" if reasoning_model == GLM_DISPLAY_NAME else None,
+        },
+        "source_sample_selection": frozen.get("sample_selection"),
         "temperature": 0.0,
         "prompt_hashes": prompt_hashes(),
         "scorer_version": frozen.get("scorer_version", SCORER_VERSION),
@@ -146,13 +186,13 @@ def build_plan(
         "ocr_http_attempt_cap": PAPER_OCR_ATTEMPT_CAP,
         "per_condition_attempt_caps": {
             "G_measured_raw": {"llm": PAPER_SAMPLE_COUNT, "ocr": 0},
-            "G_full_measured_geosym": {"llm": PAPER_SAMPLE_COUNT, "ocr": 0, "deterministic_first": True},
+            "G_full_measured_geosym": {"llm": PAPER_SAMPLE_COUNT, "ocr": 0},
             "Measured_flat_answer_baseline": {"llm": PAPER_SAMPLE_COUNT, "ocr": 0},
         },
         "retry_policy": "one counted HTTP attempt per sample-condition LLM fallback; no adaptive retries or sample replacement",
         "cache_policy": "cache key must include plan hash, model ID, condition, prompt hash, sample ID, scorer version, and measured-record hash",
         "stop_rule": "stop after the frozen 500 samples and at most 1500 LLM HTTP attempts; OCR HTTP attempts fixed at 0; no sample replacement",
-        "cost_estimate": "maximum 1500 LLM HTTP attempts; deterministic G_full answers may reduce actual attempts; OCR HTTP attempts fixed at 0",
+        "cost_estimate": "maximum 1500 LLM HTTP attempts, one per sample-condition; OCR HTTP attempts fixed at 0 (cached boxes only)",
         "dry_run": {
             "paid_calls_executed": 0,
             "cap_enforced": PAPER_LLM_ATTEMPT_CAP == PAPER_SAMPLE_COUNT * len(CONDITIONS),
@@ -164,6 +204,7 @@ def build_plan(
             "Measured-flat receives the same measured facts as full measured GeoSym.",
             "Public benefit claims require matched E0/E1 baseline rows on the same roster; G0 is optional diagnostic context under the Track C cap.",
             "The current M1/M2 curation remains heuristic and not calibrated.",
+            "Both measured arms consume the same M0' chain output and the same prompt apart from one sentence of reliability semantics; the arms differ by payload only.",
         ],
     }
     plan["plan_sha256"] = sha256_hex_bytes(canonical_json_bytes({k: v for k, v in plan.items() if k != "plan_sha256"}))
@@ -188,6 +229,24 @@ def review_plan(plan: dict[str, Any]) -> dict[str, Any]:
         findings.append("measured_m0_stage1_not_passed")
     if not plan.get("model_provenance", {}).get("display_name"):
         findings.append("model_display_name_missing")
+    if plan.get("reasoning_model") == GLM_DISPLAY_NAME:
+        if plan.get("model_provenance", {}).get("api_model_id") != GLM_API_MODEL_ID:
+            findings.append("glm_api_model_id_mismatch")
+        if float(plan.get("per_call_timeout_seconds") or 0) != GLM_TIMEOUT_SECONDS:
+            findings.append("glm_timeout_mismatch")
+        if (plan.get("glm_environment") or {}).get("GEOSYM_GLM_TIMEOUT_SECONDS") != str(int(GLM_TIMEOUT_SECONDS)):
+            findings.append("glm_env_timeout_mismatch")
+        env = plan.get("glm_environment") or {}
+        if env.get("GEOSYM_GLM_MAX_RETRIES") != "0":
+            findings.append("glm_retries_not_zero")
+        # A plan frozen at 4096 reproduces the empty-output failure mode.
+        if plan.get("model_provenance", {}).get("max_tokens") != GLM_MAX_TOKENS:
+            findings.append("glm_max_tokens_mismatch")
+        if env.get("GEOSYM_GLM_MAX_TOKENS") != str(GLM_MAX_TOKENS):
+            findings.append("glm_env_max_tokens_mismatch")
+        source_selection = plan.get("source_sample_selection")
+        if source_selection != (load_json(Path(plan["source_artifacts"]["plotqa_500_plan"]["path"])).get("frozen_before_paid_run") or {}).get("sample_selection"):
+            findings.append("source_sample_selection_not_carried_verbatim")
     return {
         "schema_version": "plotqa_measured_public_500_confirmation_prepaid_review_v1",
         "created_at_utc": utc_now(),
@@ -248,6 +307,7 @@ def run_paid(
     plan_path: Path,
     output_path: Path,
     max_new_jobs: int | None = None,
+    ocr_path: Path | None = None,
 ) -> dict[str, Any]:
     if plan.get("paid_run_approved") is not True:
         raise ValueError(plan.get("dry_run", {}).get("stop_reason") or "plan_not_approved")
@@ -256,6 +316,13 @@ def run_paid(
     if not key:
         raise ValueError(f"saved API key not found for {display_name}")
     records = as_records_by_id(measured_records_path)
+    # Cached OCR boxes drive the M0' chain's axis refit and category axis. They
+    # are read from disk, so this adds no OCR inference and no HTTP attempts.
+    ocr_rows = {
+        row["sample_id"]: row
+        for row in load_json(ocr_path or DEFAULT_OCR_PATH)
+        if isinstance(row, dict) and row.get("sample_id")
+    }
     results = []
     completed_keys = set()
     if output_path.exists():
@@ -281,27 +348,34 @@ def run_paid(
                 prediction = None
                 raw_text = ""
                 error = ""
+                # The deterministic solver that used to short-circuit this arm is
+                # gone. It fired only for G_full_measured_geosym, which made the
+                # arms differ by code path as well as evidence (invariant 6), and
+                # it was a net loss on its own terms: across the 170 samples it
+                # took over it scored 56 correct where the same samples' LLM arm
+                # scored 130. Both arms now answer the same way, and the only
+                # difference between them is the payload.
                 deterministic = False
-                if condition == "G_full_measured_geosym":
-                    prediction = deterministic_prediction_from_measured(sample, record, None)
-                    deterministic = prediction is not None
-                    if deterministic:
-                        raw_text = f"deterministic_m3_prediction={prediction}"
-                if prediction is None:
-                    facts = measured_prompt_facts(record, None, curated=condition == "G_full_measured_geosym")
-                    counter.consume_llm(sample["sample_id"], condition, "answer")
-                    image_path = None if condition == "Measured_flat_answer_baseline" else Path(sample["image_path"])
-                    try:
-                        raw_text = call_with_hard_timeout(
-                            display_name,
-                            key,
-                            image_path,
-                            answer_prompt(sample["question"], facts, condition),
-                        )
-                        prediction = extract_prediction(raw_text, sample.get("answer_type"))
-                        prediction = corrected_numeric_prediction_from_response(sample, record, raw_text, prediction)
-                    except Exception as exc:
-                        error = str(exc)
+                facts = measured_prompt_facts(
+                    record,
+                    None,
+                    curated=condition == "G_full_measured_geosym",
+                    ocr_row=ocr_rows.get(sample["sample_id"]),
+                )
+                counter.consume_llm(sample["sample_id"], condition, "answer")
+                image_path = None if condition == "Measured_flat_answer_baseline" else Path(sample["image_path"])
+                try:
+                    raw_text = call_with_hard_timeout(
+                        display_name,
+                        key,
+                        image_path,
+                        answer_prompt(sample["question"], facts, condition),
+                        timeout_seconds=float(plan.get("per_call_timeout_seconds") or PER_CALL_TIMEOUT_SECONDS),
+                    )
+                    prediction = extract_prediction(raw_text, sample.get("answer_type"))
+                    prediction = corrected_numeric_prediction_from_response(sample, record, raw_text, prediction)
+                except Exception as exc:
+                    error = str(exc)
                 parseable = prediction is not None
                 try:
                     score = score_prediction(prediction, sample.get("normalized_answer"), sample.get("answer_type")) if parseable else {"correct": False, "numeric_error": None, "tolerance": None}
@@ -437,8 +511,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--stage1-status", default="outputs/paper_level_evidence_package/plotqa_public_500/stage1_status.json")
     parser.add_argument("--public-baseline-result")
     parser.add_argument("--output-dir", default="outputs/paper_level_evidence_package/plotqa_public_500/measured_confirmation")
+    parser.add_argument("--reasoning-model")
+    parser.add_argument("--per-call-timeout-seconds", type=float, default=PER_CALL_TIMEOUT_SECONDS)
     parser.add_argument("--run-paid", action="store_true")
     parser.add_argument("--max-new-jobs", type=int)
+    parser.add_argument("--ocr", type=Path, default=DEFAULT_OCR_PATH,
+                        help="cached OCR boxes feeding the M0' chain; read from disk, never re-inferred")
     return parser.parse_args(argv)
 
 
@@ -456,6 +534,8 @@ def main(argv: list[str] | None = None) -> int:
             Path(args.stage1_status),
             output_dir,
             Path(args.public_baseline_result) if args.public_baseline_result else None,
+            reasoning_model=args.reasoning_model,
+            per_call_timeout_seconds=args.per_call_timeout_seconds,
         )
         plan_path.write_text(json.dumps(plan, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     review = review_plan(plan)
@@ -470,8 +550,12 @@ def main(argv: list[str] | None = None) -> int:
         return 0 if plan["paid_run_approved"] and review["status"] == "no_blocking_findings" else 2
     if review["status"] != "no_blocking_findings":
         raise SystemExit("prepaid review has blocking findings")
+    if plan.get("reasoning_model") == GLM_DISPLAY_NAME:
+        os.environ["GEOSYM_GLM_TIMEOUT_SECONDS"] = str(int(GLM_TIMEOUT_SECONDS))
+        os.environ["GEOSYM_GLM_MAX_TOKENS"] = str(GLM_MAX_TOKENS)
+        os.environ["GEOSYM_GLM_MAX_RETRIES"] = "0"
     os.environ.setdefault("GEOSYM_OPENAI_TIMEOUT_SECONDS", "90")
-    result = run_paid(plan, Path(args.measured_records), plan_path, output_dir / "paid_result.json", max_new_jobs=args.max_new_jobs)
+    result = run_paid(plan, Path(args.measured_records), plan_path, output_dir / "paid_result.json", max_new_jobs=args.max_new_jobs, ocr_path=Path(args.ocr))
     (output_dir / "analysis.json").write_text(json.dumps(result, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     (output_dir / "analysis.md").write_text(render_audit(result), encoding="utf-8")
     print(f"stage_status={result['stage_status']}")

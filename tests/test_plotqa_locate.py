@@ -34,9 +34,10 @@ def test_deterministic_prediction_answers_axis_tick_spacing() -> None:
         "measured_points": [],
         "ruler": {
             "y_ticks": [
-                {"text": "120000000", "value": 120000000.0},
-                {"text": "100000000", "value": 100000000.0},
-                {"text": "80000000", "value": 80000000.0},
+                {"text": "120000000", "value": 120000000.0, "pixel": 100.0},
+                {"text": "100000000", "value": 100000000.0, "pixel": 200.0},
+                {"text": "80000000", "value": 80000000.0, "pixel": 300.0},
+                {"text": "60000000", "value": 60000000.0, "pixel": 400.0},
             ]
         },
     }
@@ -44,6 +45,51 @@ def test_deterministic_prediction_answers_axis_tick_spacing() -> None:
     prediction = deterministic_prediction_from_measured(sample, record, None)
 
     assert prediction == 20_000_000.0
+
+
+def test_axis_tick_spacing_fails_closed_when_ocr_mixes_year_labels_into_the_axis() -> None:
+    """OCR routinely merges category labels into the numeric tick list.
+
+    A mixed list yields a meaningless spacing such as 2005, so the solver must
+    abstain and let the answering model read the rendered axis instead.
+    """
+    sample = {
+        "answer_type": "numeric",
+        "question": "What is the difference between two consecutive major ticks on the Y-axis ?",
+    }
+    record = {
+        "measured_points": [],
+        "ruler": {
+            "y_ticks": [
+                {"text": "1999", "value": 1999.0, "pixel": 96.0},
+                {"text": "1998", "value": 1998.0, "pixel": 252.0},
+                {"text": "2", "value": 2.0, "pixel": 340.0},
+                {"text": "1997", "value": 1997.0, "pixel": 409.0},
+            ]
+        },
+    }
+
+    assert deterministic_prediction_from_measured(sample, record, None) is None
+
+
+def test_axis_tick_spacing_fails_closed_when_ticks_are_unevenly_spaced() -> None:
+    sample = {
+        "answer_type": "numeric",
+        "question": "What is the difference between two consecutive major ticks on the X-axis ?",
+    }
+    record = {
+        "measured_points": [],
+        "ruler": {
+            "x_ticks": [
+                {"text": "50000000000", "value": 50000000000.0, "pixel": 100.0},
+                {"text": "100000000000", "value": 100000000000.0, "pixel": 200.0},
+                {"text": "150000000000", "value": 150000000000.0, "pixel": 300.0},
+                {"text": "300000000000", "value": 300000000000.0, "pixel": 400.0},
+            ]
+        },
+    }
+
+    assert deterministic_prediction_from_measured(sample, record, None) is None
 
 
 def test_deterministic_prediction_answers_axis_e_notation() -> None:
@@ -136,7 +182,14 @@ def test_deterministic_year_series_difference_keeps_same_sign_grouped_offsets_fa
     assert prediction is None
 
 
-def test_curated_bar_facts_filter_sliver_artifacts_but_raw_keeps_them() -> None:
+def test_sliver_artifacts_are_rejected_for_both_arms_by_the_m0_prime_chain() -> None:
+    """Artifact rejection is an M0' property, not a curation privilege.
+
+    It used to run only for the curated arm, which meant the arms differed in
+    evidence *quality* as well as in selection -- the control arm was handed
+    known-bad points. Both arms now consume the same admitted set, so the only
+    remaining difference is which of those facts M2' chooses to inject.
+    """
     record = {
         "chart_geometry": {"chart_type": "bar"},
         "measured_points": [
@@ -173,11 +226,20 @@ def test_curated_bar_facts_filter_sliver_artifacts_but_raw_keeps_them() -> None:
         ],
     }
 
-    raw_ids = [fact["fact_id"] for fact in measured_prompt_facts(record, None, curated=False)["measured_facts"]]
-    curated_ids = [fact["fact_id"] for fact in measured_prompt_facts(record, None, curated=True)["measured_facts"]]
+    raw = measured_prompt_facts(record, None, curated=False)
+    curated = measured_prompt_facts(record, None, curated=True)
+    raw_ids = [fact["fact_id"] for fact in raw["measured_facts"]]
 
-    assert raw_ids == ["m0_color_000", "m0_color_001", "m0_color_002"]
-    assert curated_ids == ["m0_color_000"]
+    # The two 1px-tall components are artifacts and are dropped for both arms.
+    assert raw_ids == ["m0_color_000"]
+
+    # With no OCR row the axis cannot be fitted, so M1' scores this evidence
+    # `low` and M2' withholds it rather than injecting values it could not
+    # verify. Declaring the failure is the designed behaviour: a guessed axis
+    # produces numbers that look measured but are not.
+    assert raw["evidence_reliability"]["tier"] == "low"
+    assert curated["evidence_injected"] is False
+    assert curated["measured_facts"] == []
 
 
 def test_response_normalizer_restores_signed_difference_from_label_year_operands() -> None:
@@ -220,19 +282,98 @@ def test_response_normalizer_keeps_positive_difference_when_directed_operands_po
 
 
 def test_threshold_count_prediction_uses_measured_y_values_only() -> None:
-    measured = [{"y_value": 0.1}, {"y_value": 0.25}, {"y_value": 0.7}, {"y_value": None}]
+    measured = [{"y_value": 0.1}, {"y_value": 0.25}, {"y_value": 0.7}]
 
     assert threshold_count_prediction("in how many years is the value greater than 0.2", measured) == 2.0
     assert threshold_count_prediction("in how many years is the value less than 0.2", measured) == 1.0
     assert threshold_count_prediction("in how many years is the value greater than 0.2", measured[:2]) is None
 
 
+def test_threshold_count_fails_closed_when_a_mark_is_measured_twice() -> None:
+    """M0 emits one point per CV component, not per plotted mark.
+
+    A bar split into several components inflates the count, so a duplicated
+    measured value must suppress the branch.
+    """
+    measured = [{"y_value": 0.1}, {"y_value": 0.7}, {"y_value": 0.7}, {"y_value": 0.9}]
+
+    assert threshold_count_prediction("in how many years is the value greater than 0.2", measured) is None
+
+
 def test_targeted_extrema_prediction_requires_question_label() -> None:
-    record = {"ruler": {"confidence": "medium"}}
-    measured = [
-        {"series_label": "Sweden", "x_value": 1982.0, "y_value": 0.7},
-        {"series_label": "Sweden", "x_value": 1983.0, "y_value": 0.4},
-    ]
+    record = {
+        "ruler": {"confidence": "medium"},
+        "measured_points": [
+            {"series_label": "Sweden", "x_value": 1982.0, "y_value": 0.7},
+            {"series_label": "Sweden", "x_value": 1983.0, "y_value": 0.4},
+        ],
+    }
+    measured = record["measured_points"]
 
     assert targeted_extrema_prediction("across all years what is the minimum percentage in sweden", measured, record) == 0.4
     assert targeted_extrema_prediction("across all countries what is the minimum percentage", measured, record) is None
+
+
+def test_targeted_extrema_fails_closed_when_question_asks_for_a_category() -> None:
+    """"In which year was X maximum" wants the argmax label, not the value.
+
+    Returning a measured magnitude here is a category/value type error.
+    """
+    record = {
+        "ruler": {"confidence": "high"},
+        "measured_points": [
+            {"series_label": "Iran", "x_value": 1999.0, "y_value": 7.8},
+            {"series_label": "Iran", "x_value": 2000.0, "y_value": 3.3},
+        ],
+    }
+    sample = {"answer_type": "numeric", "question": "In which year was the total resource balance in Iran maximum?"}
+
+    assert deterministic_prediction_from_measured(sample, record, None) is None
+
+
+def test_targeted_extrema_fails_closed_when_label_filter_drops_part_of_the_series() -> None:
+    """A min/max over a fragment of the series is not the chart's min/max."""
+    record = {
+        "ruler": {"confidence": "high"},
+        "measured_points": [
+            {"series_label": "Romania", "x_value": 2004.0, "y_value": 841.2},
+            {"series_label": "Romania", "x_value": 2005.0, "y_value": 692.9},
+            {"series_label": "Romania", "x_value": 2006.0, "y_value": 631.1},
+            {"series_label": "Poland", "x_value": 2004.0, "y_value": 120.0},
+        ],
+    }
+    measured = [point for point in record["measured_points"] if point["series_label"] == "Romania"]
+
+    assert targeted_extrema_prediction("across all years what is the minimum percentage in romania", measured, record) is None
+
+
+def test_ratio_question_does_not_fall_through_to_a_subtraction() -> None:
+    record = {
+        "ruler": {"confidence": "high"},
+        "measured_points": [
+            {"series_label": "Tonga", "x_value": 2013.0, "y_value": 4.0},
+            {"series_label": "Tonga", "x_value": 2014.0, "y_value": 11.3},
+        ],
+    }
+    sample = {
+        "answer_type": "numeric",
+        "question": "What is the ratio of the growth rate in Tonga in 2013 to that in 2014?",
+    }
+
+    assert deterministic_prediction_from_measured(sample, record, None) is None
+
+
+def test_metric_named_ratio_is_not_treated_as_a_ratio_operation() -> None:
+    """"employment to population ratio" is a metric name, not a quotient request."""
+    record = {
+        "measured_points": [
+            {"series_label": "1991", "category_label": "Chad", "x_value": 3.4, "source": "cv_color_component"},
+            {"series_label": "1992", "category_label": "Chad", "x_value": 5.1, "source": "cv_color_component"},
+        ]
+    }
+    sample = {
+        "answer_type": "numeric",
+        "question": "What is the difference between the employment to population ratio in 1991 and employment to population ratio in 1992 in Chad?",
+    }
+
+    assert deterministic_prediction_from_measured(sample, record, None) is not None

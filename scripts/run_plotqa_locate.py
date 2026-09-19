@@ -22,6 +22,7 @@ if str(ROOT) not in sys.path:
 
 import evaluator.adapters.base as adapter_base  # noqa: E402
 from app.helpers import _create_llm_adapter, _get_saved_key  # noqa: E402
+from evaluator.reasoning.plotqa_m0_chain import build_evidence, presentable_fact  # noqa: E402
 from scripts.prepare_public_benchmark_pilot import canonical_json_bytes, sha256_hex_bytes, stable_file_hash  # noqa: E402
 from scripts.prepare_plotqa_public_benchmark_pilot import SCORER_VERSION, SHARED_FINAL_ANSWER_INSTRUCTION  # noqa: E402
 from scripts.run_plotqa_measured_locate_smoke import (  # noqa: E402
@@ -47,38 +48,42 @@ def load_json(path: Path) -> Any:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def measured_prompt_facts(record: dict[str, Any], locate_row: dict[str, Any] | None, curated: bool) -> dict[str, Any]:
-    chart_type = record.get("chart_geometry", {}).get("chart_type")
-    facts = list(record.get("measured_points") or [])[:30]
+def measured_prompt_facts(
+    record: dict[str, Any],
+    locate_row: dict[str, Any] | None,
+    curated: bool,
+    ocr_row: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Build one arm's evidence payload from the M0' chain.
+
+    This used to curate inline against the frozen M0 record, whose measured
+    values were 16% correct because the axis was guessed rather than fitted. The
+    chain (category axis -> ruler refit -> mark admission -> M1'/M2') raises that
+    to 78% and is what the zero-cost evaluations measure, so the answering path
+    now calls the same composition instead of a parallel implementation.
+
+    ``locate_row`` points from the Stage 2 LLM locate pass are appended after the
+    chain runs. They are a different evidence source -- model-located rather than
+    measured -- and carry no mark geometry, so the geometric stages cannot score
+    them; passing them through would have them silently dropped as artifacts.
+    """
+    evidence = build_evidence(record, ocr_row, curated=curated)
+    facts = list(evidence["measured_facts"])
     if locate_row:
         for idx, point in enumerate(locate_row.get("measured_points") or []):
-            item = dict(point)
+            item = presentable_fact(point)
             item["fact_id"] = f"locate_{idx:03d}"
+            item["source"] = "mllm_locate"
             facts.append(item)
-    gaps = record.get("evidence_gaps") or []
-    if curated:
-        if chart_type == "scatter":
-            gaps = [
-                *gaps,
-                {
-                    "gap_id": "gap_scatter_series_association",
-                    "needed_for": "series_specific_reasoning",
-                    "reason": "ambiguous_series",
-                    "severity": "nonblocking",
-                },
-            ]
-        if chart_type == "bar":
-            facts = filter_bar_sliver_artifacts(facts)
-        facts = [
-            fact for fact in facts
-            if fact.get("confidence") in {"high", "medium"} and not (chart_type == "scatter" and fact.get("source") == "mllm_locate")
-        ][:20]
     return {
-        "ruler": record.get("ruler"),
-        "chart_geometry": record.get("chart_geometry"),
+        "ruler_refit": evidence["ruler_refit"],
+        "chart_geometry": evidence["chart_geometry"],
         "measured_facts": facts,
-        "evidence_gaps": gaps,
-        "curation_policy": "m1_m2_conservative" if curated else "raw_all_available",
+        "evidence_gaps": evidence["evidence_gaps"],
+        "curation_policy": evidence["curation_policy"],
+        "evidence_reliability": evidence["evidence_reliability"],
+        "evidence_injected": evidence["evidence_injected"],
+        "chain_version": evidence["chain_version"],
     }
 
 
@@ -121,13 +126,23 @@ def prompt_hashes() -> dict[str, str]:
 
 
 def answer_prompt(question: str, facts: dict[str, Any], condition: str) -> str:
+    """Build one arm's prompt.
+
+    Prompt symmetry is a hard requirement here (invariant 6). The task guidance
+    that used to live only in the curated arm now sits in
+    ``SHARED_FINAL_ANSWER_INSTRUCTION``, which every condition receives. What
+    remains arm-specific is one sentence of reliability semantics -- the thing
+    M1/M2 actually claims -- and the two strings are length-matched so the
+    difference cannot be attributed to prompt volume.
+    """
     image_instruction = "Use the image and the measured facts." if condition != "Measured_flat_answer_baseline" else "Use only the measured facts; do not infer from the image."
     fusion_instruction = (
-        "Treat ruler confidence, uncertainty, and evidence gaps as reliability signals. "
-        "If a deterministic ratio, difference, range, or extrema can be computed from measured facts that cover the required series and operands, prefer it over visual guesswork. "
-        "When an evidence gap says series association is ambiguous, inspect the image for the requested series before computing."
+        # Names only signals the payload actually carries. It previously cited
+        # per-fact uncertainty and evidence gaps, which the slimmed payload no
+        # longer contains -- an instruction to weigh absent fields is noise.
+        "Treat the stated evidence reliability and axis admissibility as reliability signals."
         if condition == "G_full_measured_geosym"
-        else "Answer directly from the supplied measured facts."
+        else "Treat the supplied measured facts as the evidence available to you."
     )
     return (
         f"{SHARED_FINAL_ANSWER_INSTRUCTION}\n"
@@ -462,9 +477,19 @@ def deterministic_prediction_from_measured(sample: dict[str, Any], record: dict[
         )
         if chart_type != "bar" or not has_question_label:
             return None
-        values = value_axis_values([point for point in measured if point.get("source") != "mllm_locate"])
+        candidates = [point for point in measured if point.get("source") != "mllm_locate"]
+        # max-min spans the full set of plotted marks, so a partially extracted
+        # series understates the range. Require the same one-point-per-mark and
+        # full-coverage guarantees used by the extremum branch.
+        if not measured_points_are_one_per_mark(candidates) or not measured_points_cover_full_series(candidates, record):
+            return None
+        values = value_axis_values(candidates)
         return max(values) - min(values) if len(values) >= 2 else None
     years = [int(match.group(0)) for match in re.finditer(r"\b(?:18|19|20|21)\d{2}\b", q)]
+    # A ratio question shares the "two operands" surface form with a difference
+    # question; answering it with a subtraction is an operation-type error.
+    if question_asks_for_ratio(q) or question_asks_for_category(q):
+        return None
     if "difference between" in q and len(years) >= 2:
         paired = paired_category_series_difference(q, measured, years)
         if paired is not None:
@@ -487,10 +512,47 @@ def deterministic_prediction_from_measured(sample: dict[str, Any], record: dict[
     return None
 
 
+def question_asks_for_category(question: str) -> bool:
+    """True when the expected answer is an axis category, not a measured value.
+
+    Generic chart-QA phrasing: "in which year/country ... was X maximum" wants the
+    argmax label, while "what is the maximum X" wants the value itself. Returning
+    a measured magnitude for the former is a category/value type error.
+    """
+    return bool(
+        re.search(r"\b(in|at|for|during)?\s*(which|what)\s+(year|country|region|city|state|category|group|sector|month|quarter|day)\b", question)
+    )
+
+
+def question_asks_for_ratio(question: str) -> bool:
+    """True when the question asks for a quotient.
+
+    "ratio" also appears inside metric names ("employment to population ratio",
+    "pupil-teacher ratio"), where the question is not asking for a division at
+    all. Only treat it as the operation when it heads a "ratio of A to B" form.
+    """
+    return bool(re.search(r"\bratio of\b", question)) or bool(re.search(r"^\s*what is the ratio\b", question))
+
+
+def measured_points_cover_full_series(measured: list[dict[str, Any]], record: dict[str, Any]) -> bool:
+    """True when the question-filtered points still span every extracted mark.
+
+    An extremum or a max-min span is defined over a whole series. The
+    question-label filter routinely keeps only a handful of the extracted marks,
+    and a min/max over that fragment is not the chart's min/max.
+    """
+    total = len(record.get("measured_points") or [])
+    return bool(total) and len(measured) >= total
+
+
 def targeted_extrema_prediction(question: str, measured: list[dict[str, Any]], record: dict[str, Any]) -> float | None:
     if "difference between the highest and the lowest" in question:
         return None
     if not any(term in question for term in ("minimum", "maximum", "highest", "lowest", "most", "least")):
+        return None
+    # Fail closed when the question asks for a category label or a derived
+    # operation: this branch can only return a single measured magnitude.
+    if question_asks_for_category(question) or question_asks_for_ratio(question) or "difference" in question:
         return None
     if record.get("ruler", {}).get("confidence") in {"low", "failed"}:
         return None
@@ -503,6 +565,10 @@ def targeted_extrema_prediction(question: str, measured: list[dict[str, Any]], r
         return None
     values = value_axis_values(measured)
     if len(values) < 2:
+        return None
+    # An extremum is only correct when every mark in the queried series was
+    # measured exactly once; duplicated or missing components shift min/max.
+    if not measured_points_are_one_per_mark(measured) or not measured_points_cover_full_series(measured, record):
         return None
     if any(term in question for term in ("minimum", "lowest", "least")):
         return min(values)
@@ -519,10 +585,34 @@ def threshold_count_prediction(question: str, measured: list[dict[str, Any]]) ->
     values = [float(point["y_value"]) for point in measured if isinstance(point.get("y_value"), (int, float))]
     if len(values) < 3:
         return None
+    # A threshold count is only correct when every plotted mark is measured
+    # exactly once. M0 emits one point per detected CV component, so a bar split
+    # into several components (or a missed bar) silently changes the count.
+    # Without a one-component-per-mark guarantee this branch cannot be trusted.
+    if not measured_points_are_one_per_mark(measured):
+        return None
     relation = match.group(1)
     if relation in {"greater than", "more than"}:
         return float(sum(1 for value in values if value > threshold))
     return float(sum(1 for value in values if value < threshold))
+
+
+def measured_points_are_one_per_mark(measured: list[dict[str, Any]]) -> bool:
+    """Heuristic guard that each measured point corresponds to a distinct mark.
+
+    Repeated values on the measured axis mean one mark was segmented into several
+    CV components, or the same mark was measured twice; either way a count or a
+    max-min span computed over these points is not trustworthy. Bars may carry
+    their magnitude on either axis, so check whichever axis is populated.
+    """
+    if not measured:
+        return False
+    for key in ("y_value", "x_value"):
+        values = [round(float(point[key]), 6) for point in measured if isinstance(point.get(key), (int, float))]
+        if len(values) != len(measured):
+            continue
+        return len(set(values)) == len(values)
+    return False
 
 
 def axis_tick_spacing_prediction(sample: dict[str, Any], record: dict[str, Any]) -> float | None:
@@ -532,14 +622,31 @@ def axis_tick_spacing_prediction(sample: dict[str, Any], record: dict[str, Any])
     axis = "y" if "y axis" in q else "x" if "x axis" in q else None
     if axis is None:
         return None
-    values = sorted({float(tick.get("value")) for tick in record.get("ruler", {}).get(f"{axis}_ticks", []) if isinstance(tick.get("value"), (int, float))})
-    diffs = sorted({round(abs(right - left), 9) for left, right in zip(values, values[1:]) if abs(right - left) > 1e-9})
-    if not diffs:
+    ticks = [tick for tick in record.get("ruler", {}).get(f"{axis}_ticks", []) if isinstance(tick.get("value"), (int, float))]
+    # Tick spacing must be read off a consistently parsed axis, but OCR on these
+    # charts routinely drops ticks and mixes category labels (e.g. years) into the
+    # numeric tick list, so the recovered tick set is usually not the drawn one.
+    # Require a fully uniform, fully numeric, densely sampled axis; anything less
+    # is left to the answering model, which reads the rendered axis directly.
+    if any(1800 <= abs(float(tick["value"])) <= 2199 for tick in ticks):
         return None
-    large_diffs = [value for value in diffs if value >= 10]
-    if not large_diffs:
+    positioned = sorted(
+        ((float(tick["pixel"]), float(tick["value"])) for tick in ticks if isinstance(tick.get("pixel"), (int, float))),
+        key=lambda item: item[0],
+    )
+    if len(positioned) < 4 or len(positioned) != len(ticks):
         return None
-    return large_diffs[len(large_diffs) // 2]
+    steps = [round(abs(right[1] - left[1]), 9) for left, right in zip(positioned, positioned[1:])]
+    if not steps or min(steps) <= 1e-9:
+        return None
+    # Uniform in value and in pixel: the two together are the only available
+    # evidence that no tick was missed between two recovered labels.
+    pixel_steps = [round(abs(right[0] - left[0]), 6) for left, right in zip(positioned, positioned[1:])]
+    if max(steps) - min(steps) > 1e-6 * max(steps):
+        return None
+    if max(pixel_steps) - min(pixel_steps) > 0.02 * max(pixel_steps):
+        return None
+    return steps[0]
 
 
 def axis_notation_prediction(sample: dict[str, Any], record: dict[str, Any]) -> str | None:

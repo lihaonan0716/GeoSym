@@ -7,6 +7,7 @@ import argparse
 import importlib.util
 import json
 import math
+import os
 import re
 import sys
 from collections import Counter
@@ -145,34 +146,131 @@ def parse_ticks(ocr_row: dict[str, Any]) -> list[ParsedTick]:
     return ticks
 
 
-def rotated_ocr_ticks(image_path: Path) -> tuple[list[ParsedTick], dict[str, Any]]:
+# Device for the local rotated-tick OCR probe. PaddleOCR keeps a model resident
+# in VRAM, so a probe launched while a GPU benchmark is in flight can exhaust the
+# device. ``cpu`` is the safe default for a probe that runs on a handful of
+# crops; set ``GEOSYM_OCR_DEVICE=gpu:0`` when the GPU is known to be free.
+ROTATED_OCR_DEVICE_ENV = "GEOSYM_OCR_DEVICE"
+
+
+def _rotated_ticks_paddleocr(image_path: Path) -> tuple[list[tuple[list[float], str, float]], str]:
+    """Read rotated text with PaddleOCR. Returns (boxes, status).
+
+    ``use_textline_orientation=True`` is what makes this probe worth running:
+    axis titles and tick labels on the value axis are frequently rendered at
+    90/270 degrees, and without orientation handling they are either missed or
+    transcribed as noise.
+    """
+    if importlib.util.find_spec("paddleocr") is None or importlib.util.find_spec("paddle") is None:
+        return [], "paddleocr_unavailable"
+    try:
+        from paddleocr import PaddleOCR  # type: ignore
+
+        if not hasattr(rotated_ocr_ticks, "_paddle_reader"):
+            device = os.environ.get(ROTATED_OCR_DEVICE_ENV) or "cpu"
+            try:
+                rotated_ocr_ticks._paddle_reader = PaddleOCR(  # type: ignore[attr-defined]
+                    lang="en",
+                    device=device,
+                    use_doc_orientation_classify=False,
+                    use_doc_unwarping=False,
+                    use_textline_orientation=True,
+                )
+            except (TypeError, ValueError):
+                # PaddleOCR 2.x keyword surface.
+                rotated_ocr_ticks._paddle_reader = PaddleOCR(use_angle_cls=True, lang="en")  # type: ignore[attr-defined]
+        reader = rotated_ocr_ticks._paddle_reader  # type: ignore[attr-defined]
+
+        collected: list[tuple[list[float], str, float]] = []
+        if hasattr(reader, "predict"):
+            for result in reader.predict(str(image_path)) or []:
+                payload = result.json if hasattr(result, "json") else result
+                if isinstance(payload, dict) and "res" in payload:
+                    payload = payload["res"]
+                if not isinstance(payload, dict):
+                    continue
+                texts = payload.get("rec_texts") or payload.get("texts") or []
+                scores = payload.get("rec_scores") or payload.get("scores") or []
+                polys = payload.get("rec_polys") or payload.get("dt_polys") or payload.get("polys") or []
+                for index, text in enumerate(texts):
+                    poly = polys[index] if index < len(polys) else None
+                    if poly is None:
+                        continue
+                    score = scores[index] if index < len(scores) else 0.0
+                    collected.append((list(poly), str(text).strip(), float(score or 0.0)))
+        if collected:
+            return collected, "ok"
+        return [], "paddleocr_no_text"
+    except Exception as exc:  # noqa: BLE001 - backend faults must fall through to the ladder
+        return [], f"paddleocr_failed:{type(exc).__name__}:{exc}"
+
+
+def _rotated_ticks_easyocr(image_path: Path) -> tuple[list[tuple[list[float], str, float]], str]:
+    """Fallback reader for environments without a usable paddlepaddle wheel."""
     if importlib.util.find_spec("easyocr") is None:
-        return [], {"attempted": True, "status": "easyocr_unavailable"}
+        return [], "easyocr_unavailable"
     try:
         import easyocr  # type: ignore
 
-        if not hasattr(rotated_ocr_ticks, "_reader"):
-            rotated_ocr_ticks._reader = easyocr.Reader(["en"], gpu=False)  # type: ignore[attr-defined]
-        raw = rotated_ocr_ticks._reader.readtext(str(image_path), rotation_info=[90, 270], detail=1, paragraph=False)  # type: ignore[attr-defined]
-    except Exception as exc:
-        return [], {"attempted": True, "status": "rotated_easyocr_failed", "error": str(exc)}
+        if not hasattr(rotated_ocr_ticks, "_easy_reader"):
+            rotated_ocr_ticks._easy_reader = easyocr.Reader(["en"], gpu=False)  # type: ignore[attr-defined]
+        raw = rotated_ocr_ticks._easy_reader.readtext(  # type: ignore[attr-defined]
+            str(image_path), rotation_info=[90, 270], detail=1, paragraph=False)
+    except Exception as exc:  # noqa: BLE001
+        return [], f"easyocr_failed:{type(exc).__name__}:{exc}"
 
-    ticks: list[ParsedTick] = []
-    for idx, item in enumerate(raw or []):
+    collected: list[tuple[list[float], str, float]] = []
+    for item in raw or []:
         if not isinstance(item, (list, tuple)) or len(item) < 3:
             continue
-        box, text, conf = item[0], str(item[1]).strip(), item[2]
+        try:
+            confidence = float(item[2])
+        except (TypeError, ValueError):
+            confidence = 0.0
+        collected.append((list(item[0]), str(item[1]).strip(), confidence))
+    return collected, "ok"
+
+
+def rotated_ocr_ticks(image_path: Path) -> tuple[list[ParsedTick], dict[str, Any]]:
+    """Probe for numeric tick labels in rotated text, via a backend ladder.
+
+    PaddleOCR is tried first and EasyOCR is the fallback. The backend that
+    produced the ticks is recorded in the returned diagnostics, because detector
+    output differs between them and any tick-derived figure has to state which
+    one it came from -- results are not poolable across backends.
+    """
+    ladder: list[dict[str, str]] = []
+    boxes: list[tuple[list[float], str, float]] = []
+    backend = None
+    for name, runner in (("PaddleOCR", _rotated_ticks_paddleocr),
+                         ("EasyOCR", _rotated_ticks_easyocr)):
+        boxes, status = runner(image_path)
+        ladder.append({"backend": name, "status": status})
+        if status == "ok" and boxes:
+            backend = name
+            break
+
+    if backend is None:
+        return [], {
+            "attempted": True,
+            "status": "no_viable_rotated_ocr_backend",
+            "backend_ladder": ladder,
+        }
+
+    ticks: list[ParsedTick] = []
+    for idx, (poly, text, confidence_value) in enumerate(boxes):
         values = parse_numbers(text)
         if not values:
             continue
-        try:
-            confidence_value = float(conf)
-        except Exception:
-            confidence_value = 0.0
         if confidence_value < 0.5:
             continue
-        xs = [float(pt[0]) for pt in box]
-        ys = [float(pt[1]) for pt in box]
+        try:
+            xs = [float(point[0]) for point in poly]
+            ys = [float(point[1]) for point in poly]
+        except (TypeError, ValueError, IndexError):
+            continue
+        if not xs or not ys:
+            continue
         bbox = [min(xs), min(ys), max(xs), max(ys)]
         for value_index, value in enumerate(values):
             ticks.append(
@@ -182,10 +280,16 @@ def rotated_ocr_ticks(image_path: Path) -> tuple[list[ParsedTick], dict[str, Any
                     scale="linear",
                     bbox=interpolated_bbox(bbox, value_index, len(values)),
                     confidence=confidence_label(confidence_value),
-                    source_box_id=f"rotated_easyocr_{idx:03d}",
+                    source_box_id=f"rotated_{backend.lower()}_{idx:03d}",
                 )
             )
-    return ticks, {"attempted": True, "status": "ok", "numeric_tick_count": len(ticks)}
+    return ticks, {
+        "attempted": True,
+        "status": "ok",
+        "numeric_tick_count": len(ticks),
+        "backend": backend,
+        "backend_ladder": ladder,
+    }
 
 
 def parse_numbers(text: str) -> list[float]:

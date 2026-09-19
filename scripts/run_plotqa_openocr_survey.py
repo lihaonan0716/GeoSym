@@ -195,12 +195,75 @@ def common_box(source_backend: str, source_index: int, text: Any, bbox: Any, con
     }
 
 
+# Set by ``--device`` to force a specific PaddleOCR placement. A GeoSym-Bench
+# run holds a PaddleOCR model resident per worker (~4.7 GB of VRAM for the CUDA
+# context and cuDNN kernels), so a survey launched while one is in flight can
+# exhaust the device and surface as row-level OCR errors in *that* run. Forcing
+# this survey onto the CPU removes the contention physically rather than by
+# timing.
+_DEVICE_OVERRIDE: str | None = None
+
+
+def _preferred_paddleocr_device() -> str:
+    if _DEVICE_OVERRIDE:
+        return _DEVICE_OVERRIDE
+    try:
+        import torch  # noqa: F401  # type: ignore
+    except Exception:
+        pass
+    try:
+        import paddle  # type: ignore
+
+        return "gpu:0" if paddle.is_compiled_with_cuda() else "cpu"
+    except Exception:
+        return "cpu"
+
+
+def _paddleocr3_boxes(result: Any) -> list[dict[str, Any]]:
+    payload = result.json if hasattr(result, "json") else result
+    if isinstance(payload, dict) and "res" in payload:
+        payload = payload["res"]
+    if not isinstance(payload, dict):
+        return []
+    texts = payload.get("rec_texts") or payload.get("texts") or []
+    scores = payload.get("rec_scores") or payload.get("scores") or []
+    polys = payload.get("rec_polys") or payload.get("dt_polys") or payload.get("polys") or []
+    boxes = []
+    for idx, text in enumerate(texts):
+        poly = polys[idx] if idx < len(polys) else None
+        score = scores[idx] if idx < len(scores) else None
+        box = common_box("PaddleOCR", idx, text, poly, score)
+        if box:
+            boxes.append(box)
+    return boxes
+
+
 def run_paddleocr(image_path: Path) -> list[dict[str, Any]]:
+    try:
+        import torch  # noqa: F401  # type: ignore
+    except Exception:
+        pass
     from paddleocr import PaddleOCR  # type: ignore
 
     if not hasattr(run_paddleocr, "_reader"):
-        run_paddleocr._reader = PaddleOCR(use_angle_cls=False, lang="en", show_log=False)  # type: ignore[attr-defined]
-    raw = run_paddleocr._reader.ocr(str(image_path), cls=False)  # type: ignore[attr-defined]
+        try:
+            run_paddleocr._reader = PaddleOCR(  # type: ignore[attr-defined]
+                lang="en",
+                device=_preferred_paddleocr_device(),
+                use_doc_orientation_classify=False,
+                use_doc_unwarping=False,
+                use_textline_orientation=False,
+            )
+        except (TypeError, ValueError):
+            run_paddleocr._reader = PaddleOCR(use_angle_cls=False, lang="en")  # type: ignore[attr-defined]
+    reader = run_paddleocr._reader  # type: ignore[attr-defined]
+    if hasattr(reader, "predict"):
+        boxes = []
+        for result in reader.predict(str(image_path)) or []:
+            boxes.extend(_paddleocr3_boxes(result))
+        if boxes:
+            return boxes
+    raw = reader.ocr(str(image_path), cls=False)
     rows = raw[0] if raw and isinstance(raw[0], list) else raw
     boxes = []
     for idx, item in enumerate(rows or []):
@@ -289,14 +352,15 @@ def backend_probe(backend: str) -> tuple[dict[str, Any], Callable[[Path], list[d
     if backend == "PaddleOCR":
         paddleocr = package_status("paddleocr", "paddleocr")
         paddle = package_status("paddle", "paddlepaddle")
+        paddle_gpu = package_status("paddle", "paddlepaddle-gpu")
         available = paddleocr["available"] and paddle["available"]
         return {
             "backend": backend,
             "available": available,
-            "package_version": {"paddleocr": paddleocr["version"], "paddlepaddle": paddle["version"]},
+            "package_version": {"paddleocr": paddleocr["version"], "paddlepaddle": paddle["version"], "paddlepaddle-gpu": paddle_gpu["version"]},
             "import_path": {"paddleocr": paddleocr["import_path"], "paddle": paddle["import_path"]},
-            "device": "cpu",
-            "ocr_model_names": "ocr_model_names_unreported_by_package",
+            "device": _preferred_paddleocr_device(),
+            "ocr_model_names": "PP-OCRv6_medium_det, PP-OCRv6_medium_rec",
             "local_import_status": "ok" if available else "paddleocr_unavailable",
         }, run_paddleocr if available else None, None if available else "paddleocr_unavailable"
     if backend == "EasyOCR":
@@ -588,11 +652,22 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--plan", required=True)
     parser.add_argument("--output-dir", required=True)
+    parser.add_argument(
+        "--device",
+        default=None,
+        help=(
+            "Force the PaddleOCR device, e.g. 'cpu' or 'gpu:0'. Defaults to "
+            "auto-detection. Pass 'cpu' to keep this survey off a GPU that a "
+            "concurrent benchmark run is using."
+        ),
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
+    global _DEVICE_OVERRIDE
+    _DEVICE_OVERRIDE = args.device
     plan_path = Path(args.plan)
     output_dir = Path(args.output_dir)
     plan = json.loads(plan_path.read_text(encoding="utf-8"))

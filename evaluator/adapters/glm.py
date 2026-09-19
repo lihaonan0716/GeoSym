@@ -83,6 +83,12 @@ class GLMAdapter(BaseLLMAdapter):
 
         # Debug: log finish reason if not 'stop'
         finish_reason = getattr(choice, "finish_reason", None)
+        self.last_finish_reason = finish_reason
+        self.last_response_metadata = {
+            "finish_reason": finish_reason,
+            "model": getattr(response, "model", self.model),
+            "response_id": getattr(response, "id", None),
+        }
         if finish_reason and finish_reason != "stop":
             print(f"[GLM] Warning: finish_reason={finish_reason}, content length={len(content)}")
 

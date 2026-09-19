@@ -19,7 +19,15 @@ exports:
       plotqa_public_500:
         path: outputs/paper_level_evidence_package/plotqa_public_500/pre_execution_audit.json
         required: true
-        role: Public PlotQA confirmation evidence package.
+        role: >-
+          Public PlotQA roster, provenance, and hash record. Its stage-status
+          conclusion is superseded; read plotqa_evidence_status for results.
+      plotqa_evidence_status:
+        path: outputs/paper_level_evidence_package/PLOTQA_EVIDENCE_STATUS.json
+        required: true
+        role: >-
+          Authoritative PlotQA result status on the frozen 500 roster, and the
+          index of superseded PlotQA artifacts.
       m1m2_stress_128:
         path: outputs/paper_level_evidence_package/m1m2_stress_128/pre_execution_audit.json
         required: true

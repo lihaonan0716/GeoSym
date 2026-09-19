@@ -420,6 +420,10 @@ def _run_single_step_reasoning(
         raw_response=raw,
         parsed=parsed,
         image_mode=image_mode,
+        extra={
+            "finish_reasons": {step_name: getattr(adapter, "last_finish_reason", None)},
+            "response_metadata": {step_name: getattr(adapter, "last_response_metadata", {})},
+        },
     )
 
 
@@ -443,6 +447,8 @@ def _run_self_consistency_reasoning(adapter, img_path: Path, gt_data: dict) -> D
             "raw": raw,
             "parsed": parsed,
             "vote_key": key,
+            "finish_reason": getattr(adapter, "last_finish_reason", None),
+            "response_metadata": getattr(adapter, "last_response_metadata", {}),
         })
 
     best_key = counter.most_common(1)[0][0] if counter else ""
@@ -455,6 +461,8 @@ def _run_self_consistency_reasoning(adapter, img_path: Path, gt_data: dict) -> D
                 "prompt": prompt,
                 "raw": chosen["raw"],
                 "parsed": chosen["parsed"],
+                "finish_reason": chosen.get("finish_reason"),
+                "response_metadata": chosen.get("response_metadata", {}),
             }
         },
         "samples": samples,
@@ -701,6 +709,8 @@ def run_judge(
             parsed = parse_judge_response(raw)
             result = evaluate_judge_response(parsed)
             result["raw_judge_response"] = raw
+            result["finish_reason"] = getattr(judge_adapter, "last_finish_reason", None)
+            result["response_metadata"] = getattr(judge_adapter, "last_response_metadata", {})
             return result
         except Exception as exc:
             last_exc = exc

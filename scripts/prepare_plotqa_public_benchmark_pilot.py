@@ -45,7 +45,15 @@ SCORER_VERSION = "plotqa_phase1_public_scorer_v1"
 DEFAULT_CONFIG_PATH = ROOT / "config" / "default_config.yaml"
 SHARED_FINAL_ANSWER_INSTRUCTION = (
     "Return JSON only with keys raw_text and normalized_prediction. "
-    "The normalized_prediction value must be the final answer string."
+    "The normalized_prediction value must be the final answer string. "
+    # Task guidance, not mechanism description. It used to sit only in the
+    # curated arm's prompt, where it was worth +6 correct answers (McNemar
+    # p=0.031) on samples whose payload curation had left untouched -- i.e. the
+    # arms differed by prompt as well as evidence, which is the asymmetry
+    # invariant 6 forbids. Every condition now receives it, so the only
+    # remaining difference between arms is the payload.
+    "If a deterministic ratio, difference, range, or extrema can be computed "
+    "from the information available, prefer it over visual guesswork."
 )
 
 

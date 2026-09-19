@@ -4,6 +4,7 @@ from pathlib import Path
 from PIL import Image
 
 from scripts.run_plotqa_openocr_survey import (
+    _paddleocr3_boxes,
     build_summary,
     categorical_tokens,
     empty_records_after_ladder,
@@ -57,6 +58,40 @@ def test_overlap_tokenization_uses_frozen_stopwords() -> None:
     assert "chart" not in categorical_tokens("What does this chart show?")
     assert "ukraine" in categorical_tokens("Net enrolment rate in Ukraine")
     assert numeric_tokens("greater than 12% in 2000") == {"12", "2000"}
+
+
+def test_paddleocr3_result_parser_keeps_boxes_text_and_scores() -> None:
+    result = {
+        "res": {
+            "rec_texts": ["2000", "Ukraine"],
+            "rec_scores": [0.91, 0.82],
+            "rec_polys": [
+                [[10, 20], [30, 20], [30, 40], [10, 40]],
+                [[50, 60], [90, 60], [90, 80], [50, 80]],
+            ],
+        }
+    }
+
+    boxes = _paddleocr3_boxes(result)
+
+    assert boxes == [
+        {
+            "box_id": "ocr_000",
+            "text": "2000",
+            "bbox": [10.0, 20.0, 30.0, 40.0],
+            "confidence": 0.91,
+            "source_backend": "PaddleOCR",
+            "source_index": 0,
+        },
+        {
+            "box_id": "ocr_001",
+            "text": "Ukraine",
+            "bbox": [50.0, 60.0, 90.0, 80.0],
+            "confidence": 0.82,
+            "source_backend": "PaddleOCR",
+            "source_index": 1,
+        },
+    ]
 
 
 def test_sample_summary_detects_axis_tick_near_annotation(tmp_path: Path) -> None:

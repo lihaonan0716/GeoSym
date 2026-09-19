@@ -209,7 +209,16 @@ def _safe_evaluate(expr, x_vals: np.ndarray) -> np.ndarray:
         return np.full_like(x_vals, np.nan, dtype=float)
 
     x = symbols("x")
-    f = sympy.lambdify(x, expr, modules=["numpy"])
+
+    # lambdify compiles generated source, so it raises on the expression itself
+    # rather than on evaluation. A model that writes a subscript ("log₂(x)")
+    # yields a Symbol carrying that glyph, which is a SyntaxError at compile
+    # time and escaped the guard below, aborting the whole condition. Scoring an
+    # unparseable prediction must yield NaN, not kill the row.
+    try:
+        f = sympy.lambdify(x, expr, modules=["numpy"])
+    except Exception:
+        return np.full_like(x_vals, np.nan, dtype=float)
 
     # Suppress numpy warnings for domain errors
     with np.errstate(all="ignore"):

@@ -210,7 +210,23 @@ GeoSym/
 python -m pip install -r requirements.txt
 ```
 
-Core dependencies include OpenCV, NumPy, Pillow, PyYAML, and SymPy. The experiments reported in the paper use Mathpix OCR for E3/E4 and for OCR-derived axis/tick extraction; configure Mathpix credentials in `config/api_keys.yaml`. EasyOCR remains available in the codebase for local OCR workflows, but it is not the reported OCR/rule baseline.
+Core dependencies include OpenCV, NumPy, Pillow, PyYAML, and SymPy.
+
+OCR backend for the E3/E4 baselines and for OCR-derived axis/tick extraction:
+
+- **PaddleOCR** (current) runs locally and needs no credentials. Install the
+  `paddlepaddle` wheel matching your device per the upstream instructions, then
+  `pip install paddleocr>=3.7.0`. Runs used PaddleOCR 3.7.0 with the
+  `PP-OCRv6_medium` detection and recognition models. Scripts that expose a
+  `--device` flag accept `cpu` or `gpu:0`; PaddleOCR keeps a model resident in
+  VRAM, so prefer `cpu` when another GPU job is in flight.
+- **Mathpix** (earlier runs) is a hosted API; configure credentials in
+  `config/api_keys.yaml`. Results produced under it are not pooled with
+  PaddleOCR results, since detector output differs.
+- **EasyOCR** is the automatic fallback in the backend ladder for environments
+  where `paddlepaddle` cannot be installed. It is not a reported baseline.
+
+Any reported OCR figure states which backend produced it.
 
 Copy `config/api_keys.yaml.example` to `config/api_keys.yaml` and fill in your API keys. GPT and Claude adapters use an API-compatible gateway base URL from `ninerouter_base_url`, `NINEROUTER_BASE_URL`, `GEOSYM_OPENAI_BASE_URL`, or `GEOSYM_CLAUDE_BASE_URL`; the public repository does not hardcode a private gateway URL.
 

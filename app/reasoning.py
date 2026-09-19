@@ -207,7 +207,13 @@ def _run_reasoning_flow(
 
     l1_raw = adapter.call_with_prompt(img_str, l1_prompt)
     l1_parsed = parse_L1_answer(l1_raw)
-    steps["L1"] = {"raw": l1_raw, "parsed": l1_parsed, "prompt": l1_prompt}
+    steps["L1"] = {
+        "raw": l1_raw,
+        "parsed": l1_parsed,
+        "prompt": l1_prompt,
+        "finish_reason": getattr(adapter, "last_finish_reason", None),
+        "response_metadata": getattr(adapter, "last_response_metadata", {}),
+    }
 
     # ---- Step 2: L2 Analysis ----
     l1_json_str = json.dumps(l1_parsed, ensure_ascii=False)
@@ -219,7 +225,13 @@ def _run_reasoning_flow(
     l2_img = img_str
     l2_raw = adapter.call_with_prompt(l2_img, l2_prompt)
     l2_parsed = parse_L2_answer(l2_raw)
-    steps["L2"] = {"raw": l2_raw, "parsed": l2_parsed, "prompt": l2_prompt}
+    steps["L2"] = {
+        "raw": l2_raw,
+        "parsed": l2_parsed,
+        "prompt": l2_prompt,
+        "finish_reason": getattr(adapter, "last_finish_reason", None),
+        "response_metadata": getattr(adapter, "last_response_metadata", {}),
+    }
 
     # ---- Step 3: L3 Reasoning ----
     l2_json_str = json.dumps(l2_parsed, ensure_ascii=False)
@@ -231,7 +243,13 @@ def _run_reasoning_flow(
     l3_img = img_str
     l3_raw = adapter.call_with_prompt(l3_img, l3_prompt)
     l3_parsed = parse_L3_answer(l3_raw)
-    steps["L3"] = {"raw": l3_raw, "parsed": l3_parsed, "prompt": l3_prompt}
+    steps["L3"] = {
+        "raw": l3_raw,
+        "parsed": l3_parsed,
+        "prompt": l3_prompt,
+        "finish_reason": getattr(adapter, "last_finish_reason", None),
+        "response_metadata": getattr(adapter, "last_response_metadata", {}),
+    }
 
     # ---- Merge final answers (all 10 dimensions) ----
     final_parsed: Dict[str, Any] = {}
@@ -819,6 +837,7 @@ def run_reasoning_all_conditions(
     gemini_enabled: bool = False,
     force_rerun: bool = False,
     target_conditions: list[str] | None = None,
+    ocr_baseline=None,
 ):
     """Run the unified six-condition matrix (E0-E5) on a single image."""
     from evaluator.metrics.reasoning import evaluate_comprehensive
@@ -903,9 +922,12 @@ def run_reasoning_all_conditions(
     layer_config = load_layer_config()
     judge_adapter = ensure_judge_adapter(judge_model_name, judge_api_key, model_name, key)
 
-    from evaluator.baselines.ocr_rule_baseline import OCRRuleBaseline
+    if ocr_baseline is None:
+        from evaluator.baselines.ocr_rule_baseline import OCRRuleBaseline
 
-    ocr_bl = OCRRuleBaseline()
+        ocr_bl = OCRRuleBaseline()
+    else:
+        ocr_bl = ocr_baseline
 
     from evaluator.metrics.reasoning import SCORED_DIMENSIONS
     _dim_keys = list(SCORED_DIMENSIONS)

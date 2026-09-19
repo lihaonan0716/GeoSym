@@ -78,6 +78,8 @@ class BaseLLMAdapter(ABC):
 
     def __init__(self, model_name: str = "unknown"):
         self.model_name = model_name
+        self.last_finish_reason = None
+        self.last_response_metadata = {}
 
     def reset_client(self) -> None:
         """Drop a cached transport client before a long-run sample boundary."""

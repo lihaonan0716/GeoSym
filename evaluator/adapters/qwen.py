@@ -78,4 +78,13 @@ class QwenVLAdapter(BaseLLMAdapter):
             },
         )
 
-        return response.choices[0].message.content or ""
+        choice = response.choices[0]
+        content = choice.message.content or ""
+        finish_reason = getattr(choice, "finish_reason", None)
+        self.last_finish_reason = finish_reason
+        self.last_response_metadata = {
+            "finish_reason": finish_reason,
+            "model": getattr(response, "model", self.model),
+            "response_id": getattr(response, "id", None),
+        }
+        return content

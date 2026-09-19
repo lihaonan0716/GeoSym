@@ -113,6 +113,7 @@ scripts/*
 !scripts/run_public_benchmark_pilot.py
 !scripts/run_extrema_validation.py
 !scripts/run_prompt_fairness_pilot.py
+!scripts/diagnose_plotqa_mark_segmentation.py
 
 # Tests are part of the public artifact — reviewers need to be able to run them.
 # The whole tree is tracked, at any depth: an exception limited to `tests/*.py`
