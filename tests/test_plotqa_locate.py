@@ -182,13 +182,13 @@ def test_deterministic_year_series_difference_keeps_same_sign_grouped_offsets_fa
     assert prediction is None
 
 
-def test_sliver_artifacts_are_rejected_for_both_arms_by_the_m0_prime_chain() -> None:
+def test_sliver_artifacts_are_rejected_by_the_m0_prime_chain() -> None:
     """Artifact rejection is an M0' property, not a curation privilege.
 
     It used to run only for the curated arm, which meant the arms differed in
     evidence *quality* as well as in selection -- the control arm was handed
-    known-bad points. Both arms now consume the same admitted set, so the only
-    remaining difference is which of those facts M2' chooses to inject.
+    known-bad points. Admission now runs unconditionally; the curated arm it
+    was once contrasted against retired with M1'/M2' on 2026-09-19.
     """
     record = {
         "chart_geometry": {"chart_type": "bar"},
@@ -226,20 +226,18 @@ def test_sliver_artifacts_are_rejected_for_both_arms_by_the_m0_prime_chain() -> 
         ],
     }
 
-    raw = measured_prompt_facts(record, None, curated=False)
-    curated = measured_prompt_facts(record, None, curated=True)
-    raw_ids = [fact["fact_id"] for fact in raw["measured_facts"]]
+    evidence = measured_prompt_facts(record, None)
+    fact_ids = [fact["fact_id"] for fact in evidence["measured_facts"]]
 
-    # The two 1px-tall components are artifacts and are dropped for both arms.
-    assert raw_ids == ["m0_color_000"]
+    # The two 1px-tall components are artifacts and are dropped.
+    assert fact_ids == ["m0_color_000"]
 
-    # With no OCR row the axis cannot be fitted, so M1' scores this evidence
-    # `low` and M2' withholds it rather than injecting values it could not
-    # verify. Declaring the failure is the designed behaviour: a guessed axis
-    # produces numbers that look measured but are not.
-    assert raw["evidence_reliability"]["tier"] == "low"
-    assert curated["evidence_injected"] is False
-    assert curated["measured_facts"] == []
+    # With no OCR row the axis cannot be fitted, so the chain declares it
+    # inadmissible rather than guessing. Declaring the failure is the designed
+    # behaviour: a guessed axis produces numbers that look measured but are not.
+    # (The M1'/M2' assertions that used to follow -- tier `low`, withheld
+    # injection -- retired with those modules on 2026-09-19.)
+    assert evidence["ruler_refit"]["admissible"] is False
 
 
 def test_response_normalizer_restores_signed_difference_from_label_year_operands() -> None:

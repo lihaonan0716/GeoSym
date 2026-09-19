@@ -36,7 +36,19 @@ from scripts.run_plotqa_measured_locate_smoke import (  # noqa: E402
 from scripts.run_public_benchmark_pilot import AttemptCounter, extract_prediction, score_prediction  # noqa: E402
 
 
-CONDITIONS = ("G_measured_raw", "G_full_measured_geosym", "Measured_flat_answer_baseline")
+CONDITIONS = ("G_measured_raw", "Measured_flat_answer_baseline")
+
+# `G_full_measured_geosym` differed from `G_measured_raw` only by the M1'/M2'
+# curation that retired on 2026-09-19. Re-running this name would now emit rows
+# identical to `G_measured_raw` while carrying a label that means "curated" in
+# the 1346 paid rows already on disk -- a silent collision, so it raises instead.
+RETIRED_CONDITIONS = {
+    "G_full_measured_geosym": (
+        "retired 2026-09-19 with M1'/M2'; its only distinguishing input "
+        "(curated selection) no longer exists. Historical rows remain valid; "
+        "see docs/M1M2_RETIREMENT_AND_FGCS_REPOSITIONING_PLAN_2026-09-19.md"
+    ),
+}
 CACHED_BASELINES = ("E0_plotqa_direct", "E1_plotqa_cot")
 
 
@@ -51,23 +63,27 @@ def load_json(path: Path) -> Any:
 def measured_prompt_facts(
     record: dict[str, Any],
     locate_row: dict[str, Any] | None,
-    curated: bool,
     ocr_row: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build one arm's evidence payload from the M0' chain.
 
     This used to curate inline against the frozen M0 record, whose measured
     values were 16% correct because the axis was guessed rather than fitted. The
-    chain (category axis -> ruler refit -> mark admission -> M1'/M2') raises that
-    to 78% and is what the zero-cost evaluations measure, so the answering path
-    now calls the same composition instead of a parallel implementation.
+    chain (category axis -> ruler refit -> mark admission) raises that to 78% and
+    is what the zero-cost evaluations measure, so the answering path calls the
+    same composition instead of a parallel implementation.
 
     ``locate_row`` points from the Stage 2 LLM locate pass are appended after the
     chain runs. They are a different evidence source -- model-located rather than
     measured -- and carry no mark geometry, so the geometric stages cannot score
     them; passing them through would have them silently dropped as artifacts.
+
+    The ``curated`` parameter was removed with M1'/M2' on 2026-09-19. It was the
+    only thing that distinguished ``G_full_measured_geosym`` from
+    ``G_measured_raw``, so that condition can no longer be reproduced; see
+    ``RETIRED_CONDITIONS`` below.
     """
-    evidence = build_evidence(record, ocr_row, curated=curated)
+    evidence = build_evidence(record, ocr_row)
     facts = list(evidence["measured_facts"])
     if locate_row:
         for idx, point in enumerate(locate_row.get("measured_points") or []):
@@ -81,7 +97,6 @@ def measured_prompt_facts(
         "measured_facts": facts,
         "evidence_gaps": evidence["evidence_gaps"],
         "curation_policy": evidence["curation_policy"],
-        "evidence_reliability": evidence["evidence_reliability"],
         "evidence_injected": evidence["evidence_injected"],
         "chain_version": evidence["chain_version"],
     }
@@ -372,8 +387,9 @@ def run_paid(plan: dict[str, Any], measured_records_path: Path, stage2_result_pa
             record = records[sample["sample_id"]]
             locate_row = locate_rows.get(sample["sample_id"])
             for condition in CONDITIONS:
-                curated = condition == "G_full_measured_geosym"
-                facts = measured_prompt_facts(record, locate_row, curated=curated)
+                if condition in RETIRED_CONDITIONS:
+                    raise ValueError(f"{condition}: {RETIRED_CONDITIONS[condition]}")
+                facts = measured_prompt_facts(record, locate_row)
                 counter.consume_llm(sample["sample_id"], condition, "answer")
                 image_path = None if condition == "Measured_flat_answer_baseline" else Path(sample["image_path"])
                 raw_text = ""

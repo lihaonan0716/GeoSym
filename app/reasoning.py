@@ -42,9 +42,6 @@ from generator.config_loader import load_config
 from evaluator.reasoning.intervention import (
     DEFAULT_INTERVENTION_MODE,
     build_intervention_payload,
-    filter_visual_facts_with_llm,
-    verify_facts_with_llm,
-    get_intervention_profile,
 )
 
 
@@ -52,7 +49,6 @@ from evaluator.reasoning.intervention import (
 
 _L1_PROMPT_PATH = _root / "prompts" / "reasoning_L1_prompt.txt"
 _L1_ASSISTED_PROMPT_PATH = _root / "prompts" / "reasoning_L1_assisted_prompt.txt"
-_L1_TIERED_PROMPT_PATH = _root / "prompts" / "reasoning_L1_tiered_prompt.txt"
 _L2_PROMPT_PATH = _root / "prompts" / "reasoning_L2_prompt.txt"
 _L3_PROMPT_PATH = _root / "prompts" / "reasoning_L3_prompt.txt"
 
@@ -148,59 +144,20 @@ def _run_reasoning_flow(
                                     "Detected points: {detected_coords}\nExtract coordinates, intercepts, extrema as JSON.")
         l1_prompt = l1_tpl.replace("{detected_coords}", coord_text)
     elif geosym_coords is not None:
-        profile = get_intervention_profile(intervention_mode)
-        verify_meta = None
-
-        # Phase 1: optional LLM-based fact verification for GeoSym fusion modes
-        if profile.get("llm_verify") and visual_facts is not None:
-            facts_for_injection, verify_meta = verify_facts_with_llm(
-                adapter,
-                img_str,
-                geosym_coords,
-                visual_facts,
-                fact_keys=profile.get("visual_fact_keys"),
-            )
-        # Backward-compatible support for deprecated llm_filter-style profiles
-        elif profile.get("llm_filter") and visual_facts is not None:
-            facts_for_injection, verify_meta = filter_visual_facts_with_llm(
-                adapter,
-                img_str,
-                geosym_coords,
-                visual_facts,
-                mode=intervention_mode,
-            )
-
-        # Phase 2: Build intervention payload (flat or tiered)
+        # Facts are injected exactly as M0 produced them. The LLM verification
+        # and tiered-injection paths were removed with M1/M2 (2026-09-19).
         geosym_intervention = build_intervention_payload(
             geosym_coords, intervention_mode, visual_facts=facts_for_injection,
         )
-        if verify_meta is not None:
-            status = verify_meta.get("status", "ok")
-            geosym_intervention["verify_metadata"] = verify_meta
-            geosym_intervention["summary"].append(
-                f"LLM verification status: {status}"
-            )
-            for note in verify_meta.get("notes", []):
-                geosym_intervention["summary"].append(f"Verification: {note}")
 
-        # Phase 3: Build L1 prompt (tiered or flat)
-        use_tiered = geosym_intervention.get("use_tiered", False)
-        if use_tiered:
-            l1_tpl = _load_prompt_file(
-                _L1_TIERED_PROMPT_PATH,
-                "Tiered evidence:\n{tiered_evidence}\nExtract coordinates, intercepts, extrema as JSON.",
-            )
-            l1_prompt = l1_tpl.replace("{tiered_evidence}", geosym_intervention["tiered_text"])
-            l1_prompt = l1_prompt.replace("{intervention_label}", geosym_intervention["label"])
-        else:
-            l1_tpl = _load_prompt_file(
-                _L1_ASSISTED_PROMPT_PATH,
-                "Detected coordinates: {detected_coords}\nStructured facts: {structured_facts}\nExtract coordinates, intercepts, extrema as JSON.",
-            )
-            l1_prompt = l1_tpl.replace("{detected_coords}", geosym_intervention["coordinate_text"])
-            l1_prompt = l1_prompt.replace("{structured_facts}", geosym_intervention["facts_text"])
-            l1_prompt = l1_prompt.replace("{intervention_mode}", geosym_intervention["mode"])
-            l1_prompt = l1_prompt.replace("{intervention_label}", geosym_intervention["label"])
+        l1_tpl = _load_prompt_file(
+            _L1_ASSISTED_PROMPT_PATH,
+            "Detected coordinates: {detected_coords}\nStructured facts: {structured_facts}\nExtract coordinates, intercepts, extrema as JSON.",
+        )
+        l1_prompt = l1_tpl.replace("{detected_coords}", geosym_intervention["coordinate_text"])
+        l1_prompt = l1_prompt.replace("{structured_facts}", geosym_intervention["facts_text"])
+        l1_prompt = l1_prompt.replace("{intervention_mode}", geosym_intervention["mode"])
+        l1_prompt = l1_prompt.replace("{intervention_label}", geosym_intervention["label"])
     else:
         l1_prompt = _load_prompt_file(_L1_PROMPT_PATH,
                                        "Extract coordinates, intercepts, extrema from the graph as JSON.")
@@ -610,7 +567,7 @@ def _load_intervention_config() -> dict:
     cfg = load_config()
     default_cfg = {
         "default_path_b_mode": DEFAULT_INTERVENTION_MODE,
-        "fusion_modes": ["visual_facts_flat", DEFAULT_INTERVENTION_MODE],
+        "fusion_modes": [DEFAULT_INTERVENTION_MODE],
         "baseline_modes": [],
     }
     icfg = cfg.get("reasoning", {}).get("intervention", default_cfg)
@@ -991,8 +948,10 @@ def run_reasoning_all_conditions(
     if cached is not None:
         cached_conds = cached.get("conditions", {})
         for ck, cond_data in cached_conds.items():
-            if ck not in condition_order:
-                continue
+            # A cached condition that is no longer runnable (E5, retired with
+            # M1/M2 on 2026-09-19) is still carried forward. It cannot be
+            # re-run, so dropping it here would silently delete a paid result
+            # from the record the next write persists.
             if force_rerun and not target_set:
                 continue
             if ck in target_set:
@@ -1245,10 +1204,17 @@ def run_reasoning_all_conditions(
     summary_md = "\n".join(tbl)
 
     cache_conditions = {}
-    for ck in condition_order:
+    # Retired conditions present in the loaded cache (E5, retired 2026-09-19)
+    # are written back out. They are absent from `condition_order` because they
+    # cannot be run; iterating that list alone would drop a paid result from the
+    # record on the next save.
+    persist_order = list(condition_order) + [
+        ck for ck in loaded_from_cache if ck not in condition_order
+    ]
+    for ck in persist_order:
         cache_conditions[ck] = build_condition_record(
             condition_id=ck,
-            label=condition_labels[ck],
+            label=condition_labels.get(ck, ck),
             status=cond_statuses.get(ck, "unknown"),
             cached=condition_cached_flags.get(ck, False),
             elapsed_ms=condition_elapsed_ms.get(ck, 0),

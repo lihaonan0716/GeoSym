@@ -148,10 +148,10 @@ reasoning:
         judge_inference_score: 0.30
   intervention:
     # Active configuration for the unified six-condition experiment matrix.
-    # E3/E4 use OCR + rules baselines, and E5 uses the GeoSym fusion modes below.
-    # Legacy factorized naming has been retired.
+    # E3/E4 use OCR + rules baselines; E5_raw is GeoSym itself.
+    # `visual_facts_full` was removed with M1/M2 on 2026-09-19.
     default_path_b_mode: "visual_facts_flat"
-    fusion_modes: ["visual_facts_flat", "visual_facts_full"]
+    fusion_modes: ["visual_facts_flat"]
     baseline_modes: ["ocr_baseline", "plain_table"]
     ablation_modes: []
   judge:

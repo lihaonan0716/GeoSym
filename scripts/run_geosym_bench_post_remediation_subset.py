@@ -29,7 +29,11 @@ from app.helpers import _get_saved_key  # noqa: E402
 from app.reasoning import run_reasoning_all_conditions  # noqa: E402
 from app.reasoning_pipeline import build_chain_text  # noqa: E402
 from app.reasoning_cache import load_reasoning_cache  # noqa: E402
-from scripts.batch_experiment import ALL_CONDITIONS  # noqa: E402
+# Track B completed on 2026-09 with all seven arms (1680 rows, E5 included).
+# This runner validates and repairs that finished artifact, so it keeps the
+# historical list: dropping E5 here would make every row-count gate accept
+# 1440 rows as complete and would reject `--conditions E5` on a repair run.
+from scripts.batch_experiment import HISTORICAL_CONDITIONS as ALL_CONDITIONS  # noqa: E402
 from scripts.prepare_public_benchmark_pilot import canonical_json_bytes, sha256_hex_bytes, stable_file_hash  # noqa: E402
 
 

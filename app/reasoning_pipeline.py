@@ -30,7 +30,8 @@ CONDITION_MAP: Dict[str, str] = {
     "E2": "direct_self_consistency",
     "E3": "ocr_answer",
     "E4": "ocr_cot",
-    "E5": "full_geosym",
+    # `E5` (full_geosym) retired 2026-09-19 with M1/M2. `E5_raw` is GeoSym
+    # itself now; never rename the key -- see CLAUDE.md "Experiment matrix".
     "E5_raw": "raw_geosym",
 }
 
@@ -153,11 +154,15 @@ def extrema_channel_enabled() -> bool:
     }
 
 
-# Conditions whose prompt content depends on the flag.  E5 (`full_geosym`) is the
-# only one, because it is the sole condition that receives `visual_facts`:
-# E5_raw passes `visual_facts=None` and E0-E4 never see GeoSym output at all.
-# A flag change therefore invalidates E5 and nothing else — paying to re-run the
-# other six would buy no information.
+# Conditions whose prompt content depends on the flag. E5 was the only one,
+# because it was the sole condition that received `visual_facts`: E5_raw passes
+# `visual_facts=None` and E0-E4 never see GeoSym output at all.
+#
+# E5 retired on 2026-09-19, so NO LIVE CONDITION consumes the extrema channel.
+# The entry is kept because caches on disk still hold E5 records and must stay
+# correctly invalidated. Do not read this set as "the extrema channel is wired
+# into the current pipeline" -- it is not; re-wiring it into E5_raw would be a
+# prompt change to the main condition and needs its own decision.
 EXTREMA_CHANNEL_CONDITIONS: frozenset = frozenset({"E5"})
 
 
@@ -544,14 +549,9 @@ def run_single_condition(
             ocr_evidence=_format_ocr_evidence(ocr_coords or []),
         )
 
-    if mode == "full_geosym":
-        return _run_reasoning_flow(
-            adapter, img_path, gt_data,
-            geosym_coords=geosym_coords or [],
-            visual_facts=visual_facts,
-            intervention_mode="visual_facts_full",
-        )
-
+    # `full_geosym` (condition E5) was the sole production entry point into
+    # M1/M2 and retired with them on 2026-09-19. `raw_geosym` (E5_raw) is
+    # GeoSym itself now; it never touched that path.
     if mode == "raw_geosym":
         return _run_reasoning_flow(
             adapter, img_path, gt_data,

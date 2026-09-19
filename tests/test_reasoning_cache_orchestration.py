@@ -20,7 +20,9 @@ from app.reasoning_pipeline import EXTREMA_CHANNEL_ENV_VAR
 
 PARABOLA = [(-2, 0), (-1, 3), (0, 4), (1, 3), (2, 0)]
 
+# The cache on disk still holds E5 records; only E5_raw and E0-E4 can run now.
 ALL_CONDITIONS = ["E0", "E1", "E2", "E3", "E4", "E5", "E5_raw"]
+LIVE_CONDITIONS = [ck for ck in ALL_CONDITIONS if ck != "E5"]
 
 
 def _cached_record(*, extrema_flag=None, judge_model="judge-x"):
@@ -149,83 +151,50 @@ def test_unchanged_flag_reruns_nothing(harness):
     record = run(_cached_record(extrema_flag=False), flag=False)
 
     assert _modes_to_conditions(ran) == set()
+    # Includes the retired E5: it is cached, not runnable, and must be carried.
     assert set(record["summary"]["cached_conditions"]) == set(ALL_CONDITIONS)
 
 
-def test_turning_the_flag_on_reruns_only_e5(harness):
-    """The core guarantee, end to end.
+# NOTE (2026-09-19): five tests asserting that flipping the extrema flag re-runs
+# E5 were removed with M1/M2. E5 was the only condition the flag could reach
+# (`EXTREMA_CHANNEL_CONDITIONS`), and it is no longer runnable, so the re-run
+# they described cannot occur. The surviving cache-preservation guarantees are
+# re-expressed below against a live condition and a stale cached E5.
 
-    E5 must be re-run because its prompt changes; everything else must be reused,
-    because re-running it would cost real API spend for no information.
+
+def test_flipping_the_flag_reruns_nothing_now_that_e5_is_retired(harness):
+    """The extrema flag no longer reaches any runnable condition.
+
+    It gated E5 alone. With E5 retired, flipping it must cost nothing -- if this
+    ever fails, the flag has been wired into a live condition and that is a
+    prompt change to the main arm, not a cache concern.
     """
     run, ran, _ = harness
 
     record = run(_cached_record(extrema_flag=False), flag=True)
 
-    assert _modes_to_conditions(ran) == {"E5"}
-    assert "E5" not in record["summary"]["cached_conditions"]
-    assert set(record["summary"]["cached_conditions"]) == set(ALL_CONDITIONS) - {"E5"}
+    assert _modes_to_conditions(ran) == set()
+    assert set(record["summary"]["cached_conditions"]) == set(ALL_CONDITIONS)
 
 
-def test_pre_flag_cache_is_also_rerun_when_the_flag_goes_on(harness):
-    """The 460 archived records have no flag field at all."""
-    run, ran, _ = harness
+def test_a_stale_cached_e5_is_preserved_not_rerun_or_dropped(harness):
+    """Archived E5 rows stay readable after their condition retired.
 
-    run(_cached_record(extrema_flag=None), flag=True)
-
-    assert _modes_to_conditions(ran) == {"E5"}
-
-
-def test_turning_the_flag_off_reruns_only_e5(harness):
-    """Symmetric: an experimental E5 must not survive into a control run."""
-    run, ran, _ = harness
-
-    run(_cached_record(extrema_flag=True), flag=False)
-
-    assert _modes_to_conditions(ran) == {"E5"}
-
-
-def test_rerun_e5_receives_flag_on_extrema(harness):
-    """The re-run must actually differ, not just happen.
-
-    Facts are recomputed from the cached coordinates, so a stale
-    `geosym_artifacts.visual_facts` cannot carry the old empty extrema forward.
+    The cache still holds E5 records produced under the old pipeline. They must
+    survive untouched, keeping the flag they were produced under -- re-running
+    is impossible and discarding would destroy paid history.
     """
-    run, _, visual_facts_seen = harness
-
-    run(_cached_record(extrema_flag=False), flag=True)
-
-    assert visual_facts_seen["full_geosym"]["extrema"] == [{"x": 0, "y": 4, "type": "max"}]
-
-
-def test_reused_conditions_keep_their_own_flag(harness):
-    """Provenance survives a mixed record.
-
-    The re-run E5 is flag-on while every reused condition keeps the flag it was
-    produced under, so the record stays readable rather than claiming one state
-    for results produced under two.
-    """
-    run, _, _ = harness
+    run, ran, _ = harness
 
     record = run(_cached_record(extrema_flag=False), flag=True)
 
-    conds = record["conditions"]
-    assert conds["E5"]["extrema_channel_enabled"] is True
-    assert conds["E5"]["cached"] is False
-    for ck in set(ALL_CONDITIONS) - {"E5"}:
-        assert conds[ck]["extrema_channel_enabled"] is False, ck
-        assert conds[ck]["cached"] is True, ck
-    assert record["run_settings"]["extrema_channel_enabled"] is True
+    assert "E5" not in _modes_to_conditions(ran)
+    assert record["conditions"]["E5"]["extrema_channel_enabled"] is False
+    assert record["conditions"]["E5"]["md"] == "**E5** cached"
 
 
-def test_targeted_rerun_of_another_condition_preserves_stale_e5(harness):
-    """A targeted run must not spend money on, or discard, an untargeted E5.
-
-    E5 is stale but out of scope here: it is neither re-run nor dropped, and its
-    own flag still says how it was produced.  `force_rerun=True` alongside a
-    target is the "re-run this one condition" path — a target on its own still
-    honours the cache.
-    """
+def test_targeted_rerun_of_one_condition_leaves_the_others_cached(harness):
+    """A targeted run must not spend money on conditions out of scope."""
     run, ran, _ = harness
 
     record = run(
@@ -234,8 +203,8 @@ def test_targeted_rerun_of_another_condition_preserves_stale_e5(harness):
     )
 
     assert _modes_to_conditions(ran) == {"E0"}
-    assert record["conditions"]["E5"]["extrema_channel_enabled"] is False
-    assert record["conditions"]["E5"]["md"] == "**E5** cached"
+    for ck in set(LIVE_CONDITIONS) - {"E0"}:
+        assert record["conditions"][ck]["cached"] is True, ck
 
 
 def test_a_string_flag_is_not_read_as_true(harness):

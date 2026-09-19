@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 
 from scripts.freeze_evidence_selection_selective_propagation_pilot_manifest import build_manifest
-from scripts.project_evidence_selection_selective_propagation_zero_cost import build_projection
 from scripts.selective_propagation import SELECTIVE_CONDITIONS
 
 
@@ -45,25 +44,11 @@ def roster_payload() -> dict:
     return {"stage_status": "selective_stress_roster_frozen", "jobs": jobs}
 
 
-def test_zero_cost_projection_preserves_plotqa_guardrail(tmp_path: Path) -> None:
-    roster_path = tmp_path / "roster.json"
-    guarded_path = tmp_path / "guarded.json"
-    write_json(roster_path, roster_payload())
-    write_json(
-        guarded_path,
-        {
-            "stage_status": "plotqa_guardrail_preserved",
-            "summary": {"G_full_guarded": {"correct": 48, "completed": 50, "parseable": 50}},
-            "guardrail": {"passed": True, "protected_output_regressions": 0},
-        },
-    )
-
-    result = build_projection(roster_path, guarded_path, tmp_path / "out")
-
-    assert result["stage_status"] == "ready_for_paid_manifest"
-    assert result["paid_calls_executed"] == 0
-    assert result["plotqa_guardrail"]["passed"] is True
-    assert result["gates"]["stress_job_count_48"] is True
+# NOTE (2026-09-19): `test_zero_cost_projection_preserves_plotqa_guardrail` was
+# removed with its module, `project_evidence_selection_selective_propagation_
+# zero_cost.py` -- a pre-paid projection for the M1/M2 rescue that retired with
+# them. The manifest test below is kept: it covers the roster freeze that still
+# reproduces the 896 paid stress_128 rows.
 
 
 def test_paid_manifest_selects_two_per_family_and_records_cost(tmp_path: Path) -> None:

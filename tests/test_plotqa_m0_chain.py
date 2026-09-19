@@ -105,8 +105,14 @@ class TestPresentableFact:
 
 
 class TestBuildEvidence:
+    # The curated/uncurated two-arm tests were removed on 2026-09-19 with
+    # M1'/M2': `test_both_arms_receive_the_same_underlying_evidence`,
+    # `test_arms_share_one_fact_budget` and `test_reliability_is_reported_for_
+    # both_arms` all compared the two arms, and only one arm now exists. The
+    # budget assertion survives below, applied to the single remaining arm.
+
     def test_payload_carries_no_extractor_bookkeeping(self):
-        evidence = build_evidence(_record(), _ocr(), curated=False)
+        evidence = build_evidence(_record(), _ocr())
         assert evidence["measured_facts"]
         for fact in evidence["measured_facts"]:
             for noisy in ("component_color_bgr", "component_bbox", "component_area",
@@ -119,36 +125,25 @@ class TestBuildEvidence:
         One observed sample carries ``"I" -> 1.0`` in the frozen ruler next to a
         correct refit. Injecting both hands the model two disagreeing axes.
         """
-        evidence = build_evidence(_record(), _ocr(), curated=False)
+        evidence = build_evidence(_record(), _ocr())
         assert "ruler" not in evidence
         assert evidence["ruler_refit"]["value_axis"] == "y"
 
-    def test_both_arms_receive_the_same_underlying_evidence(self):
-        raw = build_evidence(_record(), _ocr(), curated=False)
-        curated = build_evidence(_record(), _ocr(), curated=True)
-        raw_values = {f["measured_value"] for f in raw["measured_facts"]}
-        curated_values = {f["measured_value"] for f in curated["measured_facts"]}
-        assert curated_values <= raw_values
-
-    def test_arms_share_one_fact_budget(self):
+    def test_fact_budget_is_enforced(self):
         record = _record()
         record["measured_points"] = [_bar(100.0 + 12 * i, 200.0) for i in range(40)]
-        raw = build_evidence(record, _ocr(), curated=False, max_facts=20)
-        curated = build_evidence(record, _ocr(), curated=True, max_facts=20)
-        assert len(raw["measured_facts"]) <= 20
-        assert len(curated["measured_facts"]) <= 20
+        evidence = build_evidence(record, _ocr(), max_facts=20)
+        assert len(evidence["measured_facts"]) <= 20
 
-    def test_reliability_is_reported_for_both_arms(self):
-        """The control arm must be stratifiable by the tier the curated arm gated on."""
-        for curated in (True, False):
-            evidence = build_evidence(_record(), _ocr(), curated=curated)
-            assert evidence["evidence_reliability"]["tier"] in {"high", "medium", "low"}
+    def test_reliability_scoring_is_gone(self):
+        """M1' scored every payload; nothing should carry a tier now."""
+        assert "evidence_reliability" not in build_evidence(_record(), _ocr())
 
     def test_chain_version_is_stamped(self):
-        assert build_evidence(_record(), _ocr(), curated=True)["chain_version"] == CHAIN_VERSION
+        assert build_evidence(_record(), _ocr())["chain_version"] == CHAIN_VERSION
 
     def test_without_ocr_the_axis_is_declared_inadmissible_not_guessed(self):
-        evidence = build_evidence(_record(), None, curated=False)
+        evidence = build_evidence(_record(), None)
         assert evidence["ruler_refit"]["admissible"] is False
 
 

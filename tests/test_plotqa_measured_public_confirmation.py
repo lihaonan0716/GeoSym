@@ -40,8 +40,11 @@ def test_plotqa_measured_public_500_plan_freezes_caps(tmp_path: Path) -> None:
     review = review_plan(plan)
 
     assert plan["paid_run_approved"] is True
-    assert plan["sample_condition_job_cap"] == 1500
-    assert plan["llm_http_attempt_cap"] == 1500
+    # 500 samples x 2 live conditions. Was 1500 before `G_full_measured_geosym`
+    # retired with M1'/M2' on 2026-09-19; the cap must track the condition list
+    # rather than a literal, or a retired arm stays paid for.
+    assert plan["sample_condition_job_cap"] == 1000
+    assert plan["llm_http_attempt_cap"] == 1000
     assert plan["ocr_http_attempt_cap"] == 0
     assert plan["dry_run"]["paid_calls_executed"] == 0
     assert review["status"] == "no_blocking_findings"

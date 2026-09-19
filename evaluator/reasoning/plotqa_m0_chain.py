@@ -19,8 +19,9 @@ Stage order is forced by data dependencies, not preference:
    guess.
 3. **mark admission** drops sliver artifacts, with the survival floor that keeps
    line charts from losing all their evidence.
-4. **reliability scoring / selection** (M1'/M2') reads the result of 1-3. It must
-   be last: it scores the evidence as it will actually be injected.
+
+A fourth stage -- reliability scoring / selection (M1'/M2') -- was removed on
+2026-09-19; see `docs/M1M2_RETIREMENT_AND_FGCS_REPOSITIONING_PLAN_2026-09-19.md`.
 
 Answer independence holds throughout. Every stage reads OCR boxes, mark
 geometry, and the fitted axis; none reads a reference answer.
@@ -31,7 +32,6 @@ from __future__ import annotations
 from typing import Any, Dict, Optional
 
 from evaluator.reasoning.plotqa_category_axis import augment_record
-from evaluator.reasoning.plotqa_evidence_reliability import score_evidence, select_evidence
 from evaluator.reasoning.plotqa_mark_admission import apply_admission
 from evaluator.reasoning.plotqa_ruler_refit import refit_record
 
@@ -104,53 +104,25 @@ def build_m0_prime_record(
 def build_evidence(
     record: Dict[str, Any],
     ocr_row: Optional[Dict[str, Any]],
-    curated: bool,
     max_facts: int = 20,
 ) -> Dict[str, Any]:
-    """Build the evidence payload for one arm.
+    """Build the evidence payload from one M0' record.
 
-    Both arms consume the *same* M0' record; the only difference is whether
-    M1'/M2' may withhold or re-rank it:
-
-    - ``curated=True``  -- M2' gates on the reliability tier and ranks the
-      surviving facts, so a low-reliability sample is answered visually.
-    - ``curated=False`` -- every admitted fact is injected in extraction order,
-      truncated to the same budget. This is the uncurated-injection control, not
-      a weaker pipeline: it sees identical evidence.
-
-    Keeping the budget identical matters. If the curated arm also got a larger
-    fact budget, any gain would confound selection with quantity.
+    Every admitted fact is injected in extraction order, truncated to the
+    budget. The ``curated`` arm -- which let M1'/M2' withhold or re-rank the
+    same evidence -- was removed with those modules on 2026-09-19.
     """
     chained = build_m0_prime_record(record, ocr_row)
     points = list(chained.get("measured_points") or [])
-    reliability = score_evidence(chained)
-
-    if curated:
-        selection = select_evidence(chained, max_facts=max_facts)
-        facts = selection["selected_facts"]
-        injected = selection["inject"]
-        policy = selection.get("selection_policy") or selection["reason"]
-    else:
-        selection = None
-        facts = points[:max_facts]
-        injected = True
-        policy = f"uncurated_all_admitted_top{max_facts}"
+    facts = points[:max_facts]
 
     return {
         "ruler_refit": _axis_summary(chained.get("ruler_refit")),
         "chart_geometry": chained.get("chart_geometry"),
         "measured_facts": [presentable_fact(fact) for fact in facts],
         "evidence_gaps": chained.get("evidence_gaps") or [],
-        "curation_policy": policy,
-        # Reported for both arms so an analysis can stratify the control arm by
-        # the same reliability tier the curated arm gated on.
-        "evidence_reliability": {
-            "tier": reliability["tier"],
-            "composite": reliability["composite"],
-            "signals": reliability["signals"],
-        },
-        "evidence_injected": injected,
+        "curation_policy": f"all_admitted_top{max_facts}",
+        "evidence_injected": True,
         "chain_version": CHAIN_VERSION,
-        "_selection": selection,
         "_chained_record": chained,
     }

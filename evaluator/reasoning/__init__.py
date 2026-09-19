@@ -1,1 +1,1 @@
-"""Reasoning pipeline: parsing, intervention profiles, and numerical analysis."""
+"""Reasoning pipeline: parsing, chart-fact construction, and numerical analysis."""

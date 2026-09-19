@@ -40,7 +40,10 @@ from scripts.run_public_benchmark_pilot import AttemptCounter, extract_predictio
 
 
 PAPER_SAMPLE_COUNT = 500
-PAPER_LLM_ATTEMPT_CAP = 1500
+# Derived, not hardcoded: it was 1500 for three conditions, and retiring
+# `G_full_measured_geosym` with M1'/M2' on 2026-09-19 drops it to 1000. A
+# literal here would have silently over-authorised 500 paid calls.
+PAPER_LLM_ATTEMPT_CAP = PAPER_SAMPLE_COUNT * len(CONDITIONS)
 PAPER_OCR_ATTEMPT_CAP = 0
 # Frozen PaddleOCR boxes for the 500-sample roster. Read from disk by the M0'
 # chain; no OCR inference runs on the answering path.

@@ -1,5 +1,9 @@
 #!/usr/bin/env python
-"""Dry-run or execute the paper-level 128-job M1/M2 stress confirmation."""
+"""Dry-run or execute the paper-level 128-job evidence-injection stress run.
+
+Reproduces the 896-row `stress_128` artifact. The reliability-routing arms
+retired with M1/M2 on 2026-09-19; see `scripts/selective_propagation.py`.
+"""
 
 from __future__ import annotations
 

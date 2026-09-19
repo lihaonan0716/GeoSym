@@ -37,9 +37,7 @@ from app.reasoning_schema import (
     validate_reasoning_record,
 )
 from evaluator.reasoning.intervention import (
-    INTERVENTION_PROFILES,
     classify_extrema_candidates,
-    format_tiered_facts_for_prompt,
     infer_extrema_candidates,
 )
 
@@ -269,77 +267,12 @@ def test_public_interface_returns_only_the_candidate_schema():
         assert candidate["type"] in {"max", "min"}
 
 
-# ── P0-1c: the tiered formatter's second gate ─────────────────────────
-#
-# E5 (`full_geosym`) injects via `format_tiered_facts_for_prompt`, which used to
-# render only intercepts in Tier 2 — so even a populated extrema list never
-# reached the prompt. These tests pin down both halves of the fix: extrema are
-# now rendered, and they are rendered as experimental candidates rather than as
-# reliable Tier 2 features.
-
-E5_FACT_KEYS = INTERVENTION_PROFILES["visual_facts_full"]["visual_fact_keys"]
-
-FACTS_NO_EXTREMA = {
-    "intercepts": {"x_intercepts": [-2, 2], "y_intercept": 4},
-    "extrema": [],
-    "monotonicity": [{"interval": [-2, 0], "direction": "increasing"}],
-    "source": "computation_grounded",
-}
-FACTS_WITH_EXTREMA = {**FACTS_NO_EXTREMA, "extrema": [{"x": 0, "y": 4, "type": "max"}]}
-
-
-def _tiered(facts, keys=E5_FACT_KEYS):
-    return format_tiered_facts_for_prompt(facts, PARABOLA, fact_keys=keys)
-
-
-def test_empty_extrema_leaves_the_tiered_text_character_identical():
-    """The flag-off contract at the formatter level.
-
-    An empty extrema list must not add a header, a blank line, or a trailing
-    newline — otherwise every historical E5 prompt would differ.
-    """
-    without_key = _tiered(FACTS_NO_EXTREMA, [k for k in E5_FACT_KEYS if k != "extrema"])
-
-    assert _tiered(FACTS_NO_EXTREMA) == without_key
-
-
-def test_populated_extrema_becomes_visible_in_the_tiered_text():
-    """The actual second gate: this assertion failed before P0-1c."""
-    text = _tiered(FACTS_WITH_EXTREMA)
-
-    assert "candidate max at (0, 4)" in text
-
-
-def test_extrema_are_framed_as_candidates_not_as_reliable_facts():
-    """Wording discipline: a hypothesis to check, never a promise.
-
-    Scoped to the extrema block on purpose — Tier 1 says "fully reliable" of the
-    coordinate anchors, which is a claim the pipeline is entitled to make.
-    """
-    text = _tiered(FACTS_WITH_EXTREMA)
-    block = text[text.index("== UNFILTERED EXTREMA CANDIDATES"):].lower()
-
-    assert "candidate" in block
-    assert "verify against the image" in block
-    for overclaim in ("fully reliable", "you may rely", "verified", "confirmed"):
-        assert overclaim not in block
-
-
-def test_extrema_do_not_appear_inside_tier_2():
-    """Tier 2 promises exact observations; unfiltered candidates are not that."""
-    text = _tiered(FACTS_WITH_EXTREMA)
-    tier2_start = text.index("== TIER 2")
-    tier3_start = text.index("== TIER 3")
-
-    assert "candidate max" not in text[tier2_start:tier3_start]
-    assert text.index("candidate max") > tier3_start
-
-
-def test_extrema_are_not_rendered_when_the_profile_excludes_them():
-    """`fact_keys` still gates the category, as it does for every other tier."""
-    text = _tiered(FACTS_WITH_EXTREMA, ["intercepts", "monotonicity"])
-
-    assert "candidate" not in text
+# NOTE (2026-09-19): five tests covering `format_tiered_facts_for_prompt`
+# ("P0-1c: the tiered formatter's second gate") were removed here. They
+# asserted on E5's tiered injection, which retired with M1/M2 — the formatter
+# and the `visual_facts_full` profile they imported no longer exist. The
+# extrema-candidate generation they guarded is still covered above; what was
+# dropped is the E5 injection surface, not extrema coverage.
 
 
 # ── Flag provenance across the condition cache ────────────────────────

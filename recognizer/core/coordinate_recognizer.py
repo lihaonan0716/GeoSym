@@ -3666,7 +3666,7 @@ class CoordinateRecognizer:
     # ------------------------------------------------------------------
     # These methods extract mathematical facts directly from the curve
     # pixel data using the same CV pipeline that detects coordinates.
-    # Unlike the integer-grid inference in intervention.py, these produce
+    # Unlike the integer-grid inference in the chart-fact module, these produce
     # sub-pixel-accurate results grounded in visual evidence.
     # ------------------------------------------------------------------
 

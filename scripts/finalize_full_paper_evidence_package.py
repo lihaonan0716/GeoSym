@@ -24,7 +24,8 @@ import yaml  # noqa: E402
 from scripts.prepare_public_benchmark_pilot import stable_file_hash  # noqa: E402
 from scripts.prepare_plotqa_public_benchmark_pilot import validate_plotqa_sample_semantics  # noqa: E402
 from scripts.audit_prompt_fairness import run_audit as run_prompt_fairness_audit  # noqa: E402
-from scripts.batch_experiment import ALL_CONDITIONS  # noqa: E402
+# Validates artifacts already on disk, which contain the retired E5 arm.
+from scripts.batch_experiment import HISTORICAL_CONDITIONS as ALL_CONDITIONS  # noqa: E402
 from app.helpers import _get_saved_key  # noqa: E402
 
 

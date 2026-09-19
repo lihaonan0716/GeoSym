@@ -31,7 +31,23 @@ FAMILIES = [
     "logarithmic", "piecewise_linear", "quadratic", "rational",
 ]
 PROFILE = "clean_render"
-ALL_CONDITIONS = ["E0", "E1", "E2", "E3", "E4", "E5", "E5_raw"]
+# `E5` (M0+M1+M2+M3) retired 2026-09-19 with M1/M2. `E5_raw` (M0+M3) is now
+# GeoSym itself, not an ablation -- call it "GeoSym" in prose, but never rename
+# the string: `E5` and `E5_raw` coexist in the same paid artifacts, so renaming
+# would silently read the retired arm. See CLAUDE.md "Experiment matrix".
+#
+# Two lists, because one list cannot mean both things:
+#   ALL_CONDITIONS      -- what a new run may execute. E5 is gone; asking for it
+#                          must fail loudly rather than quietly cost money.
+#   HISTORICAL_CONDITIONS -- what the 29425 paid rows on disk contain. Analysis
+#                          and rescoring iterate over THIS, or they would
+#                          silently drop the 3439 historical E5 rows and report
+#                          a subset as if it were the whole artifact.
+ALL_CONDITIONS = ["E0", "E1", "E2", "E3", "E4", "E5_raw"]
+
+RETIRED_CONDITIONS = ["E5"]
+
+HISTORICAL_CONDITIONS = ["E0", "E1", "E2", "E3", "E4", "E5", "E5_raw"]
 
 PROGRESS_FILE = Path(
     os.environ.get("GEOSYM_BATCH_PROGRESS_FILE", str(_project_root / "outputs" / "batch_progress.json"))

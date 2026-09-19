@@ -1,23 +1,20 @@
 """
-GeoSym structured visual-symbolic fusion module.
+GeoSym chart-fact construction and prompt injection.
 
-This module implements the fusion bridge between GeoSym's visual coordinate
-extraction and downstream LLM reasoning.  It converts reliable coordinates
-and visually-computed facts into structured representations for the
-experiment to compare different *fusion levels*:
+Converts reliable coordinates into structured facts (intercepts, extrema,
+monotonicity, symmetry) and formats them for injection into the reasoning
+prompts. Used by the `E5_raw` condition — the GeoSym method itself.
 
-    E3 / E4 – OCR + rule evidence baselines
-    E5      – GeoSym fusion pipeline
-
-The retired factorized naming is no longer part of the active project narrative.
+Confidence scoring (M1) and utility-aware selection (M2) were removed on
+2026-09-19 after eight independent tests found no discriminative signal;
+see `docs/M1M2_RETIREMENT_AND_FGCS_REPOSITIONING_PLAN_2026-09-19.md`.
+What remains is M0's inference capability plus flat prompt formatting.
 """
 
 from __future__ import annotations
 
 import json
 import logging
-import os
-import re
 import statistics
 from typing import Any, Dict, Iterable, List, Optional, Tuple
 
@@ -31,22 +28,14 @@ EXTREMA_FILTER_X_GAP_FACTOR = 1.5
 EXTREMA_FILTER_Y_JUMP_FACTOR = 2.5
 
 INTERVENTION_PROFILES: Dict[str, Dict[str, Any]] = {
-    # Active GeoSym fusion modes used by the current six-condition matrix.
+    # Flat injection is the only surviving profile. `visual_facts_full`
+    # (LLM verification + tiered injection) was removed with M1/M2 on
+    # 2026-09-19; it was the sole production entry point into that path.
     "visual_facts_flat": {
         "label": "GeoSym Structured Fusion (Flat Facts)",
         "role": "experimental",
         "visual_fact_keys": ["intercepts", "extrema", "monotonicity"],
-        "tiered_injection": False,
-        "llm_verify": False,
         "description": "GeoSym coordinates plus structured visual facts injected in a flat format.",
-    },
-    "visual_facts_full": {
-        "label": "Full GeoSym Pipeline",
-        "role": "main",
-        "visual_fact_keys": ["intercepts", "extrema", "monotonicity"],
-        "tiered_injection": True,
-        "llm_verify": True,
-        "description": "Full pipeline: LLM error detection + completeness-aware tiered injection.",
     },
 }
 
@@ -100,235 +89,15 @@ def get_intervention_profile(mode: str | None) -> Dict[str, str]:
     return profile
 
 
-_FILTER_PROMPT = """You are verifying candidate visual facts for a math function graph.
-
-You are given:
-1. The graph image.
-2. Reliable coordinate evidence extracted by GeoSym.
-3. Candidate visual facts extracted from the same image.
-
-Your job is NOT to compute new facts. Your job is ONLY to decide which candidate
-facts are visually supported and useful enough to keep.
-
-STRICT RULES:
-- Do NOT invent new numeric values.
-- Do NOT modify candidate values.
-- Only keep or reject existing indexed candidates.
-- If a candidate is uncertain, reject it.
-- Be conservative: precision matters more than recall.
-- Use the image as the ground truth; use the reliable coordinates as anchors.
-
-Reliable coordinates:
-{coords_text}
-
-Candidate visual facts (indexed):
-{candidate_facts}
-
-Return ONLY JSON in this exact schema:
-{
-  "keep": {
-    "x_intercepts": [0, 2],
-    "keep_y_intercept": false,
-    "extrema": [1],
-    "monotonicity": [0]
-  },
-  "notes": [
-    "short reason 1",
-    "short reason 2"
-  ]
-}
-
-Meaning:
-- x_intercepts: indices of x-intercept candidates to keep
-- keep_y_intercept: whether to keep the single y-intercept candidate
-- extrema: indices of extrema candidates to keep
-- monotonicity: indices of monotonicity candidates to keep
-
-Reject candidates that are contradicted by the image, unsupported by the curve shape,
-or too imprecise / too broad to trust.
-"""
-
-
-def _extract_json_object(text: str) -> Dict[str, Any]:
-    """Extract the first JSON object from an LLM response."""
-    src = text.strip()
-    m = re.search(r"```(?:json)?\s*(\{.*?\})\s*```", src, re.DOTALL)
-    if m:
-        src = m.group(1)
-    else:
-        start = src.find("{")
-        end = src.rfind("}")
-        if start != -1 and end != -1 and end > start:
-            src = src[start:end + 1]
-    data = json.loads(src)
-    if not isinstance(data, dict):
-        raise ValueError("Expected JSON object from LLM filter")
-    return data
-
-
-def _build_filter_candidates(
-    facts: Dict[str, Any],
-    *,
-    fact_keys: Optional[List[str]] = None,
-) -> Dict[str, Any]:
-    """Build an indexed candidate structure for the LLM filter."""
-    keys = fact_keys if fact_keys is not None else list(_VISUAL_FACT_KEYS)
-    payload: Dict[str, Any] = {}
-
-    if "intercepts" in keys:
-        raw = facts.get("intercepts", {}) or {}
-        x_ints = raw.get("x_intercepts", []) or []
-        y_int = raw.get("y_intercept")
-        payload["intercepts"] = {
-            "x_intercepts": [
-                {"idx": i, "value": x_val}
-                for i, x_val in enumerate(x_ints)
-            ],
-            "y_intercept": (
-                {"idx": 0, "value": y_int}
-                if y_int is not None else None
-            ),
-        }
-
-    if "extrema" in keys:
-        raw = facts.get("extrema", []) or []
-        payload["extrema"] = [
-            {"idx": i, "x": item.get("x"), "y": item.get("y"), "type": item.get("type")}
-            for i, item in enumerate(raw)
-            if isinstance(item, dict)
-        ]
-
-    if "monotonicity" in keys:
-        raw = facts.get("monotonicity", []) or []
-        payload["monotonicity"] = [
-            {
-                "idx": i,
-                "interval": item.get("interval"),
-                "direction": item.get("direction"),
-                "scope": item.get("scope", "visible_range"),
-            }
-            for i, item in enumerate(raw)
-            if isinstance(item, dict)
-        ]
-
-    return payload
-
-
-def _coerce_index_list(raw: Any, upper_bound: int) -> List[int]:
-    """Parse a list of integer indices safely."""
-    if not isinstance(raw, list):
-        return []
-    out: List[int] = []
-    for item in raw:
-        try:
-            idx = int(item)
-        except (TypeError, ValueError):
-            continue
-        if 0 <= idx < upper_bound and idx not in out:
-            out.append(idx)
-    return out
-
-
-def filter_visual_facts_with_llm(
-    adapter,
-    image: Any,
-    coords: Iterable[Any],
-    facts: Dict[str, Any],
-    *,
-    mode: str | None = None,
-) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-    """Use the current reasoning model to conservatively filter visual facts.
-
-    The model is only allowed to keep/reject indexed candidates; numeric values
-    are copied verbatim from the CV pipeline so the filter cannot hallucinate
-    new facts.
-    """
-    profile = get_intervention_profile(mode)
-    fact_keys: List[str] = list(profile.get("visual_fact_keys") or _VISUAL_FACT_KEYS)
-    candidates = _build_filter_candidates(facts, fact_keys=fact_keys)
-    coords_text = format_coords(coords)
-    prompt = _FILTER_PROMPT.replace("{coords_text}", coords_text)
-    prompt = prompt.replace(
-        "{candidate_facts}",
-        json.dumps(candidates, ensure_ascii=False, indent=2),
-    )
-
-    metadata: Dict[str, Any] = {
-        "applied": True,
-        "mode": profile.get("mode"),
-        "raw_candidate_counts": {
-            "x_intercepts": len(candidates.get("intercepts", {}).get("x_intercepts", [])),
-            "y_intercept": 1 if candidates.get("intercepts", {}).get("y_intercept") is not None else 0,
-            "extrema": len(candidates.get("extrema", [])),
-            "monotonicity": len(candidates.get("monotonicity", [])),
-        },
-        "notes": [],
-        "status": "ok",
-    }
-
-    try:
-        raw = adapter.call_with_prompt(image, prompt)
-        decision = _extract_json_object(raw)
-        keep = decision.get("keep", {}) if isinstance(decision.get("keep"), dict) else {}
-        metadata["raw_response"] = raw
-        if isinstance(decision.get("notes"), list):
-            metadata["notes"] = [str(x) for x in decision["notes"][:8]]
-
-        raw_intercepts = facts.get("intercepts", {}) or {}
-        raw_x = raw_intercepts.get("x_intercepts", []) or []
-        keep_x = _coerce_index_list(keep.get("x_intercepts"), len(raw_x))
-        keep_y = bool(keep.get("keep_y_intercept")) and raw_intercepts.get("y_intercept") is not None
-
-        raw_extrema = facts.get("extrema", []) or []
-        keep_extrema = _coerce_index_list(keep.get("extrema"), len(raw_extrema))
-
-        raw_mono = facts.get("monotonicity", []) or []
-        keep_mono = _coerce_index_list(keep.get("monotonicity"), len(raw_mono))
-
-        filtered: Dict[str, Any] = {
-            "intercepts": {
-                "x_intercepts": [raw_x[i] for i in keep_x],
-                "y_intercept": raw_intercepts.get("y_intercept") if keep_y else None,
-            },
-            "extrema": [raw_extrema[i] for i in keep_extrema],
-            "monotonicity": [raw_mono[i] for i in keep_mono],
-            "source": "visual_computation_llm_filtered",
-        }
-
-        metadata["kept_counts"] = {
-            "x_intercepts": len(filtered["intercepts"]["x_intercepts"]),
-            "y_intercept": 1 if filtered["intercepts"]["y_intercept"] is not None else 0,
-            "extrema": len(filtered["extrema"]),
-            "monotonicity": len(filtered["monotonicity"]),
-        }
-        return filtered, metadata
-    except Exception as exc:
-        logger.warning("LLM fact filter failed for mode=%s: %s", mode, exc)
-        fallback = dict(facts)
-        fallback["source"] = "visual_computation_filter_failed"
-        metadata["status"] = "failed_open"
-        metadata["notes"] = [f"LLM filter failed: {type(exc).__name__}"]
-        return fallback, metadata
-
-
 def infer_chart_facts(coords: Iterable[Any]) -> Dict[str, Any]:
     """Infer compact chart facts from detected integer coordinates.
 
-    Each fact category is annotated with a ``_confidence`` field
-    (``"high"`` / ``"medium"`` / ``"low"``) so downstream formatting
-    can decide what to inject versus what to omit.
+    Facts are emitted unannotated. The heuristic ``_confidence`` tiers this
+    function used to attach were removed with M1 (2026-09-19): their only
+    consumers were the confidence gates that shipped with M1/M2, and eight
+    independent tests found the tiers carried no discriminative signal.
     """
     points = normalize_coords(coords)
-    intercepts = _infer_intercepts(points)
-    monotonicity = _infer_monotonicity(points)
-    extrema = _infer_extrema(points)
-    symmetry = _infer_symmetry(points)
-
-    # ---- Confidence scoring ----
-    intercepts["_confidence"] = _score_intercept_confidence(intercepts, points)
-    _score_monotonicity_confidence(monotonicity, points)
-    extrema_conf = "high" if len(points) >= 5 else ("medium" if len(points) >= 3 else "low")
-    symmetry_conf = _score_symmetry_confidence(points, symmetry)
 
     notes = []
     if not points:
@@ -338,74 +107,12 @@ def infer_chart_facts(coords: Iterable[Any]) -> Dict[str, Any]:
 
     return {
         "coordinates": [[x, y] for x, y in points],
-        "intercepts": intercepts,
-        "extrema": extrema,
-        "extrema_confidence": extrema_conf,
-        "monotonicity": monotonicity,
-        "symmetry": symmetry,
-        "symmetry_confidence": symmetry_conf,
+        "intercepts": _infer_intercepts(points),
+        "extrema": _infer_extrema(points),
+        "monotonicity": _infer_monotonicity(points),
+        "symmetry": _infer_symmetry(points),
         "notes": notes,
     }
-
-
-def _score_intercept_confidence(intercepts: dict, points: list) -> str:
-    """Score overall intercept confidence."""
-    y_exact = intercepts.get("y_intercept_exact", False)
-    y_val = intercepts.get("y_intercept")
-    has_x_exact = bool(intercepts.get("x_intercepts_exact"))
-    has_x_interp = bool(intercepts.get("x_intercepts_interpolated"))
-
-    if y_exact and has_x_exact and not has_x_interp:
-        return "high"
-    if y_val is not None and y_val != "undetermined":
-        return "medium"
-    return "low"
-
-
-def _score_monotonicity_confidence(segments: list, points: list) -> None:
-    """Add per-segment confidence in place."""
-    n = len(points)
-    for seg in segments:
-        interval = seg.get("interval", [])
-        lo = interval[0] if interval else None
-        hi = interval[1] if interval else None
-        has_inf = any(isinstance(v, str) and "inf" in str(v) for v in interval)
-
-        lo_num = lo if isinstance(lo, (int, float)) else None
-        hi_num = hi if isinstance(hi, (int, float)) else None
-        if lo_num is not None and hi_num is not None:
-            span_pts = sum(1 for x, _ in points if lo_num <= x <= hi_num)
-        else:
-            span_pts = n
-
-        if span_pts >= 4 and not has_inf:
-            seg["_confidence"] = "high"
-        elif span_pts >= 3:
-            seg["_confidence"] = "medium"
-        else:
-            seg["_confidence"] = "low"
-
-
-def _score_symmetry_confidence(points: list, symmetry: str) -> str:
-    """Score symmetry confidence."""
-    if len(points) < 4:
-        return "low"
-    point_set = set((x, y) for x, y in points)
-    pos_pts = [(x, y) for x, y in points if x > 0]
-    if not pos_pts:
-        return "low"
-    if symmetry == "neither":
-        return "medium"
-    match_count = 0
-    for x, y in pos_pts:
-        if symmetry == "even" and (-x, y) in point_set:
-            match_count += 1
-        elif symmetry == "odd" and (-x, -y) in point_set:
-            match_count += 1
-    ratio = match_count / len(pos_pts) if pos_pts else 0
-    if ratio >= 0.9:
-        return "high"
-    return "medium"
 
 
 def build_intervention_payload(
@@ -420,8 +127,8 @@ def build_intervention_payload(
     directly — these are grounded in pixel-level evidence and far more
     reliable than the heuristic ``infer_chart_facts``.
 
-    For tiered-injection fusion modes, the payload includes a
-    ``tiered_text`` field with the 3-tier structured evidence block.
+    Facts are injected flat. The tiered-injection variant was removed with
+    M2 (2026-09-19).
     """
     profile = get_intervention_profile(mode)
     points = normalize_coords(coords)
@@ -432,17 +139,11 @@ def build_intervention_payload(
         facts = infer_chart_facts(points)
 
     vf_keys: Optional[List[str]] = profile.get("visual_fact_keys")
-    use_tiered = profile.get("tiered_injection", False)
 
-    if use_tiered and vf_keys:
-        tiered_text = format_tiered_facts_for_prompt(facts, coords, fact_keys=vf_keys)
-        structured_facts = tiered_text
-    elif vf_keys and len(vf_keys) > 0:
+    if vf_keys:
         structured_facts = format_visual_facts_for_prompt(facts, fact_keys=vf_keys)
-        tiered_text = ""
     else:
         structured_facts = "Not provided in this intervention profile."
-        tiered_text = ""
 
     return {
         "mode": profile["mode"],
@@ -452,8 +153,6 @@ def build_intervention_payload(
         "coordinate_text": format_coords(points),
         "facts": facts,
         "facts_text": structured_facts,
-        "tiered_text": tiered_text,
-        "use_tiered": use_tiered,
         "summary": build_summary(profile["mode"], points, facts),
     }
 
@@ -466,7 +165,7 @@ def format_coords(coords: Iterable[Any]) -> str:
     return ", ".join(f"({x}, {y})" for x, y in points)
 
 
-# ── Visual fact formatting (Module M2 output → prompt text) ──────────
+# ── Visual fact formatting (chart facts → prompt text) ──────────
 
 _VISUAL_FACT_KEYS = ("intercepts", "extrema", "monotonicity")
 
@@ -478,10 +177,9 @@ def format_visual_facts_for_prompt(
 ) -> str:
     """Format visually-computed facts into a structured JSON for prompt injection.
 
-    Unlike the old ``format_structured_facts`` which had confidence-gating
-    for heuristic inferences, visual facts from the CV pipeline are treated
-    as high-confidence by default because they are grounded in pixel-level
-    evidence (same reliability tier as coordinate extraction).
+    Every fact is injected as-is. Visual facts from the CV pipeline are
+    grounded in pixel-level evidence, the same reliability tier as the
+    coordinate extraction they come from.
     """
     keys = fact_keys if fact_keys is not None else list(_VISUAL_FACT_KEYS)
     payload: Dict[str, Any] = {}
@@ -530,193 +228,10 @@ def format_visual_facts_for_prompt(
 
 # ── Tiered fact formatting (completeness-aware injection) ────────────
 
-def format_tiered_facts_for_prompt(
-    facts: Dict[str, Any],
-    coords: Iterable[Any],
-    *,
-    fact_keys: Optional[List[str]] = None,
-) -> str:
-    """Format GeoSym output as a tiered structured text block.
-
-    Tier 1 — Coordinate Anchors: high-priority coordinate evidence
-    Tier 2 — Detected Features: intercepts (exact grid observations)
-    Tier 3 — Inferred Patterns: monotonicity (reference only, verify from image)
-    Experimental — extrema candidates, unfiltered and unverified
-
-    Extrema are deliberately *not* in Tier 2.  Tier 2 states exact observations
-    the model may lean on; extrema come from a discrete three-point test whose
-    measured candidate precision is weaker, so presenting them as
-    detected features would overstate what the pipeline knows.  They are emitted
-    as an explicitly experimental, hypothesis-only block instead, and only when
-    the extrema list is non-empty — so a run with the extrema channel off
-    produces character-identical output to every run recorded before it.
-    """
-    keys = fact_keys if fact_keys is not None else list(_VISUAL_FACT_KEYS)
-    points = normalize_coords(coords)
-    lines: List[str] = []
-
-    # ── Tier 1: Coordinate Anchors ──
-    lines.append("== TIER 1: COORDINATE ANCHORS (high priority) ==")
-    if points:
-        coord_str = ", ".join(f"({x}, {y})" for x, y in points)
-        lines.append(f"GeoSym detected {len(points)} integer-valued points on the curve:")
-        lines.append(coord_str)
-        lines.append("These are pixel-level detections. Keep them unless the image clearly contradicts them.")
-    else:
-        lines.append("No coordinate points detected.")
-    lines.append("")
-
-    # ── Tier 2: Detected Features (only exact observations) ──
-    tier2_items: List[str] = []
-    if "intercepts" in keys:
-        raw = facts.get("intercepts") or {}
-        x_ints = raw.get("x_intercepts", [])
-        y_int = raw.get("y_intercept")
-        if x_ints:
-            tier2_items.append(
-                f"  - X-intercepts at grid points: {x_ints}\n"
-                f"    Note: There may be additional x-intercepts at non-integer positions. Check the image."
-            )
-        if y_int is not None:
-            tier2_items.append(f"  - Y-intercept at grid point: {y_int}")
-
-    if tier2_items:
-        lines.append("== TIER 2: DETECTED FEATURES (exact grid observations) ==")
-        lines.append("The following features were observed at exact grid intersections.")
-        lines.append("Additional features may exist at non-integer positions — check the image.")
-        lines.extend(tier2_items)
-        lines.append("")
-
-    # ── Tier 3: Inferred Patterns ──
-    if "monotonicity" in keys:
-        raw_mono = facts.get("monotonicity", [])
-        lines.append("== TIER 3: INFERRED PATTERNS (reference only — verify from image) ==")
-        if isinstance(raw_mono, list) and raw_mono:
-            n_pts = len(points)
-            mono_parts = []
-            for m in raw_mono:
-                interval = m.get("interval", [])
-                direction = m.get("direction", "?")
-                mono_parts.append(f"[{interval[0]}, {interval[1]}] {direction}")
-            lines.append(f"  - Monotonicity (inferred from {n_pts} detected points):")
-            for part in mono_parts:
-                lines.append(f"    {part}")
-            lines.append("    WARNING: These intervals are derived from limited coordinate data.")
-            lines.append("    The actual intervals may be WIDER. Use the image as your primary")
-            lines.append("    reference for monotonicity — extend intervals as needed.")
-        else:
-            lines.append("  - Insufficient data to infer monotonicity.")
-            lines.append("    Please determine monotonicity directly from the image.")
-
-    # ── Experimental: unfiltered extrema candidates ──
-    # Rendered only when the extrema channel produced something, which keeps the
-    # output byte-identical to historical runs whenever the list is empty.  The
-    # wording must stay hypothesis-only: these candidates carry no reliability
-    # guarantee, they cannot be told apart from jumps across a discontinuity, and
-    # they must never override what the model reads off the image.
-    if "extrema" in keys:
-        raw_extrema = facts.get("extrema")
-        if isinstance(raw_extrema, list) and raw_extrema:
-            lines.append("")
-            lines.append(
-                "== UNFILTERED EXTREMA CANDIDATES "
-                "(experimental — verify against the image) =="
-            )
-            for e in raw_extrema:
-                lines.append(f"  - candidate {e.get('type', '?')} at ({e.get('x')}, {e.get('y')})")
-            lines.append("    These are candidates from a discrete three-point test, not")
-            lines.append("    detected features. A jump across a discontinuity (for example a")
-            lines.append("    vertical asymptote) produces the same signature as a turning")
-            lines.append("    point, so some candidates are expected to be spurious. Treat")
-            lines.append("    each one as a hypothesis to check against the image, and do not")
-            lines.append("    let it override your own reading of the curve.")
-
-    return "\n".join(lines)
-
 
 # ── LLM fact verification (conservative error detection) ─────────────
 
 _VERIFY_PROMPT_PATH = "prompts/fact_verification_prompt.txt"
-
-
-def verify_facts_with_llm(
-    adapter,
-    image: Any,
-    coords: Iterable[Any],
-    facts: Dict[str, Any],
-    *,
-    fact_keys: Optional[List[str]] = None,
-) -> Tuple[Dict[str, Any], Dict[str, Any]]:
-    """Use the LLM to identify and remove INCORRECT facts.
-
-    Unlike the old ``filter_visual_facts_with_llm`` which selected
-    *useful* facts (aggressive filtering), this is a conservative error
-    detector that only removes facts clearly contradicted by the image.
-    """
-    keys = fact_keys if fact_keys is not None else list(_VISUAL_FACT_KEYS)
-    coords_text = format_coords(coords)
-    candidates = _build_filter_candidates(facts, fact_keys=keys)
-    candidate_text = json.dumps(candidates, ensure_ascii=False, indent=2)
-
-    prompt_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-                               _VERIFY_PROMPT_PATH)
-    try:
-        with open(prompt_path, "r", encoding="utf-8") as f:
-            prompt_tpl = f.read()
-    except FileNotFoundError:
-        prompt_tpl = (
-            "Review these visual facts against the image. "
-            "Mark each as correct or incorrect.\n"
-            "Coords: {coords_text}\nFacts: {candidate_facts}\n"
-            "Return JSON with status for each category."
-        )
-
-    prompt = prompt_tpl.replace("{coords_text}", coords_text)
-    prompt = prompt.replace("{candidate_facts}", candidate_text)
-
-    metadata: Dict[str, Any] = {
-        "applied": True, "type": "verification",
-        "status": "ok", "notes": [],
-    }
-
-    try:
-        raw = adapter.call_with_prompt(image, prompt)
-        decision = _extract_json_object(raw)
-        metadata["raw_response"] = raw
-
-        filtered = dict(facts)
-        removed: List[str] = []
-
-        for category in keys:
-            cat_result = decision.get(category, {})
-            if isinstance(cat_result, dict):
-                status = cat_result.get("status", "correct").lower()
-                reason = cat_result.get("reason", "")
-            else:
-                status = "correct"
-                reason = ""
-
-            if status == "incorrect":
-                removed.append(f"{category}: {reason}")
-                if category == "intercepts":
-                    filtered["intercepts"] = {
-                        "x_intercepts": [],
-                        "y_intercept": None,
-                    }
-                elif category == "extrema":
-                    filtered["extrema"] = []
-                elif category == "monotonicity":
-                    filtered["monotonicity"] = []
-
-        metadata["removed_categories"] = removed
-        metadata["notes"] = [f"Removed: {c}" for c in removed] if removed else ["All checked facts retained"]
-        return filtered, metadata
-
-    except Exception as exc:
-        logger.warning("LLM fact verification failed: %s", exc)
-        metadata["status"] = "failed_open"
-        metadata["notes"] = [f"Verification failed: {type(exc).__name__}"]
-        return dict(facts), metadata
 
 
 _ALL_FACT_KEYS = ("intercepts", "extrema", "monotonicity", "symmetry")
@@ -734,102 +249,6 @@ _CONF_THRESHOLDS = {
     "inject": {"high", "medium"},
     "hint_only": {"low"},
 }
-
-
-def format_structured_facts(
-    facts: Dict[str, Any],
-    *,
-    fact_keys: Optional[List[str]] = None,
-) -> str:
-    """Return a confidence-gated JSON string for prompt injection.
-
-    Confidence levels:
-      - **high** → injected as reliable data
-      - **medium** → injected with a "verify" note
-      - **low** → replaced with an instruction to check the image
-
-    This prevents incomplete inferences from overriding the LLM's own
-    visual reasoning, which is the root cause of injection-induced
-    performance degradation.
-    """
-    keys = fact_keys if fact_keys is not None else list(_ALL_FACT_KEYS)
-    reliable: Dict[str, Any] = {}
-    verify_hints: List[str] = []
-
-    for k in keys:
-        raw = facts.get(k, _FACT_DEFAULTS.get(k))
-        if k == "intercepts":
-            reliable[k] = _gate_intercepts(raw, verify_hints)
-        elif k == "monotonicity":
-            reliable[k] = _gate_monotonicity(raw, verify_hints)
-        elif k == "extrema":
-            conf = facts.get("extrema_confidence", "medium")
-            if conf == "low":
-                verify_hints.append("Extrema: not enough points to determine reliably — check image.")
-            else:
-                reliable[k] = raw
-        elif k == "symmetry":
-            conf = facts.get("symmetry_confidence", "medium")
-            if conf == "low":
-                verify_hints.append("Symmetry: insufficient data — determine from image.")
-            else:
-                reliable[k] = raw
-        else:
-            reliable[k] = raw
-
-    if verify_hints:
-        reliable["⚠ verify_from_image"] = verify_hints
-
-    reliable["notes"] = facts.get("notes", [])
-    return json.dumps(reliable, ensure_ascii=False, indent=2)
-
-
-def _gate_intercepts(intercepts: dict, hints: List[str]) -> dict:
-    """Gate intercept facts by confidence."""
-    conf = intercepts.get("_confidence", "medium")
-    out = {}
-
-    # x-intercepts
-    x_exact = intercepts.get("x_intercepts_exact", [])
-    x_interp = intercepts.get("x_intercepts_interpolated", [])
-    if x_exact:
-        out["x_intercepts"] = x_exact
-    if x_interp:
-        out["x_intercepts_estimated"] = x_interp
-    if not x_exact and not x_interp:
-        hints.append("x-intercepts: none on integer grid — check image for zero-crossings.")
-
-    # y-intercept
-    y_val = intercepts.get("y_intercept")
-    y_exact = intercepts.get("y_intercept_exact", False)
-    if y_exact and y_val is not None and y_val != "undetermined":
-        out["y_intercept"] = y_val
-    elif isinstance(y_val, (int, float)):
-        out["y_intercept_estimated"] = y_val
-        out["y_intercept_note"] = "interpolated — verify from image"
-    else:
-        hints.append("y-intercept: not on integer grid — read it from the image.")
-
-    return out
-
-
-def _gate_monotonicity(segments: list, hints: List[str]) -> list:
-    """Gate monotonicity segments by per-segment confidence."""
-    gated = []
-    for seg in segments:
-        conf = seg.get("_confidence", "medium")
-        clean_seg = {
-            "interval": seg["interval"],
-            "direction": seg["direction"],
-        }
-        if conf == "low":
-            clean_seg["note"] = _VERIFY_IMAGE
-        gated.append(clean_seg)
-
-    if not gated:
-        hints.append("Monotonicity: not enough data — determine from the image.")
-
-    return gated
 
 
 def build_summary(mode: str, points: List[Tuple[int, int]], facts: Dict[str, Any]) -> List[str]:

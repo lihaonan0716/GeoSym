@@ -1,4 +1,11 @@
-"""Utilities for the M1/M2 selective propagation protocol."""
+"""Utilities for the evidence-injection strategy comparison.
+
+Defines `SELECTIVE_CONDITIONS`, the seven arm names of the 896-row
+`stress_128` paid artifact. The reliability-routing arms retired with
+M1/M2 on 2026-09-19; `G_all_evidence`, `G_random_k` and `G_top_confidence`
+remain reportable as an injection-strategy comparison. Arm names are part
+of the paid data and must never be renamed.
+"""
 
 from __future__ import annotations
 

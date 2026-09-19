@@ -33,7 +33,8 @@ from evaluator.reasoning.parser import (  # noqa: E402
     parse_judge_response,
 )
 from evaluator.metrics.reasoning import evaluate_judge_response  # noqa: E402
-from scripts.batch_experiment import ALL_CONDITIONS  # noqa: E402
+# Analysis reads historical artifacts, which still contain the retired E5 arm.
+from scripts.batch_experiment import HISTORICAL_CONDITIONS as ALL_CONDITIONS  # noqa: E402
 from scripts.prepare_public_benchmark_pilot import canonical_json_bytes, sha256_hex_bytes  # noqa: E402
 
 
