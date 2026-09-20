@@ -88,6 +88,10 @@ scripts/*
 !scripts/estimate_rerun_budget.py
 !scripts/prepare_public_benchmark_pilot.py
 !scripts/run_public_benchmark_pilot.py
+!scripts/run_m3_attribution_pilot.py
+!scripts/analyze_m3_attribution.py
+!scripts/run_plotqa_numeric_attribution.py
+!scripts/analyze_plotqa_numeric_attribution.py
 !scripts/run_extrema_validation.py
 !scripts/run_prompt_fairness_pilot.py
 !scripts/diagnose_plotqa_mark_segmentation.py

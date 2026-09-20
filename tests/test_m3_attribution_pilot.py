@@ -134,9 +134,40 @@ class TestScientificGuards:
         assert plan["falsification_signals"]["H2_form_first"]
 
     def test_falsification_signals_are_frozen_before_spending(self):
-        plan = _plan()
-        assert "E6_flat_single >= E5_raw - 1.0" in plan["falsification_signals"]["H1_layering"]
-        assert "+5.0" in plan["falsification_signals"]["H2_form_first"]
+        """Both signals must name their arms, their direction, and their test.
+
+        Asserted as properties rather than as literal thresholds: the original
+        fixed thresholds (-1.0 total points, +5.0 expression points) were
+        replaced after a cross-batch probe measured per-cell noise at sd 31.9,
+        which puts the standard error of an arm mean near 3.0 even at n=110. A
+        1.0-point rule was inside the noise, so the decision is now a paired
+        test requiring significance AND a positive direction.
+        """
+        signals = _plan()["falsification_signals"]
+        layering = signals["H1_layering"]
+        assert "E5_raw" in layering and "E6_flat_single" in layering
+        assert "alpha=0.05" in layering
+        assert "positive" in layering
+        # The losing outcome must be spelled out, so it cannot be renamed later.
+        assert "never as a layering gain" in layering
+
+        form_first = signals["H2_form_first"]
+        assert "E7_form_first" in form_first and "E5_raw" in form_first
+        assert "transcendental" in form_first
+        assert "unsupported" in form_first
+
+    def test_empty_output_exclusion_is_part_of_the_frozen_rule(self):
+        """An empty body scored as zero would bias whichever arm truncates more."""
+        shared = _plan()["falsification_signals"]["shared_rules"]
+        assert "empty" in shared
+        assert "invariant 6" in shared
+
+    def test_merged_experiments_are_declared_in_the_plan(self):
+        """A and B run as one batch; the merge must be auditable, not implicit."""
+        merged = _plan()["merged_experiments"]
+        assert merged["merged"] == ["A_layering", "B_form_first"]
+        assert merged["h2_transcendental_sample_count"] == 80
+        assert merged["calls_saved_versus_sequential"] == 600
 
 
 class TestEvidenceSymmetry:
@@ -184,3 +215,87 @@ class TestPersistence:
         captured = scoring_inputs({"steps": {"L1": {"raw": ""}, "L2": {"raw": "t"}}})
         assert "L1" not in captured["step_raw_text"]
         assert captured["step_raw_text"]["L2"] == "t"
+
+
+class TestPaidOcrIsImpossibleOnThisPath:
+    """The plan freezes `ocr_http_attempt_cap = 0`; the code must make it true.
+
+    The first implementation wrapped only the LLM counter, so M0 extraction took
+    the default route -- and that route is paid. `recognize_intersections` only
+    tries the free clean-grid extractor first when
+    `GEOSYM_CLEAN_GRID_FALLBACK_FIRST` is set, which it is not, so it fell
+    through to `ChartExtractor` and billed one Mathpix call per sample. A probe
+    measured exactly one `requests.post` per image, while the result file
+    recorded `actual_ocr_http_attempts: 0` as a hardcoded constant.
+    """
+
+    def test_a_mathpix_call_raises_and_is_counted(self):
+        import recognizer.mathpix.mathpix_image_ocr as mathpix_module
+
+        from scripts.run_m3_attribution_pilot import OcrCallAttempted, forbid_paid_ocr
+
+        with forbid_paid_ocr() as attempts:
+            with pytest.raises(OcrCallAttempted):
+                mathpix_module.requests.post("https://api.mathpix.com", json={})
+            assert attempts[0] == 1
+
+    def test_transport_is_restored_afterwards(self):
+        import recognizer.mathpix.mathpix_image_ocr as mathpix_module
+
+        from scripts.run_m3_attribution_pilot import forbid_paid_ocr
+
+        original = mathpix_module.requests.post
+        with forbid_paid_ocr():
+            assert mathpix_module.requests.post is not original
+        assert mathpix_module.requests.post is original
+
+    def test_clean_grid_only_replaces_the_paid_extractor(self):
+        import evaluator.adapters.recognizer as recognizer_module
+
+        from scripts.run_m3_attribution_pilot import clean_grid_only_m0
+
+        original = recognizer_module.RecognizerAdapter.recognize_intersections
+        with clean_grid_only_m0():
+            assert recognizer_module.RecognizerAdapter.recognize_intersections is not original
+        assert recognizer_module.RecognizerAdapter.recognize_intersections is original
+
+    def test_extraction_under_both_guards_bills_nothing(self):
+        """The real check: run M0 on one image of every family, measure zero."""
+        from app.reasoning_pipeline import extract_geosym_coords
+        from scripts.run_m3_attribution_pilot import clean_grid_only_m0, forbid_paid_ocr
+
+        images = ROOT_IMAGES = __import__("pathlib").Path("dataset/images")
+        if not images.is_dir():
+            pytest.skip("dataset/images not present")
+        picks = [sorted(d.glob("*.png"))[0]
+                 for d in sorted(x for x in images.iterdir() if x.is_dir())
+                 if list(d.glob("*.png"))]
+        if not picks:
+            pytest.skip("no benchmark images available")
+
+        with forbid_paid_ocr() as attempts, clean_grid_only_m0():
+            for image in picks:
+                coords, _facts, ok, _reason = extract_geosym_coords(
+                    "GLM-4.6V", "dummy-key", image, {})
+                assert ok is True
+                assert coords
+            assert attempts[0] == 0
+
+    def test_result_records_a_measured_ocr_count_not_a_literal(self):
+        """`actual_ocr_http_attempts` must come from the counter."""
+        import inspect
+
+        from scripts import run_m3_attribution_pilot as runner
+
+        source = inspect.getsource(runner.write_result)
+        assert '"actual_ocr_http_attempts": ocr_http_attempts,' in source
+        assert '"actual_ocr_http_attempts": 0,' not in source
+
+    def test_a_nonzero_measured_count_reaches_the_result_file(self, tmp_path):
+        from scripts import run_m3_attribution_pilot as runner
+
+        plan = _plan()
+        payload = runner.write_result(
+            plan, tmp_path / "r.json", [], runner.AttemptCounter(10),
+            "complete", 7)
+        assert payload["actual_ocr_http_attempts"] == 7
