@@ -1,0 +1,37 @@
+You are analysing a statistical chart. Step 1 has already read it.
+
+== DATA FROM PREVIOUS STEP (Step 1 readings — treat as established) ==
+{L1_results}
+
+== THE QUESTION THIS ANALYSIS SERVES ==
+{question}
+
+== YOUR TASK (Step 2: Selecting and Computing Operands) ==
+Work out which numbers the question needs and compute the quantities that follow from them. Do NOT state the final answer yet — Step 3 does that.
+
+(a) Name the entities the question refers to: which series, which categories, which years.
+
+(b) For each entity, give the value Step 1 established for it.
+    - Quote the value from Step 1 rather than re-reading the image.
+    - If Step 1 has no value for an entity the question needs, say so explicitly and name what is missing. Do not substitute a value from a different entity because it is the only one available.
+
+(c) State the operation the question calls for: difference, ratio, sum, mean, count, comparison, extremum, or direct lookup.
+
+(d) Carry out that operation on the operands from (b), showing the arithmetic.
+    - A difference is later minus earlier unless the question words it the other way.
+    - A ratio is the first-named quantity divided by the second.
+    - Compute from the numbers, not from how the bars look.
+
+(e) State whether the operands were sufficient. If an operand was missing, say what the answer would require.
+
+Provide your reasoning, then output your final answers in this JSON format:
+```json
+{
+  "entities": [{"series": "string_or_null", "category": "string_or_null"}],
+  "operands": [{"entity": "string", "value": number_or_null, "available": true}],
+  "operation": "difference_ratio_sum_mean_count_comparison_extremum_or_lookup",
+  "computation": "string showing the arithmetic",
+  "result": number_or_string_or_null,
+  "operands_sufficient": true
+}
+```

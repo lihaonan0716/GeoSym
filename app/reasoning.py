@@ -102,6 +102,7 @@ def _run_reasoning_flow(
     intervention_mode: str = DEFAULT_INTERVENTION_MODE,
     l1_prompt_path: Path | None = None,
     coord_text_override: str | None = None,
+    l3_prompt_path: Path | None = None,
 ) -> dict:
     """
     Three-step reasoning flow aligned with Curcio layers.
@@ -116,6 +117,9 @@ def _run_reasoning_flow(
         l1_prompt_path: Custom L1 prompt template (for baselines).
                         When set, overrides the default assisted prompt.
         coord_text_override: Pre-formatted coordinate text for baselines.
+        l3_prompt_path: Custom L3 prompt template. Everything upstream is
+                        unchanged, so a contrast using it isolates the
+                        inference layer.
 
     Returns::
 
@@ -192,7 +196,7 @@ def _run_reasoning_flow(
 
     # ---- Step 3: L3 Reasoning ----
     l2_json_str = json.dumps(l2_parsed, ensure_ascii=False)
-    l3_tpl = _load_prompt_file(_L3_PROMPT_PATH,
+    l3_tpl = _load_prompt_file(l3_prompt_path or _L3_PROMPT_PATH,
                                 "Given L1: {L1_results}, L2: {L2_results}\nDetermine expression, domain, range as JSON.")
     l3_prompt = l3_tpl.replace("{L1_results}", l1_json_str)
     l3_prompt = l3_prompt.replace("{L2_results}", l2_json_str)

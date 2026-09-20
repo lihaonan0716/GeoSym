@@ -91,6 +91,10 @@ scripts/*
 !scripts/run_extrema_validation.py
 !scripts/run_prompt_fairness_pilot.py
 !scripts/diagnose_plotqa_mark_segmentation.py
+!scripts/verify_plotqa_m0_chain_wiring.py
+!scripts/rescore_year_answers_offline.py
+!scripts/analyze_plotqa_template_loss_decomposition.py
+!scripts/analyze_zero_row_elimination.py
 
 # Tests are part of the public artifact — reviewers need to be able to run them.
 # The whole tree is tracked, at any depth: an exception limited to `tests/*.py`

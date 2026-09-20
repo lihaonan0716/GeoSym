@@ -1,0 +1,42 @@
+You are a math expert reading a function graph.
+
+You are given an image of a function graph AND computation-grounded coordinate detections from GeoSym.
+
+== GEOSYM DETECTED COORDINATE POINTS (computation-grounded, reliable) ==
+The following integer-valued coordinate points were detected by GeoSym's geometric pipeline through pixel-level grid intersection analysis:
+{detected_coords}
+
+These points are computation-grounded detections (not OCR or neural estimation). They are generally reliable but may be incomplete near the edges of the visible range.
+
+Your task is to answer the complete quantitative reasoning problem in a single pass, using the image together with the detected coordinate points above.
+
+Return ONLY one final JSON object in this format:
+```json
+{
+  "coordinates": "(x1,y1), (x2,y2), ...",
+  "intercepts": {"x_intercepts": [x1, x2, ...], "y_intercept": number_or_null},
+  "extrema": [{"x": val, "y": val, "type": "max_or_min"}, ...],
+  "predictions": {prediction_json_example},
+  "rate_of_change": numeric_value,
+  "monotonicity": [{"interval": [a, b], "direction": "increasing_or_decreasing"}, ...],
+  "symmetry": "even_or_odd_or_neither",
+  "expression": "your expression here",
+  "domain": "interval notation",
+  "range": "interval notation",
+  "inference_explanation": "2-4 sentences explaining how you inferred the expression, domain, and range"
+}
+```
+
+Requirements:
+- Trust the GeoSym-detected points listed above, and actively look for additional points in the image that GeoSym may have missed, especially near the edges of the visible range.
+- Infer all visible coordinates, intercepts, extrema, quantitative properties, and final analytical properties.
+- For predictions, use the EXACT x-values listed here as string keys: {prediction_xs}
+- The average rate of change must be computed between x = {rate_x1} and x = {rate_x2}.
+- Use the coordinate points to constrain the expression, and verify your expression against the known points by substituting each point to check consistency.
+- For expressions, use ^ for exponents, sqrt() for square root, and abs() for absolute value.
+- Determine the MATHEMATICAL domain, not the visible x-axis range on the graph. The domain is the set of all x-values for which the inferred function is mathematically defined.
+- Use a finite domain only when the inferred expression or a clear mathematical feature requires it, such as sqrt(), logarithms, endpoints, or vertical asymptotes. Otherwise, if the curve continues through the visible window with no sign of stopping, the domain is likely (-inf, +inf).
+- Determine the domain based on the inferred expression, not from the image boundaries.
+- Determine the MATHEMATICAL range, not the visible y-axis range on the graph. The range is the set of all possible output y-values of the inferred function.
+- Determine the range from the inferred expression and extrema, not from image boundaries. If the graph suggests unbounded behavior beyond the visible window, allow +inf or -inf as appropriate.
+- In `inference_explanation`, explain the mathematical basis for the final expression, domain, and range. Keep it concise but specific.

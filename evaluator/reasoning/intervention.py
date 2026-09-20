@@ -226,29 +226,14 @@ def format_visual_facts_for_prompt(
     return json.dumps(payload, ensure_ascii=False, indent=2)
 
 
-# ── Tiered fact formatting (completeness-aware injection) ────────────
-
-
-# ── LLM fact verification (conservative error detection) ─────────────
-
-_VERIFY_PROMPT_PATH = "prompts/fact_verification_prompt.txt"
-
-
-_ALL_FACT_KEYS = ("intercepts", "extrema", "monotonicity", "symmetry")
-_FACT_DEFAULTS: Dict[str, Any] = {
-    "intercepts": {},
-    "extrema": [],
-    "monotonicity": [],
-    "symmetry": "neither",
-}
-
-
-_VERIFY_IMAGE = "⚠ verify from the image (low-confidence estimate)"
-
-_CONF_THRESHOLDS = {
-    "inject": {"high", "medium"},
-    "hint_only": {"low"},
-}
+# The tiered-formatting and LLM-verification sections that stood here were
+# removed with M1/M2 on 2026-09-19, along with their last consumers. The
+# constants they left behind (`_VERIFY_PROMPT_PATH`, `_VERIFY_IMAGE`,
+# `_CONF_THRESHOLDS`, `_ALL_FACT_KEYS`, `_FACT_DEFAULTS`) went with them: they
+# described a confidence-gating policy this module no longer applies, and
+# leaving them readable invited a future caller to reimplement against them.
+# `prompts/fact_verification_prompt.txt` stays on disk -- its SHA256 is part of
+# the paid `code_state` records under outputs/.
 
 
 def build_summary(mode: str, points: List[Tuple[int, int]], facts: Dict[str, Any]) -> List[str]:

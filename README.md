@@ -1,17 +1,17 @@
 # GeoSym
 
-**GeoSym: Structured Evidence Fusion for Reliable Quantitative Chart Reasoning**
+**GeoSym: Geometric Evidence Extraction and Layered Reasoning for Quantitative Chart Understanding**
 
-Multimodal large language models have demonstrated remarkable capabilities in visual understanding, yet they remain prone to hallucination and imprecise numerical reasoning when confronted with tasks demanding quantitative accuracy. Existing enhancement strategies — including chain-of-thought prompting, self-consistency decoding, and tool-augmented reasoning — improve general reasoning but lack explicit mechanisms to assess the correctness and task-relevance of externally injected evidence; information, once obtained, is treated as uniformly reliable.
+Multimodal large language models have demonstrated remarkable capabilities in visual understanding, yet they remain prone to hallucination and imprecise numerical reasoning when confronted with tasks demanding quantitative accuracy. Existing enhancement strategies — including chain-of-thought prompting, self-consistency decoding, and tool-augmented reasoning — improve general reasoning but leave evidence construction implicit in the prompt, so the quality of what the reasoner is given is neither engineered nor auditable.
 
-GeoSym is an evidence fusion framework for quantitative chart reasoning that manages how visual evidence is generated, scored, selected, and propagated through an LLM reasoning chain. The framework operates through four modules:
+GeoSym is a chart-evidence pipeline for quantitative reasoning that makes evidence construction an explicit pipeline stage feeding a layered reasoning chain. The framework operates through two modules:
 
-1. **M0 — Candidate Evidence Generation**: Computation-grounded visual extraction through geometric pixel-level analysis, producing coordinates, intercepts, extrema, and monotonicity intervals.
-2. **M1 — Confidence-Scored Fact Construction**: Source reliability assessment transforming raw candidates into structured facts with heuristic confidence tiers.
-3. **M2 — Utility-Aware Evidence Selection**: Utility-driven curation selecting a compact high-value evidence subset based on relevance, complementarity, and conflict risk — without performing numerical computation.
-4. **M3 — Hierarchical Fusion Reasoning**: Layered reasoning that presents structured evidence as high-priority anchors or hypotheses across reading, analysis, and inference layers aligned with Curcio's graph comprehension taxonomy.
+1. **M0 — Geometric Evidence Extraction**: Computation-grounded visual extraction through geometric pixel-level analysis, producing coordinates, intercepts, extrema, and monotonicity intervals.
+2. **M3 — Layered Reasoning**: Layered reasoning that presents structured evidence across reading, analysis, and inference layers aligned with Curcio's graph comprehension taxonomy, each layer receiving a layer-restricted evidence view.
 
-**Keywords:** Evidence fusion · Multimodal reasoning · Quantitative chart reasoning · Vision-language models · Evidence reliability
+> **Two modules, not four.** Earlier versions of this framework included **M1** (confidence-scored fact construction) and **M2** (utility-aware evidence selection). Both were **retired on 2026-09-19** after eight independent evaluations found no discriminative signal: held-out AUC fell to 0.584 as the underlying evidence improved, all eight substitute features stayed below 0.60, a seven-point budget sweep moved the score by at most +2, every per-fact suppression rule was net-negative, and the two arms produced byte-identical output on 76.8% of samples. The current pipeline performs **no reliability scoring, tiering, gating, or re-ranking** — every admitted fact is injected. Results produced under the retired modules are retained below and labelled as historical.
+
+**Keywords:** Multimodal reasoning · Quantitative chart reasoning · Vision-language models · Visual evidence extraction · Layered reasoning
 
 ## M0 Visual Evidence Extraction — Examples
 
@@ -45,11 +45,11 @@ GeoSym's M0 module performs computation-grounded coordinate extraction via geome
 </tr>
 </table>
 
-Each annotated image shows detected intersection points (green/yellow circles) with their computed real-valued coordinates. These coordinate anchors serve as the candidate evidence set that flows into M1 for confidence scoring and subsequent pipeline stages.
+Each annotated image shows detected intersection points (green/yellow circles) with their computed real-valued coordinates. These coordinate anchors are the evidence set that M3 consumes.
 
 ## Framework Architecture
 
-GeoSym enforces a clear separation of concerns: computation-grounded modules (M0, M1) produce and score evidence; a language model (M2) performs semantic curation; and the reasoning module (M3) synthesizes across abstraction layers. Each module operates within its domain of competence.
+GeoSym enforces a clear separation of concerns: a computation-grounded module (M0) produces evidence, and the reasoning module (M3) synthesizes across abstraction layers. Each module operates within its domain of competence, and each is defined by an evidence interface rather than a fixed algorithm, so implementations can be substituted.
 
 ### M0: Candidate Evidence Generation
 
@@ -61,28 +61,13 @@ Two complementary implementations share a common ruler infrastructure:
 - **Enhanced M0** (`presenter/`): A four-phase pipeline for real-world charts without integer grids. Phase 1 builds a coordinate ruler from OCR tick labels via least-squares regression. Phase 2 uses an LLM to locate semantically important points at the pixel level. Phase 3 converts pixel coordinates to chart units through the ruler. Phase 4 checks measurements against axis bounds and fuses evidence into a standardized format.
 - **Shared Ruler** (`presenter/ruler.py`): OCR-based coordinate system construction used by both implementations. Supports linear, logarithmic, datetime, and categorical axis scales.
 
-### M1: Confidence-Scored Fact Construction
+### Fact Construction
 
-M1 transforms raw candidates into structured facts with heuristic confidence tiers. Confidence is computed based on:
+From the extracted coordinates, GeoSym infers intercepts, extrema, monotonicity intervals, and symmetry, then formats them as a single flat JSON block for injection. Facts are emitted **unannotated**: there are no confidence tiers, no scores, and no selection step. Flat injection is the only surviving profile — the tiered profile was removed with M1/M2.
 
-- Density of supporting pixel evidence
-- Precision of grid alignment (exact grid-coincident vs. interpolated)
-- Algebraic consistency across candidates (e.g., intercepts cross-checked against monotonicity)
+### M3: Layered Reasoning
 
-Facts are assigned to three confidence tiers — **high**, **medium**, and **low** — with candidates below a minimum threshold discarded entirely.
-
-### M2: Utility-Aware Evidence Selection
-
-M2 curates a compact subset of scored facts for injection into the reasoning pipeline. A language model serves as the selection operator, assessing facts on three dimensions: **relevance**, **complementarity**, and **contradiction risk**. Critically, M2 performs no numerical computation — it operates purely in the semantic domain, deciding which facts are worth presenting to the reasoner.
-
-Two injection strategies are supported:
-
-- **Flat injection**: All retained facts as a single JSON block with confidence-gated values.
-- **Tiered injection**: Facts organized into three epistemic tiers (high-priority coordinate evidence, detected features, inferred patterns).
-
-### M3: Hierarchical Fusion Reasoning
-
-M3 consumes the curated evidence through a three-layer reasoning hierarchy:
+M3 consumes the evidence through a three-layer reasoning hierarchy:
 
 - **L1 (Reading)**: Extract or consolidate coordinates, intercepts, and extrema. Evidence is injected primarily at this layer.
 - **L2 (Analysis)**: Perform quantitative analysis — function value predictions, rate of change, monotonicity, and symmetry.
@@ -116,33 +101,39 @@ path = snapshot_download(repo_id="lihaonan0716/GeoSym-Bench", repo_type="dataset
 
 ### Evaluation Dimensions
 
-Each image carries annotations across 10 evaluation dimensions scored with equal weight:
+Each image carries annotations across 10 evaluation dimensions. The dimensions are **not** equally weighted: they are combined by a three-group scheme defined in `config/default_config.yaml`, giving effective per-dimension weights from 0.045 to 0.150.
 
-| Dimension | Description |
-|-----------|-------------|
-| D1: Intercepts | x- and y-intercepts |
-| D2: Extrema | Local minima/maxima with type labels |
-| D3: Predictions | Function values at specified non-integer x-values |
-| D4: Rate of change | Average slope over a defined interval |
-| D5: Monotonicity | Increasing/decreasing intervals |
-| D6: Symmetry | Even, odd, or neither |
-| D7: Expression | Closed-form formula |
-| D8: Domain | Mathematical domain |
-| D9: Range | Mathematical range |
-| D10: Inference quality | Independently scored by judge model |
+| Dimension | Group (group weight) | Effective weight | Description |
+|-----------|----------------------|:----------------:|-------------|
+| D1: Intercepts | G1 visual readout (0.30) | 0.150 | x- and y-intercepts |
+| D2: Extrema | G1 visual readout (0.30) | 0.150 | Local minima/maxima with type labels |
+| D3: Predictions | G2 quantitative analysis (0.30) | 0.075 | Function values at specified non-integer x-values |
+| D4: Rate of change | G2 quantitative analysis (0.30) | 0.045 | Average slope over a defined interval |
+| D5: Monotonicity | G2 quantitative analysis (0.30) | 0.105 | Increasing/decreasing intervals |
+| D6: Symmetry | G2 quantitative analysis (0.30) | 0.075 | Even, odd, or neither |
+| D7: Expression | G3 mathematical inference (0.40) | 0.120 | Closed-form formula |
+| D8: Domain | G3 mathematical inference (0.40) | 0.080 | Mathematical domain |
+| D9: Range | G3 mathematical inference (0.40) | 0.080 | Mathematical range |
+| D10: Inference quality | G3 mathematical inference (0.40) | 0.120 | Independently scored by judge model |
+
+Extracted coordinates are M0 intermediate data and are deliberately not scored.
 
 ## Experimental Conditions
 
-Six experimental conditions form a progressive enhancement spectrum:
+Six live conditions form a progressive enhancement spectrum:
 
 | ID | Condition | Image | CoT | SC | OCR | GeoSym | Description |
 |----|-----------|:-----:|:---:|:--:|:---:|:------:|-------------|
 | E0 | DirectQA | ✓ | | | | | Raw image → MLLM single-pass |
 | E1 | DirectQA-CoT | ✓ | ✓ | | | | With chain-of-thought decomposition |
-| E2 | DirectQA-SC | ✓ | ✓ | ✓ | | | Self-consistency voting |
+| E2 | DirectQA-SC | ✓ | ✓ | ✓ | | | Aggregation over prompt variants, deterministic at `T=0` |
 | E3 | OCRRulesQA | ✓ | | | ✓ | | Mathpix OCR extraction + rule-based feature computation |
 | E4 | OCRRules-CoT | ✓ | ✓ | | ✓ | | Mathpix OCR + rule-based features + CoT |
-| E5 | FullGeoSym | ✓ | | | | ✓ | Complete M0→M1→M2→M3 pipeline |
+| **`E5_raw`** | **GeoSym** | ✓ | | | | ✓ | **M0 + M3 — the method itself, not an ablation** |
+
+The retired `E5` (FullGeoSym, M0+M1+M2+M3) is no longer run. Its rows remain in the historical artifacts alongside `E5_raw` rows, so the condition identifier `E5_raw` is kept byte-identical in code, configs, and data even though the prose name is simply "GeoSym".
+
+E2 aggregates over prompt variants at `T=0` rather than sampling stochastically; it is named "self-consistency" for continuity with the literature, but it is deterministic.
 
 ## Cross-Domain Evaluation
 
@@ -156,7 +147,7 @@ Beyond the controlled benchmark, GeoSym includes real-world chart demonstrations
 
 OmniScience figures are reproduced under Creative Commons Attribution 4.0 (CC-BY 4.0). Original paper DOIs and full attribution are provided in [`assets/real_charts/README.md`](assets/real_charts/README.md).
 
-M1–M3 modules operate without modification across domains; only M0 requires domain-specific instantiation via the Enhanced M0 pipeline (`presenter/`). These cases illustrate measurement traceability, feature localization, and source attribution rather than constituting a systematic external benchmark.
+M3 operates without modification across domains; only M0 requires domain-specific instantiation via the Enhanced M0 pipeline (`presenter/`). These cases illustrate measurement traceability, feature localization, and source attribution rather than constituting a systematic external benchmark.
 
 ## Key Results
 
@@ -169,12 +160,15 @@ Across 460 evaluated samples with GPT-5.4 as the backbone MLLM:
 | E2 (DirectQA-SC) | 78.81 | -0.65 |
 | E3 (OCRRulesQA) | 78.17 | -1.30 |
 | E4 (OCRRules-CoT) | 79.25 | -0.22 |
-| **E5 (FullGeoSym)** | **93.67** | **+14.21** |
+| **`E5_raw` (GeoSym, M0+M3)** | **93.48** | **+14.02** |
+| ~~E5 (FullGeoSym, M0+M1+M2+M3)~~ | 93.67 | +14.21 |
 
-- FullGeoSym outperforms the strongest baseline condition (E0) by 14.21 points and the sample-wise best-of-baselines reference (per-sample maximum over E0–E4) by 10.67 points.
-- 86% of samples (394/460) achieve positive improvement over the sample-wise best-of-baselines reference; 93.3% of samples (429/460) improve over E0.
-- Ablation (E5_raw: M0+M3 only) scores 93.48, estimating a large aggregate incremental effect from adding generated visual evidence and hierarchical reasoning (+14.02 over E0).
-- M1–M2 curation is marginal at aggregate (+0.19, not a significant main effect). The larger +2.42 effect on the 18% of samples where extraction quality degrades is reported only as a post-hoc diagnostic, not as confirmatory robustness evidence.
+- GeoSym (`E5_raw`) outperforms the strongest baseline condition (E0) by 14.02 points.
+- The E5 row is **historical only** and is struck through because the modules that distinguished it from `E5_raw` have been retired. It is shown for continuity with earlier reports, not as a current result.
+- The gap between the two arms is **+0.19 in E5's favour, not a significant main effect** — this is one of the eight findings that led to retiring M1/M2. The larger +2.42 effect on the 18% of samples where extraction quality degrades was selected by an outcome variable, so it was only ever reportable as a post-hoc diagnostic, never as confirmatory robustness evidence; it did not survive the fuller evaluation.
+- Sample-wise figures reported previously (best-of-baselines margin of 10.67 points; 86% of samples improving over the per-sample baseline maximum; 93.3% improving over E0) were computed for the E5 arm and are likewise historical. Recomputing them for `E5_raw` requires a re-analysis that has not yet been run.
+
+`E5_raw` merges M0 and M3 into a single arm, so these numbers do **not** separate the contribution of geometric extraction from that of layered reasoning. Disentangling the two is an open problem, not a settled result.
 
 ## Repository Structure
 
@@ -183,7 +177,7 @@ GeoSym/
 ├── generator/       # Benchmark generation and mathematical ground truth
 ├── recognizer/      # Function-specialized M0 (grid-based coordinate extraction)
 ├── presenter/       # Enhanced M0 (ruler + LLM locate) + real-world chart showcase
-├── evaluator/       # LLM adapters, metrics, reasoning (M1/M2/M3)
+├── evaluator/       # LLM adapters, metrics, fact construction, M3 reasoning
 ├── prompts/         # Prompt templates for all pipeline stages
 ├── app/             # Backend orchestration modules for reasoning, cache, and schemas
 ├── config/          # Configuration files and API key template
@@ -198,7 +192,7 @@ GeoSym/
 | `generator/` | Benchmark generation: synthetic function-graph images, perturbations, and exact ground truth |
 | `recognizer/` | GeoSym's visual extraction backbone for coordinate evidence on controlled benchmarks |
 | `presenter/` | Enhanced M0 pipeline (ruler, measure, verify) and real-world chart showcase flows |
-| `evaluator/` | Structured fusion logic, LLM adapters, reasoning scoring, judge scoring, baselines, and response parsing |
+| `evaluator/` | Fact construction and prompt formatting, LLM adapters, reasoning scoring, judge scoring, baselines, and response parsing |
 | `app/` | Backend orchestration for reasoning pipelines, cache records, schemas, and connection checks |
 | `prompts/` | Prompt templates for reasoning layers, judge evaluation, M0 locate, visual fact inference |
 | `scripts/` | CLI tools for dataset generation, benchmark execution, analysis, audits, and paper evidence packaging |
@@ -262,7 +256,7 @@ Key sections:
 
 - `page`, `chart`, `coords`, `ticks`, `curves`, `noise`: image generation and perturbation
 - `reasoning.layers`: evaluation dimension definitions
-- `reasoning.intervention`: GeoSym fusion settings
+- `reasoning.intervention`: evidence injection settings (flat profile only)
 - `reasoning.judge`: judge LLM configuration
 - `models`: LLM provider and model registry
 - `output`: dataset locations
@@ -318,7 +312,7 @@ If you use GeoSym in your research, please cite:
 
 ```bibtex
 @misc{wang2026geosym,
-  title     = {GeoSym: Structured Evidence Fusion for Reliable Quantitative Chart Reasoning},
+  title     = {GeoSym: Geometric Evidence Extraction and Layered Reasoning for Quantitative Chart Understanding},
   author    = {Wang, Yongqing and Zhang, Qisheng and Guo, Linyan and Li, Haonan and Sun, Tianjun and Yu, Samson S.},
   year      = {2026},
   note      = {Manuscript in preparation. Software and dataset available online},

@@ -35,7 +35,28 @@ CONDITION_MAP: Dict[str, str] = {
     "E5_raw": "raw_geosym",
 }
 
-MODE_TO_SHORT: Dict[str, str] = {v: k for k, v in CONDITION_MAP.items()}
+# Attribution arms added 2026-09-19. Both receive the same M0 evidence as
+# `E5_raw` and each changes exactly one thing, so a contrast against it is
+# attributable: E6 removes the layering (single pass, same evidence), E7 keeps
+# the layering and swaps only the L3 template.
+#
+# Held OUT of `CONDITION_ORDER` on purpose. That list is what
+# `reasoning_schema.validate_*` requires a record for, and what the UI renders
+# as the headline matrix. Adding these there would fail validation on every
+# existing run, which carries no such records. They are dispatchable by name
+# without being part of the standing matrix.
+ATTRIBUTION_CONDITION_MAP: Dict[str, str] = {
+    "E6_flat_single": "flat_single_geosym",
+    "E7_form_first": "form_first_geosym",
+}
+
+# Dispatch accepts both; ordering and validation see only the matrix.
+DISPATCHABLE_CONDITION_MAP: Dict[str, str] = {
+    **CONDITION_MAP,
+    **ATTRIBUTION_CONDITION_MAP,
+}
+
+MODE_TO_SHORT: Dict[str, str] = {v: k for k, v in DISPATCHABLE_CONDITION_MAP.items()}
 
 CONDITION_ORDER: List[str] = list(CONDITION_MAP.keys())
 
@@ -413,10 +434,13 @@ def _run_single_step_reasoning(
     step_name: str,
     image_mode: str,
     ocr_evidence: Optional[str] = None,
+    detected_coords: Optional[str] = None,
 ) -> Dict[str, Any]:
     prompt = _inject_prediction_placeholders(_load_prompt(prompt_path), gt_data)
     if ocr_evidence is not None:
         prompt = prompt.replace("{ocr_evidence}", ocr_evidence)
+    if detected_coords is not None:
+        prompt = prompt.replace("{detected_coords}", detected_coords)
     raw = adapter.call_with_prompt(str(img_path), prompt)
     parsed = parse_comprehensive_answer(raw)
     return _build_single_step_pipeline(
@@ -560,7 +584,46 @@ def run_single_condition(
             l1_prompt_path=_root / "prompts" / "ablation_coords_only_L1_prompt.txt",
         )
 
+    # `flat_single_geosym` (E6) isolates the layering itself: identical M0
+    # evidence, asked in one pass instead of L1->L2->L3. A contrast against
+    # `raw_geosym` is therefore attributable to the three-layer structure and
+    # nothing else, which `E5_raw` alone cannot show since it merges M0 and M3.
+    if mode == "flat_single_geosym":
+        return _run_single_step_reasoning(
+            adapter,
+            img_path,
+            gt_data,
+            prompt_path=_root / "prompts" / "ablation_flat_single_geosym_prompt.txt",
+            step_name="FlatSingleGeoSym",
+            image_mode="geosym_assisted",
+            detected_coords=_format_detected_coords(geosym_coords or []),
+        )
+
+    # `form_first_geosym` (E7) changes only the L3 template: identify the
+    # function family from qualitative structure before solving for parameters.
+    # Targets the observed failure where precise coordinates invite fitting a
+    # polynomial through the points instead of recognizing a transcendental form.
+    if mode == "form_first_geosym":
+        return _run_reasoning_flow(
+            adapter, img_path, gt_data,
+            geosym_coords=geosym_coords or [],
+            visual_facts=None,
+            l1_prompt_path=_root / "prompts" / "ablation_coords_only_L1_prompt.txt",
+            l3_prompt_path=_root / "prompts" / "reasoning_L3_form_first_prompt.txt",
+        )
+
     raise ValueError(f"Unknown reasoning mode: {mode}")
+
+
+def _format_detected_coords(coords: list) -> str:
+    """Render M0 coordinates exactly as the layered arm's L1 prompt receives them.
+
+    Shared so the single-pass arm cannot drift into a different evidence
+    rendering, which would confound the layering contrast with a payload change.
+    """
+    if not coords:
+        return "No coordinate points were detected."
+    return ", ".join(f"({x}, {y})" for x, y in coords)
 
 
 # ── Layer config ───────────────────────────────────────────────────────
@@ -613,11 +676,48 @@ def build_gt_summary(gt_data: dict) -> str:
     return "\n".join(lines)
 
 
+def render_step_transcript(pipeline_result: dict) -> Optional[str]:
+    """Render every reasoning step's raw model output, in execution order.
+
+    Single-step conditions already reach the Judge this way -- see
+    ``_build_single_step_pipeline``, which stores exactly
+    ``=== {step} ===\\n{raw}``. Layered conditions had no equivalent, so
+    ``build_chain_text`` fell through to reconstructing them from
+    ``final_parsed``: conclusions only, derivation discarded.
+
+    Returns ``None`` when no step carries usable raw text, so the caller can
+    fall back rather than send the Judge an empty transcript.
+    """
+    steps = pipeline_result.get("steps")
+    if not isinstance(steps, dict) or not steps:
+        return None
+    sections = []
+    for name, payload in steps.items():
+        raw = (payload or {}).get("raw") if isinstance(payload, dict) else None
+        if not isinstance(raw, str) or not raw.strip():
+            continue
+        sections.append(f"=== {name} ===\n{raw.strip()}")
+    return "\n\n".join(sections) if sections else None
+
+
 def build_chain_text(pipeline_result: dict) -> str:
-    """Build Judge-visible mathematical inference text for any pipeline style."""
+    """Build Judge-visible mathematical inference text for any pipeline style.
+
+    Every arm sends the model's own generated text. Before 2026-09-19 only the
+    single-step arms did: they set ``judge_chain_text`` to their raw response
+    (measured coverage 102-106% of generated characters), while layered arms
+    were rebuilt from ``final_parsed`` and reached the Judge at 25-27% -- the
+    L1 reading and L2 analysis that justify the answer were dropped before the
+    Judge was asked to rate ``evidence_support``. That is a baseline-fairness
+    defect in our own harness (CLAUDE.md invariant 6), not a property of the
+    method, so the transcript path is now shared.
+    """
     override = pipeline_result.get("judge_chain_text")
     if override:
         return override
+    transcript = render_step_transcript(pipeline_result)
+    if transcript:
+        return transcript
     parsed = pipeline_result.get("final_parsed", {}) or {}
     lines = [
         f"Expression: {parsed.get('expression', '')}",

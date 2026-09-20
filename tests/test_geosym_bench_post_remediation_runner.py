@@ -239,18 +239,15 @@ def test_condition_row_hashes_staged_pipeline_chain_text() -> None:
 
     row = condition_row(sample, cache, "E5")
 
+    # Until 2026-09-19 this expected the four ``final_parsed`` answer lines,
+    # because layered pipelines were rebuilt from their conclusions while
+    # single-step ones sent their raw output verbatim. That asymmetry was the
+    # bug -- the Judge scored ``evidence_support`` on layered arms after their
+    # derivation had been removed -- so the expectation now follows the raw
+    # step transcript both styles share.
     empty_hash = sha256_hex_bytes(canonical_json_bytes(""))
     expected_hash = sha256_hex_bytes(
-        canonical_json_bytes(
-            "\n".join(
-                [
-                    "Expression: x+1",
-                    "Domain: all real numbers",
-                    "Range: all real numbers",
-                    "Inference explanation: The plotted line has slope 1.",
-                ]
-            )
-        )
+        canonical_json_bytes('=== L3 ===\n{"expression":"x+1"}')
     )
     assert row["chain_text_sha256"] == expected_hash
     assert row["chain_text_sha256"] != empty_hash

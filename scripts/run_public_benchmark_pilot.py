@@ -39,6 +39,24 @@ PLOTQA_CONDITIONS = set(plotqa_prompts.DEFAULT_CONDITIONS)
 SUPPORTED_PAID_CONDITIONS = set(DEFAULT_CONDITIONS) | PLOTQA_CONDITIONS
 NUMERIC_ABS_TOLERANCE = 1.0
 NUMERIC_REL_TOLERANCE = 0.05
+
+# A year answer is an identifying label, not a magnitude: 2006 is not 2007, and
+# no relative tolerance on it is meaningful. The generic numeric rule
+# `max(1.0, |ref| * 0.05)` yields +/-100.35 years at ref=2007, so a prediction of
+# 1907 or 2107 scored correct. Measured on the frozen 500-sample roster, this
+# inflated every arm and -- because it inflated them by *different* amounts
+# (E0 -7, G_measured_raw -10, Measured_flat -14 under the strict rule) -- it
+# distorted precisely the between-arm comparison the artifacts exist to support.
+#
+# Detection uses two independent signals that must agree: the question asks
+# which year, and the reference is an integral year-range value. On the frozen
+# roster the two signals agree on all 37 samples with zero disagreement in
+# either direction, so neither is carrying the rule alone. This is a property of
+# the question type, not of any answer key -- no benchmark-specific constant
+# selects a sample (invariant 5).
+YEAR_QUESTION_PATTERN = re.compile(r"\b(?:in |during )?which year\b", re.IGNORECASE)
+YEAR_VALUE_MIN, YEAR_VALUE_MAX = 1800, 2100
+
 CONFIDENCE_LABELS = {"high", "medium", "low", "unknown"}
 REJECT_REASON_LABELS = {"low_confidence", "contradiction_risk", "low_utility", "unsupported"}
 
@@ -68,14 +86,80 @@ def first_json_object(text: str) -> dict[str, Any]:
     raise ValueError("no JSON object found in model response")
 
 
+# Phrases a model uses to decline rather than answer. Matched only inside the
+# model's own ``normalized_prediction`` field, never against free-form
+# reasoning, so a chain of thought that mentions uncertainty on the way to an
+# answer is unaffected.
+ABSTENTION_MARKERS = (
+    "cannot be determined",
+    "can not be determined",
+    "cannot determine",
+    "not determinable",
+    "indeterminable",
+    "unmeasurable",
+    "not measurable",
+    "unanswerable",
+    "cannot be answered",
+    "not available",
+    "not provided",
+    "insufficient data",
+    "insufficient information",
+    "no data",
+    "unknown",
+    "n/a",
+)
+
+
+def is_abstention(value: Any) -> bool:
+    """True when the model declined to answer rather than answering wrongly.
+
+    A declined answer must not become a number. ``normalize_answer`` scans for
+    the first numeric token anywhere in the string, so "Cannot be determined
+    (data for 1988 and 1990 is missing)" yields 1988.0 and a refusal is scored
+    as a confident wrong answer. That misreads the model in the one direction
+    that matters: it credits evidence-aware abstention as failure, and only the
+    evidence arms can abstain, so the distortion is not symmetric between arms
+    even though this code is (invariant 6).
+
+    A bare numeric string is never an abstention, so "0" stays 0.0.
+    """
+    if value is None:
+        return True
+    text = str(value).strip()
+    if not text:
+        return True
+    lowered = text.lower()
+    if any(marker in lowered for marker in ABSTENTION_MARKERS):
+        # "unknown" inside a longer sentence that also states a number is an
+        # answer with a caveat, not a refusal; require the phrase to dominate.
+        return not re.fullmatch(r"[-+]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][-+]?\d+)?", text)
+    return False
+
+
 def extract_prediction(raw_text: str, answer_type: str) -> Any:
+    """Parse the model's answer, or return None when it declined or failed.
+
+    Returning None rather than raising keeps the caller's contract: an
+    unparseable or declined response is recorded as not answered, which scores
+    as incorrect without inventing a number the model never gave.
+    """
     text = raw_text.strip()
     try:
         parsed = first_json_object(text)
-        if "normalized_prediction" in parsed:
-            return normalize_answer(parsed["normalized_prediction"], answer_type)
-        if "raw_text" in parsed:
-            return normalize_answer(parsed["raw_text"], answer_type)
+        for field in ("normalized_prediction", "raw_text"):
+            if field not in parsed:
+                continue
+            candidate = parsed[field]
+            # Checked before normalisation: afterwards the refusal has already
+            # collapsed into whichever digits it happened to contain.
+            if answer_type == "numeric" and is_abstention(candidate):
+                return None
+            try:
+                return normalize_answer(candidate, answer_type)
+            except Exception:
+                # This field carried no usable answer. Fall through to the next
+                # one, then to the free-text paths below.
+                continue
     except Exception:
         pass
     tag_match = re.search(r"<answer>\s*(.*?)\s*</answer>", text, flags=re.IGNORECASE | re.DOTALL)
@@ -86,14 +170,58 @@ def extract_prediction(raw_text: str, answer_type: str) -> Any:
         text = final_match.group(1).strip()
     if answer_type in {"categorical", "text"}:
         text = text.splitlines()[0] if text.splitlines() else text
+    # The same guard on the free-text path. Only applied once the answer-bearing
+    # span has been isolated: an unfenced refusal is still a refusal, but a
+    # narrowed "<answer>7</answer>" is not, whatever the surrounding prose said.
+    if answer_type == "numeric" and is_abstention(text):
+        return None
     return normalize_answer(text, answer_type)
 
 
-def score_prediction(prediction: Any, reference: Any, answer_type: str) -> dict[str, Any]:
+def is_year_answer(question: Any, reference: Any) -> bool:
+    """True when the answer identifies a year and must therefore match exactly.
+
+    Both signals must hold: the question asks *which year*, and the reference is
+    an integral value inside the year range. Requiring both keeps a genuine
+    magnitude that happens to land on 2010.0 from being scored as a label, and
+    keeps a year question with an unexpected reference from being scored as a
+    magnitude. See the note on ``YEAR_QUESTION_PATTERN`` for why this is a
+    property of the question type rather than a benchmark-specific constant.
+    """
+    if not isinstance(question, str) or not YEAR_QUESTION_PATTERN.search(question):
+        return False
+    try:
+        value = float(reference)
+    except (TypeError, ValueError):
+        return False
+    return value == int(value) and YEAR_VALUE_MIN <= value <= YEAR_VALUE_MAX
+
+
+def score_prediction(prediction: Any, reference: Any, answer_type: str,
+                     question: Any = None) -> dict[str, Any]:
+    """Score one prediction.
+
+    ``question`` is optional so that the existing call sites keep working; when
+    it is absent the year rule cannot fire and scoring falls back to the generic
+    numeric tolerance. That default is deliberate: silently guessing that a
+    reference *looks like* a year would change historical numbers for callers
+    that never opted in. Callers that score year questions must pass it.
+    """
+    # A declined or unparseable answer scores as incorrect, explicitly. It used
+    # to reach here only as an exception from `float(None)`, which callers
+    # caught alongside genuine transport errors -- so "the model refused" and
+    # "the request failed" became the same recorded outcome.
+    if prediction is None:
+        return {"correct": False, "numeric_error": None, "tolerance": None, "abstained": True}
     if answer_type == "numeric":
         pred = float(prediction)
         ref = float(reference)
         numeric_error = abs(pred - ref)
+        if is_year_answer(question, reference):
+            # Exact match only. Tolerance 0.0 is recorded rather than None so
+            # that a reader can tell the strict rule fired from missing data.
+            return {"correct": pred == ref, "numeric_error": numeric_error,
+                    "tolerance": 0.0, "year_answer": True}
         tolerance = max(NUMERIC_ABS_TOLERANCE, abs(ref) * NUMERIC_REL_TOLERANCE)
         return {"correct": numeric_error <= tolerance, "numeric_error": numeric_error, "tolerance": tolerance}
     return {"correct": prediction == reference, "numeric_error": None, "tolerance": None}

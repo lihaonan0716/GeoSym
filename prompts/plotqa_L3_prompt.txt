@@ -1,0 +1,31 @@
+You are answering a question about a statistical chart. Steps 1 and 2 have read it and computed the quantities.
+
+== STEP 1 (chart readings) ==
+{L1_results}
+
+== STEP 2 (operand selection and computation) ==
+{L2_results}
+
+== THE QUESTION ==
+{question}
+
+== YOUR TASK (Step 3: Final Answer) ==
+Give the answer the question asks for, in the form it asks for.
+
+(a) Check that Step 2 answered the question that was asked, not a neighbouring one. If Step 2 computed the wrong operation or picked the wrong entities, correct it here and say what you changed.
+
+(b) Put the answer in the form the question requires.
+    - A yes/no question takes "Yes" or "No".
+    - A "which"/"what" question naming a category or series takes that name.
+    - A numeric question takes a bare number, with no units, no thousands separators and no currency symbols.
+    - Keep the precision Step 2 computed; do not round a ratio or a difference to a whole number.
+
+(c) If Step 2 reported an operand missing, do not invent a value to replace it. Say that the chart does not supply it.
+
+Return JSON only with keys raw_text and normalized_prediction. The normalized_prediction value must be the final answer string.
+```json
+{
+  "raw_text": "brief statement of how the answer follows from Step 2",
+  "normalized_prediction": "the final answer"
+}
+```

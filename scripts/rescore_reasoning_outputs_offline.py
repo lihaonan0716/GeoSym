@@ -485,11 +485,25 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     group.add_argument("--archive-root", type=Path)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--cache-model", default="GPT-5.5")
+    parser.add_argument("--cache-dir", type=Path, default=None,
+                        help=("Read transcripts from this directory instead of "
+                              "the default cache. Used to rescore against a "
+                              "cache whose L3 was re-run after the token-cap "
+                              "repair, without mutating the original."))
     return parser.parse_args(argv)
 
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(sys.argv[1:] if argv is None else argv)
+    if args.cache_dir:
+        # Redirect the cache module rather than copying files around: the
+        # original cache is the only record of the paid run and the re-judge
+        # hash check depends on it staying byte-identical.
+        if not args.cache_dir.is_dir():
+            print(f"missing cache dir: {args.cache_dir}", file=sys.stderr)
+            return 2
+        import app.reasoning_cache as _cache_mod
+        _cache_mod._CACHE_DIR = args.cache_dir.resolve()
     if args.input_artifact:
         payload = rescore_artifact(args.input_artifact, args.output, args.cache_model)
     else:

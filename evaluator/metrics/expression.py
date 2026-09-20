@@ -111,6 +111,21 @@ def _normalize_expr_str(s: str) -> str:
     s = s.replace("\\left[", "[").replace("\\right]", "]")
     # \cdot, \times -> *
     s = s.replace("\\cdot", "*").replace("\\times", "*")
+    # Logarithm base subscripts, before the generic \log rule and before braces
+    # are stripped. `\log_{2}(x+2)` otherwise became `log_2(x+2)` -- a SYMBOL
+    # named `log_2` multiplied by `(x+2)`, i.e. a polynomial, so every
+    # logarithmic answer was scored against a non-logarithmic ground truth and
+    # could only match by copying the reference spelling verbatim.
+    # Handles: \log_{2}(u), \log_2(u), log_{2}(u), log_2(u), log2(u), log₂(u).
+    _SUBSCRIPT_DIGITS = str.maketrans("₀₁₂₃₄₅₆₇₈₉", "0123456789")
+    s = s.translate(_SUBSCRIPT_DIGITS)
+    s = re.sub(
+        r"\\?log[_]?\{?\s*(?P<base>\d+(?:\.\d+)?|e)\s*\}?\s*\(\s*(?P<arg>[^()]*(?:\([^()]*\)[^()]*)*)\s*\)",
+        lambda m: (f"log({m.group('arg')})" if m.group("base") == "e"
+                   else f"log({m.group('arg')}, {m.group('base')})"),
+        s,
+    )
+
     # LaTeX function names: \ln -> log, \log -> log, \sin -> sin, etc.
     s = re.sub(r"\\ln\b", "log", s)
     s = re.sub(r"\\log\b", "log", s)
@@ -145,6 +160,218 @@ def _normalize_expr_str(s: str) -> str:
     return s
 
 
+# Comparison operators as models write them, mapped to SymPy relationals.
+_COMPARATORS = (
+    ("≤", "<="), ("≥", ">="), ("≦", "<="), ("≧", ">="),
+    ("=<", "<="), ("=>", ">="),
+)
+
+# A condition clause: "x <= -4", "-3 < x <= 1", "x > -2".
+_CONDITION = re.compile(
+    r"^\s*(?:-?[\d./]+\s*(?:<=|<|>=|>)\s*)?x\s*(?:<=|<|>=|>)\s*-?[\d./]+\s*$"
+)
+
+# Grammar A: "<value> if <cond> else <value>"  (may nest on the right)
+_IF_ELSE = re.compile(r"^(?P<then>.+?)\s+if\s+(?P<cond>.+?)\s+else\s+(?P<other>.+)$",
+                      re.IGNORECASE | re.DOTALL)
+
+# Grammar B: "piecewise(cond, val, ...)" or "if(cond, val, val)"
+_FUNC_FORM = re.compile(r"^(?:piecewise|if)\s*\((?P<body>.*)\)$", re.IGNORECASE | re.DOTALL)
+
+# One "<value> <keyword> <condition>" clause, either order.
+_VALUE_THEN_COND = re.compile(
+    r"^(?P<value>.+?)\s*(?:,\s*)?\b(?:for|if|when|where)\b\s*(?P<cond>.+)$",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _split_piecewise_clauses(s: str) -> Optional[list[str]]:
+    """Split a piecewise body into clauses on top-level ';' or ','.
+
+    Commas inside brackets or inside an interval are not separators, so depth is
+    tracked. Returns None when nothing splits, letting the caller fall through.
+    """
+    clauses: list[str] = []
+    depth = 0
+    current: list[str] = []
+    for ch in s:
+        if ch in "([{":
+            depth += 1
+        elif ch in ")]}":
+            depth -= 1
+        if depth == 0 and ch == ";":
+            clauses.append("".join(current))
+            current = []
+            continue
+        current.append(ch)
+    clauses.append("".join(current))
+
+    if len(clauses) == 1:
+        # No ';' -- try ',' but only where a condition keyword follows, so that
+        # "f(x) = 2, for x < 0, -x, for x >= 0" splits and "(a, b)" does not.
+        parts = re.split(r",(?=\s*(?:f\s*\(\s*x\s*\)|y)?\s*=?\s*[^,]*\b(?:for|if|when|where)\b)",
+                         clauses[0], flags=re.IGNORECASE)
+        if len(parts) > 1:
+            clauses = parts
+    cleaned = [c.strip().strip(",").strip() for c in clauses if c.strip().strip(",").strip()]
+    return cleaned if len(cleaned) > 1 else None
+
+
+def _parse_condition(text: str, x) -> Optional[Any]:
+    """Turn a written condition into a SymPy relational, or None."""
+    cond = text.strip().rstrip(".,;").strip()
+    for glyph, ascii_op in _COMPARATORS:
+        cond = cond.replace(glyph, ascii_op)
+    cond = re.sub(r"^\s*(?:and|,)\s*", "", cond, flags=re.IGNORECASE).strip()
+    if cond.lower() in {"otherwise", "else", "elsewhere", "all other x", "otherwise."}:
+        return True
+    if not _CONDITION.match(cond):
+        return None
+    try:
+        # A chained bound ("-3 < x <= 1") must become an explicit conjunction;
+        # SymPy does not chain relationals the way Python does.
+        chain = re.match(
+            r"^\s*(?P<lo>-?[\d./]+)\s*(?P<op1><=|<)\s*x\s*(?P<op2><=|<)\s*(?P<hi>-?[\d./]+)\s*$",
+            cond,
+        )
+        if chain:
+            lo = sympify(chain.group("lo"))
+            hi = sympify(chain.group("hi"))
+            left = (lo < x) if chain.group("op1") == "<" else (lo <= x)
+            right = (x < hi) if chain.group("op2") == "<" else (x <= hi)
+            return sympy.And(left, right)
+        return sympify(cond, locals={"x": x})
+    except Exception:
+        return None
+
+
+def _parse_piecewise(expr_str: str) -> Optional[Any]:
+    """Parse the piecewise spellings models actually produce.
+
+    Six grammars appear in real output, and they are not evenly distributed
+    across conditions: arms given precise coordinates describe a curve's flat
+    tail as a literal constant piece far more often. Leaving these unparseable
+    scored a mathematically sound answer as zero and penalised one arm ~3x more
+    than another, so the scorer was measuring its own grammar coverage.
+
+    Returns a SymPy Piecewise, or None to let the caller fall through.
+    """
+    x = symbols("x")
+    s = expr_str.strip()
+    for glyph, ascii_op in _COMPARATORS:
+        s = s.replace(glyph, ascii_op)
+
+    # LaTeX `cases` is how the benchmark writes its own piecewise ground truth,
+    # so without this branch the reference is unparseable and every answer in
+    # that family scores zero regardless of correctness.
+    cases = re.search(r"\\begin\{cases\}(?P<body>.*?)\\end\{cases\}", s, re.DOTALL)
+    if cases:
+        body = cases.group("body")
+        body = re.sub(r"\\(?:geq|ge)\b", ">=", body)
+        body = re.sub(r"\\(?:leq|le)\b", "<=", body)
+        body = re.sub(r"\\(?:text|mathrm)\s*\{([^}]*)\}", r"\1", body)
+        body = body.replace("\\;", " ").replace("\\,", " ").replace("\\quad", " ")
+        rows = [r for r in re.split(r"\\\\+", body) if r.strip()]
+        pairs = []
+        for row in rows:
+            # Each row is "<value> & <condition>".
+            parts = [p for p in row.split("&")]
+            if len(parts) < 2:
+                return None
+            value = _parse_expression_atom(parts[0].replace("\\", "").strip())
+            cond = _parse_condition(parts[1].replace("\\", "").strip(), x)
+            if value is None or cond is None:
+                return None
+            pairs.append((value, cond))
+        return sympy.Piecewise(*pairs) if pairs else None
+
+    s = re.sub(r"^\s*(?:piecewise(?:\s+function)?)\s*[:=]?\s*", "", s, flags=re.IGNORECASE)
+    s = re.sub(r"^[yf]\s*\(?\s*x?\s*\)?\s*=\s*", "", s, flags=re.IGNORECASE).strip()
+
+    # Grammar B: functional form, already comma-separated (cond, val) pairs.
+    func = _FUNC_FORM.match(s)
+    if func:
+        parts = [p.strip() for p in func.group("body").split(",")]
+        pairs = []
+        for i in range(0, len(parts) - 1, 2):
+            cond = _parse_condition(parts[i], x)
+            value = _parse_expression_atom(parts[i + 1])
+            if cond is None or value is None:
+                return None
+            pairs.append((value, cond))
+        if len(parts) % 2 == 1:
+            fallback = _parse_expression_atom(parts[-1])
+            if fallback is not None:
+                pairs.append((fallback, True))
+        return sympy.Piecewise(*pairs) if pairs else None
+
+    # Grammar A: "<value> if <cond> else <value>", possibly nested.
+    if_else = _IF_ELSE.match(s)
+    if if_else:
+        cond = _parse_condition(if_else.group("cond"), x)
+        then = _parse_expression_atom(if_else.group("then"))
+        other_text = if_else.group("other").strip()
+        other = _parse_piecewise(other_text) or _parse_expression_atom(other_text)
+        if cond is None or then is None or other is None:
+            return None
+        return sympy.Piecewise((then, cond), (other, True))
+
+    # Grammars C/D/E: brace- or delimiter-separated "<value> for <cond>" clauses.
+    body = s.strip()
+    if body.startswith("{") and body.endswith("}"):
+        body = body[1:-1].strip()
+    clauses = _split_piecewise_clauses(body)
+    if not clauses:
+        return None
+
+    pairs = []
+    for clause in clauses:
+        clause = re.sub(r"^[yf]\s*\(?\s*x?\s*\)?\s*=\s*", "", clause.strip(),
+                        flags=re.IGNORECASE).strip()
+        match = _VALUE_THEN_COND.match(clause)
+        if not match:
+            return None
+        value = _parse_expression_atom(match.group("value"))
+        cond = _parse_condition(match.group("cond"), x)
+        if value is None or cond is None:
+            return None
+        pairs.append((value, cond))
+    return sympy.Piecewise(*pairs) if pairs else None
+
+
+def _parse_expression_atom(expr_str: str) -> Optional[Any]:
+    """Parse a single non-piecewise expression, or None."""
+    if not _SYMPY_OK:
+        return None
+    s = _normalize_expr_str(expr_str)
+    if not s:
+        return None
+    x = symbols("x")
+    local_dict = {"x": x, "e": sympy.E, "pi": sympy.pi, "Piecewise": sympy.Piecewise}
+    try:
+        return sympify(s, locals=local_dict)
+    except Exception:
+        pass
+    try:
+        transformations = standard_transformations + (
+            implicit_multiplication_application, convert_xor,
+        )
+        return parse_expr(s, local_dict=local_dict, transformations=transformations)
+    except Exception:
+        return None
+
+
+def _looks_piecewise(s: str) -> bool:
+    low = s.lower()
+    return bool(
+        r"\begin{cases}" in low
+        or re.search(r"\bpiecewise\b", low)
+        or re.search(r"\b(?:for|if|when|where)\b\s*-?[\d./]*\s*<?=?\s*x\s*[<>]", low)
+        or re.search(r"\belse\b", low)
+        or re.search(r"^\s*if\s*\(", low)
+    )
+
+
 def parse_expression(expr_str: str) -> Optional[Any]:
     """
     Parse an expression string into a SymPy expression.
@@ -153,12 +380,18 @@ def parse_expression(expr_str: str) -> Optional[Any]:
       - Standard SymPy notation: ``x**2 + 2*x + 1``
       - Caret notation: ``x^2 + 2x + 1``
       - LaTeX fragments: ``\\frac{1}{x}``
+      - Piecewise prose: ``2 for x <= 0; -x for x > 0``
 
     Returns:
         SymPy expression or None if parsing fails.
     """
     if not _SYMPY_OK:
         return None
+
+    if expr_str and _looks_piecewise(str(expr_str)):
+        piecewise = _parse_piecewise(str(expr_str))
+        if piecewise is not None:
+            return piecewise
 
     s = _normalize_expr_str(expr_str)
     if not s:

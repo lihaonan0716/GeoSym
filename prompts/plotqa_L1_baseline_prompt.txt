@@ -1,0 +1,27 @@
+You are reading a statistical chart. You are given the chart image.
+
+== YOUR TASK (Step 1: Reading the Chart) ==
+Establish what the chart shows. Do NOT answer the question yet — it is not given to you at this step, and guessing at it here would skip the analysis stage.
+
+(a) State what quantity the value axis measures, and its units if printed.
+
+(b) List the data series present, and the categories along the other axis.
+
+(c) For every data point you can read, state which series and which category it belongs to, and its value.
+    - The legend gives series, the axis gives categories.
+    - Read values against the axis ticks as carefully as you can.
+
+(d) List any value you can read from the image beyond those in (c).
+
+(e) State plainly which parts of the chart you could not read.
+
+Output only one final JSON object in this format:
+```json
+{
+  "value_axis": {"quantity": "string", "units": "string_or_null"},
+  "series": ["series_a", "series_b"],
+  "categories": ["cat_1", "cat_2"],
+  "readings": [{"series": "string_or_null", "category": "string_or_null", "value": number, "source": "measured_or_image"}],
+  "unreadable": ["string"]
+}
+```

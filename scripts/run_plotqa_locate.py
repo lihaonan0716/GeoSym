@@ -51,6 +51,12 @@ RETIRED_CONDITIONS = {
 }
 CACHED_BASELINES = ("E0_plotqa_direct", "E1_plotqa_cot")
 
+# Stage 3 smoke roster size, and the retry headroom allowed above one attempt
+# per sample-condition job. Both were folded into the literals 24 and 32 while
+# three conditions ran; they are named so the caps follow `CONDITIONS`.
+STAGE3_SAMPLE_COUNT = 8
+STAGE3_ATTEMPT_HEADROOM = 8
+
 
 def utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -132,6 +138,22 @@ def component_is_sliver(fact: dict[str, Any]) -> bool:
 
 
 def prompt_hashes() -> dict[str, str]:
+    """Hash every arm's prompt template, including the retired one.
+
+    ``full_measured`` stays in this map deliberately. Its hash identifies the
+    prompt behind 1346 paid rows already on disk, and dropping the entry would
+    make those artifacts unverifiable. This is why ``answer_prompt`` keeps the
+    retired branch and does not itself reject retired names -- the refusal
+    belongs on the paid path (``run_paid``), which is what must not spend.
+
+    These hashes do NOT match the ones frozen in the 2026-08-31 paid plans.
+    Commit 4f96f8a moved task guidance into ``SHARED_FINAL_ANSWER_INSTRUCTION``
+    so that every arm receives it (invariant 6: the curated arm had carried a
+    task hint the baselines lacked). That repair necessarily changed the prompt
+    text, so a mismatch against those plans is the expected and correct signal
+    that the paid rows predate the fairness fix -- not drift to be silenced by
+    pinning the old value back.
+    """
     templates = {
         "measured_raw": answer_prompt("{question}", {}, "G_measured_raw"),
         "full_measured": answer_prompt("{question}", {}, "G_full_measured_geosym"),
@@ -144,11 +166,14 @@ def answer_prompt(question: str, facts: dict[str, Any], condition: str) -> str:
     """Build one arm's prompt.
 
     Prompt symmetry is a hard requirement here (invariant 6). The task guidance
-    that used to live only in the curated arm now sits in
-    ``SHARED_FINAL_ANSWER_INSTRUCTION``, which every condition receives. What
-    remains arm-specific is one sentence of reliability semantics -- the thing
-    M1/M2 actually claims -- and the two strings are length-matched so the
-    difference cannot be attributed to prompt volume.
+    that used to live only in the curated arm sits in
+    ``SHARED_FINAL_ANSWER_INSTRUCTION``, which every condition receives.
+
+    Since M1'/M2' retired, the two live arms also share the same
+    evidence-framing sentence, so the only remaining difference between them is
+    the image-access instruction -- the manipulation under test. The
+    reliability-semantics branch below is dead for live runs and is kept solely
+    to reproduce the prompt behind the paid ``G_full_measured_geosym`` rows.
     """
     image_instruction = "Use the image and the measured facts." if condition != "Measured_flat_answer_baseline" else "Use only the measured facts; do not infer from the image."
     fusion_instruction = (
@@ -292,9 +317,14 @@ def build_plan(diagnostic_plan_path: Path, diagnostic_result_path: Path, measure
         stop_reason = "missing_measured_records"
     elif len(baseline_rows) != 16:
         stop_reason = "missing_cached_e0_e1_baselines"
-    total_stage_cap = 32
+    # Planned jobs track the live condition list. These were 24 (8 x 3) with a
+    # 32-attempt ceiling before `G_full_measured_geosym` retired on 2026-09-19;
+    # a literal would authorise 8 calls for an arm that can no longer run. The
+    # headroom above the planned jobs is preserved proportionally.
+    planned_jobs = STAGE3_SAMPLE_COUNT * len(CONDITIONS)
+    total_stage_cap = planned_jobs + STAGE3_ATTEMPT_HEADROOM
     cap = total_stage_cap - prior_llm_attempts
-    if cap < 24 and stop_reason is None:
+    if cap < planned_jobs and stop_reason is None:
         stop_reason = "insufficient_remaining_stage3_llm_cap"
     plan = {
         "schema_version": "plotqa_measured_geosym_stage3_plan_v1",
@@ -302,8 +332,13 @@ def build_plan(diagnostic_plan_path: Path, diagnostic_result_path: Path, measure
         "stage": "stage3_full_measured_geosym_smoke",
         "paid_run_approved": stop_reason is None,
         "paid_calls_executed": 0,
-        "hypothesis": "Measured facts plus reliability-aware curation can answer the Stage 2-passed PlotQA smoke set at least one sample better than the strongest cached direct baseline.",
-        "falsification_signal": "If G_full_measured_geosym is not at least max(E0,E1)+1 correct or measured-flat matches/exceeds it, do not claim fusion benefit and run bottleneck repair.",
+        # Restated 2026-09-19: the original hypothesis and falsification signal
+        # were about reliability-aware curation and keyed on
+        # `G_full_measured_geosym`, which no longer runs -- an untestable
+        # hypothesis frozen into a paid plan. What remains testable is whether
+        # measured geometric evidence beats the direct baselines at all.
+        "hypothesis": "Measured geometric facts from the M0' chain can answer the Stage 2-passed PlotQA smoke set at least one sample better than the strongest cached direct baseline.",
+        "falsification_signal": "If G_measured_raw is not at least max(E0,E1)+1 correct, do not claim measured-evidence benefit and run bottleneck repair. If measured-flat matches or exceeds it, the gain is not attributable to image access.",
         "selected_ids": sample_ids,
         "selected_samples": samples,
         "conditions": list(CONDITIONS),
@@ -319,30 +354,28 @@ def build_plan(diagnostic_plan_path: Path, diagnostic_result_path: Path, measure
         "temperature": 0.0,
         "prompt_hashes": prompt_hashes(),
         "scorer_version": SCORER_VERSION,
-        "sample_condition_job_cap": 24,
+        "sample_condition_job_cap": planned_jobs,
         "llm_http_attempt_cap": cap,
         "prior_possible_llm_http_attempts": prior_llm_attempts,
         "total_stage3_llm_http_attempt_cap": total_stage_cap,
         "ocr_http_attempt_cap": 0,
         "per_condition_attempt_caps": {
-            "G_measured_raw": {"llm": 8, "ocr": 0},
-            "G_full_measured_geosym": {"llm": 8, "ocr": 0},
-            "Measured_flat_answer_baseline": {"llm": 8, "ocr": 0},
+            condition: {"llm": STAGE3_SAMPLE_COUNT, "ocr": 0} for condition in CONDITIONS
         },
         "retry_policy": "one counted HTTP attempt per sample-condition; no adaptive retries or sample replacement",
         "cache_policy": "cached E0/E1 results are reused by artifact hash; Stage 2 locate pixels are reused by hash",
-        "stop_rule": "stop after the frozen 8 samples and 24 sample-condition jobs; never exceed 32 total Stage 3 LLM HTTP attempts including prior failed-run attempts",
-        "cost_estimate": f"maximum 24 planned LLM HTTP attempts with {cap} remaining attempts under a hard 32-attempt Stage 3 cap; OCR HTTP attempts fixed at 0",
+        "stop_rule": f"stop after the frozen {STAGE3_SAMPLE_COUNT} samples and {planned_jobs} sample-condition jobs; never exceed {total_stage_cap} total Stage 3 LLM HTTP attempts including prior failed-run attempts",
+        "cost_estimate": f"maximum {planned_jobs} planned LLM HTTP attempts across {len(CONDITIONS)} conditions with {cap} remaining attempts under a hard {total_stage_cap}-attempt Stage 3 cap; OCR HTTP attempts fixed at 0",
         "dry_run": {
             "paid_calls_executed": 0,
-            "cap_enforced": cap + prior_llm_attempts == total_stage_cap and cap >= 24,
+            "cap_enforced": cap + prior_llm_attempts == total_stage_cap and cap >= planned_jobs,
             "stopped_before_paid_calls": stop_reason is not None,
             "stop_reason": stop_reason,
         },
         "interpretation_limits": [
-            "This is an 8-sample smoke, not the 50-sample public-benefit claim.",
-            "Measured-flat receives the same measured facts as full measured GeoSym.",
-            "The current M1/M2 curation is heuristic and not calibrated.",
+            f"This is a {STAGE3_SAMPLE_COUNT}-sample smoke, not the 50-sample public-benefit claim.",
+            "Measured-flat receives the same measured facts and the same evidence-framing sentence as the image-plus-facts arm; the two live arms differ only by image access, which is the manipulation under test.",
+            "No reliability scoring, tiering, or evidence selection runs on this path; M1'/M2' retired 2026-09-19 and every admitted fact is injected.",
         ],
     }
     plan["plan_sha256"] = sha256_hex_bytes(canonical_json_bytes({k: v for k, v in plan.items() if k != "plan_sha256"}))

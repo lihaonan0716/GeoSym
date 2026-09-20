@@ -626,7 +626,10 @@ def evaluate_intercepts(
     pred_xi = sorted(pred_intercepts.get("x_intercepts", []))
     pred_yi = pred_intercepts.get("y_intercept")
 
-    # x-intercepts: matched scoring
+    # x-intercepts: matched scoring, recall-only for the same reason as extrema
+    # (see `evaluate_extrema`): this is the basis every historical paid row was
+    # scored under. Inventing x-intercepts where the truth has none does not
+    # reduce the score; `x_intercepts_surplus` below records it instead.
     xi_score = 100.0
     if gt_xi:
         if not pred_xi:
@@ -670,12 +673,19 @@ def evaluate_intercepts(
     pred_disp = f"x:{pred_xi[:5]} y:{pred_yi}"
     gt_disp = f"x:{gt_xi[:5]} y:{gt_yi}"
 
+    # Diagnostic only: not folded into `score`, so the recall-only basis is
+    # preserved, but an invented x-intercept remains countable in a report.
+    xi_surplus = len(pred_xi) - len(gt_xi) if not gt_xi else max(0, len(pred_xi) - len(gt_xi))
+
     return {
         "correct": score >= 80.0,
         "score": round(score, 3),
         "pred_display": str(pred_disp)[:80],
         "gt_display": str(gt_disp)[:80],
-        "details": f"xi={xi_score:.1f} yi={yi_score:.1f}",
+        "details": f"xi={xi_score:.1f} yi={yi_score:.1f}"
+                   + (f" x_surplus={xi_surplus}" if xi_surplus > 0 else ""),
+        "x_intercepts_surplus": xi_surplus,
+        "scoring_basis": "recall_only",
     }
 
 
@@ -693,17 +703,53 @@ def evaluate_extrema(
     Each GT extremum is matched to the closest predicted one.
     Position: distance-based (Euclidean, scale=3).
     Type: exact match bonus (20% of per-point score).
+
+    **This score is RECALL, not F1.** A prediction that finds every true
+    extremum scores 100 even when it also reports extrema that do not exist.
+    That is a deliberate choice, not an oversight: it is the behaviour all
+    29425 historical paid rows were scored under, and changing it would make
+    new numbers incomparable with them (CLAUDE.md invariant 13).
+
+    The consequence must be disclosed wherever this dimension is reported. On
+    the 240-sample GLM-4.6V run the two arms differ mainly in precision:
+
+        arm      precision   recall
+        E2           0.803    0.777
+        E5_raw       0.615    0.979
+
+    So a high extrema score means "missed almost nothing", NOT "was right".
+    ``precision`` and ``surplus`` are returned alongside the score so any
+    report can state both; never quote the score alone as accuracy.
     """
+    def _precision_fields(pred_n: int, matched: float, surplus: int) -> Dict[str, Any]:
+        return {
+            "precision": round(matched / pred_n, 4) if pred_n else None,
+            "surplus": surplus,
+            "scoring_basis": "recall_only",
+        }
+
     if not isinstance(gt_extrema, list) or not gt_extrema:
-        return {"correct": True, "score": 100.0,
-                "pred_display": "N/A", "gt_display": "N/A",
-                "details": "No extrema in GT"}
+        # A monotone curve has no extrema. Reporting some is a hallucination,
+        # and under a recall-only basis there is nothing to recall, so the
+        # score stays 100. `precision` is 0.0 in that case and is the field
+        # that carries the signal.
+        invented = len(pred_extrema) if isinstance(pred_extrema, list) else 0
+        return {
+            "correct": True,
+            "score": 100.0,
+            "pred_display": "none" if not invented else f"{invented} invented",
+            "gt_display": "none",
+            "details": ("No extrema in GT, none predicted" if not invented
+                        else f"No extrema in GT; {invented} predicted (recall-only basis: not penalised)"),
+            **_precision_fields(invented, 0.0, invented),
+        }
 
     if not isinstance(pred_extrema, list) or not pred_extrema:
         return {"correct": False, "score": 0.0,
                 "pred_display": "none",
                 "gt_display": f"{len(gt_extrema)} points",
-                "details": "No extrema predicted"}
+                "details": "No extrema predicted",
+                **_precision_fields(0, 0.0, 0)}
 
     used = set()
     scores = []
@@ -725,15 +771,27 @@ def evaluate_extrema(
         scores.append(best_s)
 
     avg = sum(scores) / len(scores) * 100
+
+    # Surplus does not change the score -- see the recall-only note above -- but
+    # it is measured and returned so a report can disclose it. A surplus that is
+    # never computed is a surplus nobody can mention.
+    surplus = max(0, len(pred_extrema) - len(gt_extrema))
+    matched = sum(1.0 for s in scores if s > 0.5)
+
     pred_disp = ", ".join(f"({e.get('x')},{e.get('y')})" for e in pred_extrema[:5])
     gt_disp = ", ".join(f"({e.get('x')},{e.get('y')},{e.get('type','')})" for e in gt_extrema[:5])
+
+    detail = f"avg_match={avg:.1f}"
+    if surplus:
+        detail += f" surplus={surplus} (recall-only basis: not penalised)"
 
     return {
         "correct": avg >= 80.0,
         "score": round(avg, 3),
         "pred_display": pred_disp[:80] or "none",
         "gt_display": gt_disp[:80],
-        "details": f"avg_match={avg:.1f}",
+        "details": detail,
+        **_precision_fields(len(pred_extrema), matched, surplus),
     }
 
 

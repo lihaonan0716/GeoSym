@@ -473,7 +473,10 @@ def build_track_f_artifacts(output_root: Path) -> dict[str, Any]:
     sensitivity_parameters = {
         "tier_rank_high_medium_low_unknown": "TIER_RANK = {\"high\": 0, \"medium\": 1, \"low\": 2, \"unknown\": 3}" in (ROOT / "scripts" / "selective_propagation.py").read_text(encoding="utf-8"),
         "selected_fact_budget_rule": "budget = max(1, len(selected_fact_ids)) if candidates else 0",
-        "confidence_threshold_policy": "_CONF_THRESHOLDS",
+        # Names the policy this artifact was generated under. `_CONF_THRESHOLDS`
+        # was deleted with M1/M2 on 2026-09-19, so the label records history
+        # rather than a symbol a reader could still look up.
+        "confidence_threshold_policy": "_CONF_THRESHOLDS (retired 2026-09-19 with M1/M2)",
         "random_seed": 20260830,
     }
     sensitivity_rows = []

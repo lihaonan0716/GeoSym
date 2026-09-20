@@ -187,15 +187,16 @@ def build_plan(
         "sample_condition_job_cap": PAPER_SAMPLE_COUNT * len(CONDITIONS),
         "llm_http_attempt_cap": PAPER_LLM_ATTEMPT_CAP,
         "ocr_http_attempt_cap": PAPER_OCR_ATTEMPT_CAP,
+        # Derived from the live condition list for the same reason the cap is:
+        # a literal entry for a retired arm authorises calls that can no longer
+        # be made, and the totals would no longer sum to the cap above.
         "per_condition_attempt_caps": {
-            "G_measured_raw": {"llm": PAPER_SAMPLE_COUNT, "ocr": 0},
-            "G_full_measured_geosym": {"llm": PAPER_SAMPLE_COUNT, "ocr": 0},
-            "Measured_flat_answer_baseline": {"llm": PAPER_SAMPLE_COUNT, "ocr": 0},
+            condition: {"llm": PAPER_SAMPLE_COUNT, "ocr": 0} for condition in CONDITIONS
         },
         "retry_policy": "one counted HTTP attempt per sample-condition LLM fallback; no adaptive retries or sample replacement",
         "cache_policy": "cache key must include plan hash, model ID, condition, prompt hash, sample ID, scorer version, and measured-record hash",
-        "stop_rule": "stop after the frozen 500 samples and at most 1500 LLM HTTP attempts; OCR HTTP attempts fixed at 0; no sample replacement",
-        "cost_estimate": "maximum 1500 LLM HTTP attempts, one per sample-condition; OCR HTTP attempts fixed at 0 (cached boxes only)",
+        "stop_rule": f"stop after the frozen {PAPER_SAMPLE_COUNT} samples and at most {PAPER_LLM_ATTEMPT_CAP} LLM HTTP attempts; OCR HTTP attempts fixed at {PAPER_OCR_ATTEMPT_CAP}; no sample replacement",
+        "cost_estimate": f"maximum {PAPER_LLM_ATTEMPT_CAP} LLM HTTP attempts, one per sample-condition across {len(CONDITIONS)} conditions; OCR HTTP attempts fixed at {PAPER_OCR_ATTEMPT_CAP} (cached boxes only)",
         "dry_run": {
             "paid_calls_executed": 0,
             "cap_enforced": PAPER_LLM_ATTEMPT_CAP == PAPER_SAMPLE_COUNT * len(CONDITIONS),
@@ -204,10 +205,10 @@ def build_plan(
         },
         "interpretation_limits": [
             "This is a frozen 500-sample PlotQA confirmation, not the full PlotQA benchmark or leaderboard.",
-            "Measured-flat receives the same measured facts as full measured GeoSym.",
+            "Measured-flat receives the same measured facts and the same evidence-framing sentence as the image-plus-facts arm; the two live arms differ only by image access, which is the manipulation under test.",
             "Public benefit claims require matched E0/E1 baseline rows on the same roster; G0 is optional diagnostic context under the Track C cap.",
-            "The current M1/M2 curation remains heuristic and not calibrated.",
-            "Both measured arms consume the same M0' chain output and the same prompt apart from one sentence of reliability semantics; the arms differ by payload only.",
+            "No reliability scoring, tiering, or evidence selection runs on this path; M1'/M2' retired 2026-09-19 and every admitted fact is injected.",
+            "Both arms consume the same M0' chain output, so a difference between them measures image access rather than evidence content.",
         ],
     }
     plan["plan_sha256"] = sha256_hex_bytes(canonical_json_bytes({k: v for k, v in plan.items() if k != "plan_sha256"}))
@@ -218,10 +219,12 @@ def review_plan(plan: dict[str, Any]) -> dict[str, Any]:
     findings = []
     if len(plan.get("selected_ids") or []) != PAPER_SAMPLE_COUNT:
         findings.append("selected_roster_not_500")
+    # Finding labels carry the expected value rather than a literal, so a cap
+    # change cannot leave a review reporting the wrong number it checked against.
     if plan.get("sample_condition_job_cap") != PAPER_SAMPLE_COUNT * len(CONDITIONS):
-        findings.append("sample_condition_cap_not_1500")
+        findings.append(f"sample_condition_cap_not_{PAPER_SAMPLE_COUNT * len(CONDITIONS)}")
     if plan.get("llm_http_attempt_cap") != PAPER_LLM_ATTEMPT_CAP:
-        findings.append("llm_cap_not_1500")
+        findings.append(f"llm_cap_not_{PAPER_LLM_ATTEMPT_CAP}")
     if plan.get("ocr_http_attempt_cap") != PAPER_OCR_ATTEMPT_CAP:
         findings.append("ocr_cap_not_zero")
     if plan.get("dry_run", {}).get("paid_calls_executed") != 0:

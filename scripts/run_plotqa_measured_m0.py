@@ -746,6 +746,107 @@ def model_values_look_like_years(model: dict[str, Any]) -> bool:
     return bool(values) and all(isinstance(v, (int, float)) and 1800 <= float(v) <= 2199 for v in values)
 
 
+# A bar whose right edge lands this close to the plot-area edge was cut off by
+# it rather than ending there.
+BAR_TRUNCATION_TOLERANCE_PX = 1.5
+# Below this length-to-thickness ratio a component is a point marker, not a bar.
+# Matches ``plotqa_ruler_refit.BAR_ASPECT_RATIO``; the two modules must agree on
+# what counts as a bar or one will repair what the other measures differently.
+BAR_ELONGATION_RATIO = 1.6
+# How far from the value-axis baseline a bar may start. A legend swatch or a
+# floating rule sits well past this, and requiring a baseline start is what
+# keeps this repair from extending objects that are not bars.
+BAR_BASELINE_TOLERANCE_FRACTION = 0.25
+# Maximum per-channel colour distance for a pixel to belong to the same bar.
+BAR_COLOUR_MATCH_DISTANCE = 40
+
+
+def _extend_truncated_bars(
+    image: np.ndarray,
+    points: list[dict[str, Any]],
+    plot_area: list[float],
+    x_model: dict[str, Any] | None = None,
+) -> int:
+    """Restore the right edge of horizontal bars the plot area cut off.
+
+    ``infer_plot_area`` puts the right edge at the last x tick *label*
+    (``max(tick.bbox[2]) + 20``), but a horizontal bar routinely runs past it: an
+    axis labelled to 80 carries a bar of 77.5 whose pixels end beyond the "80"
+    text. The ROI crop then truncated every such bar to the same boundary pixel,
+    so a whole series read as one identical value -- stamped
+    ``refit_from_ocr_ticks`` like a real measurement, with nothing downstream able
+    to notice. On the frozen roster ink extends past the plot area on 109 of 168
+    horizontal-bar samples (64.9%, median 71.6px).
+
+    This repairs existing bars in place. It does **not** widen the detection
+    window: an earlier attempt did, and admitted legend swatches and stray marks
+    into every chart type, dropping value accuracy from 0.873 to 0.760 including
+    on ``vbar`` and ``dot``, which have no cropping at all. Repairing rather than
+    re-detecting is why the mark count cannot change.
+
+    Three conditions must all hold, and together they are the negative control:
+    the component is elongated, it starts at the baseline, and its right edge sits
+    on the plot-area edge. A bar that genuinely ends mid-plot fails the third and
+    is left alone.
+
+    Returns the number of bars repaired.
+    """
+    if image is None or not plot_area or len(plot_area) != 4:
+        return 0
+    left, top, right, bottom = (float(v) for v in plot_area)
+    width = right - left
+    if width <= 0:
+        return 0
+
+    height_px, width_px = image.shape[:2]
+    repaired = 0
+    for point in points:
+        bbox = point.get("component_bbox")
+        if not isinstance(bbox, (list, tuple)) or len(bbox) != 4:
+            continue
+        x_lo, y_lo, x_hi, y_hi = (float(v) for v in bbox)
+        span_x, span_y = x_hi - x_lo, y_hi - y_lo
+        if span_x <= 0 or span_y <= 0:
+            continue
+        if span_x < span_y * BAR_ELONGATION_RATIO:
+            continue  # Point-like: no length to restore.
+        if x_lo > left + width * BAR_BASELINE_TOLERANCE_FRACTION:
+            continue  # Not grown from the baseline: legend, rule, or annotation.
+        if abs(x_hi - right) > BAR_TRUNCATION_TOLERANCE_PX:
+            continue  # Ends inside the plot: its edge is its real value.
+
+        row_lo, row_hi = max(0, int(round(y_lo))), min(height_px, int(round(y_hi)))
+        col_lo, col_hi = max(0, int(round(x_lo))), min(width_px, int(round(x_hi)))
+        if row_hi <= row_lo or col_hi <= col_lo:
+            continue
+        patch = image[row_lo:row_hi, col_lo:col_hi]
+        if patch.size == 0:
+            continue
+        # The bar's own colour, sampled from the part of it that survived the
+        # crop, so the search never depends on a palette assumption.
+        colour = np.median(patch.reshape(-1, 3), axis=0)
+        band = image[row_lo:row_hi, :]
+        matched = np.abs(band.astype(int) - colour.astype(int)).sum(axis=2) < BAR_COLOUR_MATCH_DISTANCE
+        columns = np.where(matched.any(axis=0))[0]
+        if columns.size == 0:
+            continue
+        true_right = float(columns.max())
+        if true_right > x_hi:
+            point["component_bbox"] = [x_lo, y_lo, true_right, y_hi]
+            point["right_edge_before_truncation_repair"] = x_hi
+            # ``x_value`` was computed from the truncated edge before this ran.
+            # Leaving it stale would keep the wrong number in the record even
+            # though the geometry is now right -- and it is the field the frozen
+            # schema exposes, so a consumer reading it would see no repair.
+            if x_model and x_model.get("type") == "linear":
+                repaired_value = pixel_to_value(x_model, true_right)
+                if repaired_value is not None:
+                    point["x_value_before_truncation_repair"] = point.get("x_value")
+                    point["x_value"] = repaired_value
+            repaired += 1
+    return repaired
+
+
 def segment_marks(image_path: Path, plot_area: list[float], x_model: dict[str, Any], y_model: dict[str, Any]) -> tuple[list[dict[str, Any]], dict[str, Any]]:
     image = cv2.imread(str(image_path))
     if image is None:
@@ -796,7 +897,15 @@ def segment_marks(image_path: Path, plot_area: list[float], x_model: dict[str, A
         )
     color_points = color_component_marks(roi, x0, y0, x_model, y_model, points)
     points.extend(color_points)
-    return points, {"component_count": len(points), "mask_nonzero": int(np.count_nonzero(mask)), "color_component_count": len(color_points)}
+    # Runs after both detectors and on the full image, so a bar the ROI cut off
+    # can be followed past the crop. Detection itself stays inside the plot area.
+    truncation_repairs = _extend_truncated_bars(image, points, plot_area, x_model)
+    return points, {
+        "component_count": len(points),
+        "mask_nonzero": int(np.count_nonzero(mask)),
+        "color_component_count": len(color_points),
+        "truncated_bars_repaired": truncation_repairs,
+    }
 
 
 def median_component_color(roi: np.ndarray, mask: np.ndarray) -> list[int]:

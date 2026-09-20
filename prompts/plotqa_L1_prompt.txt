@@ -1,0 +1,33 @@
+You are reading a statistical chart. You are given the chart image AND measured evidence extracted from it by a geometric pipeline.
+
+== MEASURED EVIDENCE (pixel-to-value measurements from the chart) ==
+{measured_evidence}
+
+Each measured fact may carry a series label (which data series it belongs to), a category label (which x-axis category or year it sits at), and a measured value. Labels are absent when the extractor could not attach one; a missing label does not make the value wrong, it makes it unattributed.
+
+== YOUR TASK (Step 1: Reading the Chart) ==
+Establish what the chart shows. Do NOT answer the question yet — it is not given to you at this step, and guessing at it here would skip the analysis stage.
+
+(a) State what quantity the value axis measures, and its units if printed.
+
+(b) List the data series present, and the categories along the other axis.
+
+(c) For every measured value you can attribute, state which series and which category it belongs to.
+    - Use the image to attach labels the extractor missed: the legend gives series, the axis gives categories.
+    - Keep the measured number when the image agrees with it. The measurement is more precise than visual estimation.
+    - Correct a measured number only when the image plainly contradicts it, and say so.
+
+(d) List any value you can read from the image that the evidence does not contain.
+
+(e) State plainly which parts of the chart you could not read.
+
+Output only one final JSON object in this format:
+```json
+{
+  "value_axis": {"quantity": "string", "units": "string_or_null"},
+  "series": ["series_a", "series_b"],
+  "categories": ["cat_1", "cat_2"],
+  "readings": [{"series": "string_or_null", "category": "string_or_null", "value": number, "source": "measured_or_image"}],
+  "unreadable": ["string"]
+}
+```

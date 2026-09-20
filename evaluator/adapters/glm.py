@@ -58,6 +58,20 @@ class GLMAdapter(BaseLLMAdapter):
         client = self._get_client()
 
         max_tokens = int(os.environ.get("GEOSYM_GLM_MAX_TOKENS", "4096"))
+
+        # Thinking is billed against max_tokens and is emitted before any
+        # answer, so a long internal derivation can consume the whole budget
+        # and leave the response truncated with nothing written. The Qwen
+        # adapter has always disabled it; this one never had the option.
+        # Default keeps the historical behaviour -- every stored run was
+        # produced with thinking on, and silently changing that would make new
+        # rows incomparable with them.
+        extra_body: dict = {}
+        thinking = os.environ.get("GEOSYM_GLM_THINKING", "enabled").strip().lower()
+        if thinking in {"disabled", "off", "false", "0"}:
+            extra_body["thinking"] = {"type": "disabled"}
+        self.last_thinking_mode = "disabled" if extra_body else "enabled"
+
         response = client.chat.completions.create(
             model=self.model,
             messages=[
@@ -76,6 +90,7 @@ class GLMAdapter(BaseLLMAdapter):
             ],
             max_tokens=max_tokens,
             temperature=0.0,
+            **({"extra_body": extra_body} if extra_body else {}),
         )
 
         choice = response.choices[0]

@@ -288,12 +288,38 @@ def attach_x_axis_categories(
     }
 
 
+def numeric_labels_are_categories(record: Dict[str, Any]) -> bool:
+    """True when numeric bottom-axis text names categories rather than ticks.
+
+    ``x_axis_category_candidates`` drops numeric boxes by default because on a
+    horizontal bar chart the bottom axis *is* the value axis, so its numbers are
+    ruler ticks. On every other orientation the bottom axis is the category
+    axis, and PlotQA labels it with years far more often than not -- so the
+    default discarded the whole category axis on 199 of the frozen 500 samples,
+    reporting ``no_candidates`` with nothing read.
+
+    The distinction needs no new geometry: it is exactly the orientation
+    ``value_axis_orientation`` already computes from mark shape. Imported here
+    rather than at module scope because the ruler module is the heavier of the
+    two and only this one predicate needs it.
+    """
+    from evaluator.reasoning.plotqa_ruler_refit import value_axis_orientation
+
+    return value_axis_orientation(record) != "x"
+
+
 def augment_record(record: Dict[str, Any], ocr_row: Optional[Dict[str, Any]]) -> Dict[str, Any]:
     """Return a shallow-copied record with x-axis categories attached.
 
     The input record is not mutated, so the frozen artifact stays valid; the
     measured points are deep-enough copied that attaching a label cannot leak
     back into the caller's originals.
+
+    Measured offline on the frozen 500 before this rule was written into the
+    pipeline (``scripts/probe_plotqa_numeric_category_axis.py``): labelled
+    samples 133 -> 346, labelled marks 1877 -> 5555, precision of the newly
+    attached labels 0.957 against the official annotation, and **zero samples
+    lost a label they already had** in any chart family.
     """
     if not ocr_row:
         return {**record, "category_axis": {"status": "no_ocr_row", "assigned_count": 0}}
@@ -304,10 +330,13 @@ def augment_record(record: Dict[str, Any], ocr_row: Optional[Dict[str, Any]]) ->
         return {**record, "category_axis": {"status": "no_plot_area", "assigned_count": 0}}
 
     points = [dict(point) for point in (record.get("measured_points") or [])]
+    numeric_categories = numeric_labels_are_categories(record)
     candidates = admissible_category_columns(
-        x_axis_category_candidates(ocr_row, plot_area))
+        x_axis_category_candidates(
+            ocr_row, plot_area, exclude_numeric=not numeric_categories))
     summary = attach_x_axis_categories(points, candidates)
     summary["labels"] = [c["label"] for c in candidates]
+    summary["numeric_labels_admitted"] = numeric_categories
     return {**record, "measured_points": points, "category_axis": summary}
 
 

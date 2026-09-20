@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-title: "GeoSym: Structured Evidence Fusion for Reliable Quantitative Chart Reasoning"
+title: "GeoSym: Geometric Evidence Extraction and Layered Reasoning for Quantitative Chart Understanding"
 message: "If you use this software, please cite it using the metadata from this file."
 type: software
 date-released: "2026-05-12"
@@ -26,8 +26,8 @@ authors:
 repository-code: "https://github.com/lihaonan0716/GeoSym"
 license: MIT
 keywords:
-  - evidence fusion
+  - geometric evidence extraction
   - multimodal reasoning
   - quantitative chart reasoning
   - vision-language models
-  - evidence reliability
+  - layered reasoning

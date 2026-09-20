@@ -205,13 +205,108 @@ def _extract_json_block(text: str) -> Optional[Dict]:
                     return loaded
                 else:
                     start = None
-    return None
+
+    # Truncated output: the model began a JSON object and the response ended
+    # mid-value, so neither path above can close it. Observed in real runs where
+    # a fully correct answer was already written (`{"expression": "|x| - 1",`)
+    # and scored zero because nothing recovered it. Salvage the complete
+    # key/value pairs and discard the partial tail.
+    return _salvage_truncated_json(text)
+
+
+# One complete `"key": <value>` pair, where the value is a finished string,
+# number, or literal. A value still being written has no closing quote or
+# delimiter and therefore does not match -- which is the point.
+_JSON_PAIR = re.compile(
+    r'"(?P<key>[A-Za-z_][A-Za-z0-9_]*)"\s*:\s*'
+    r'(?P<value>"(?:[^"\\]|\\.)*"|-?\d+(?:\.\d+)?|true|false|null)\s*(?=[,}\n])'
+)
+
+
+def _salvage_truncated_json(text: str) -> Optional[Dict]:
+    """Recover complete key/value pairs from an unterminated JSON object.
+
+    Returns None unless an opening brace was seen and at least one pair was
+    fully written, so ordinary prose cannot be mistaken for JSON.
+    """
+    if not text:
+        return None
+    brace = text.rfind('{')
+    if brace == -1:
+        return None
+    fragment = text[brace:]
+    if '}' in fragment and fragment.count('{') == fragment.count('}'):
+        return None  # Well-formed and already handled above.
+
+    recovered: Dict[str, Any] = {}
+    for match in _JSON_PAIR.finditer(fragment):
+        try:
+            recovered[match.group("key")] = json.loads(match.group("value"))
+        except json.JSONDecodeError:
+            continue
+    return recovered or None
+
+
+# A captured "expression" that is really narrative text scores near zero even
+# when the model derived the right formula, so a prose capture is worse than no
+# capture at all: it silently converts a correct answer into a wrong one. These
+# two checks reject a candidate that reads like a sentence rather than a formula.
+_PROSE_LEAD = re.compile(
+    r'^(?:the|this|these|that|there|it|we|i|so|thus|then|here|now|let|let\'s|'
+    r'looking|using|based|since|from|because|therefore|hence|first|next|'
+    r'finally|to\s|for\s|given|note|observe|notice|substituting|checking|'
+    r'verify|verifying|solving|plugging)\b',
+    re.IGNORECASE,
+)
+
+# Prose markers that never appear in a bare mathematical expression. Piecewise
+# answers legitimately contain "for"/"if", so those are matched only as whole
+# sentences elsewhere -- not here.
+_PROSE_PHRASE = re.compile(
+    r'\b(?:can be written|is given by|appears to be|suggests?|means that|'
+    r'which gives|we get|so that|in other words|as follows|shows? that|'
+    r'indicates?|implies|form where|vertex is at|value equals)\b',
+    re.IGNORECASE,
+)
+
+
+def _looks_like_prose(value: str) -> bool:
+    """True when a captured field reads as narration rather than an answer.
+
+    Deliberately conservative: a piecewise expression with ``for``/``if``
+    clauses, or anything carrying an operator with few English words, is kept.
+    """
+    if not value:
+        return True
+    stripped = value.strip()
+    # A leading list marker ("- The vertex is at ...") is narration, but a
+    # negative expression ("-x + 4") is not.
+    if re.match(r'^[-*•]\s+', stripped):
+        return True
+    if _PROSE_LEAD.match(stripped) or _PROSE_PHRASE.search(stripped):
+        return True
+    # Count standalone English words; formulas have few, sentences have many.
+    words = re.findall(r'\b[A-Za-z]{3,}\b', stripped)
+    allowed = {"sqrt", "abs", "log", "ln", "exp", "sin", "cos", "tan", "inf",
+               "for", "if", "else", "and", "or", "piecewise", "otherwise", "where"}
+    prose_words = [w for w in words if w.lower() not in allowed]
+    if len(prose_words) >= 3:
+        return True
+    # A sentence ending in a colon is an introduction to the answer, not the
+    # answer -- the formula follows on the next line.
+    return stripped.endswith(":")
 
 
 def _extract_labeled_fields(text: str) -> Dict[str, str]:
     """
     Fallback: extract answers from labeled markers like:
     **Expression:** ..., **Domain:** ..., (a) ..., etc.
+
+    Used only when no JSON object could be recovered. Each candidate is
+    screened by :func:`_looks_like_prose`, because the L3 prompt numbers its
+    tasks ``(h)/(i)/(j)`` and models freely emit ``(a)``-style list markers in
+    their narration -- an unscreened positional pattern captured that narration
+    as the answer.
     """
     result = {}
 
@@ -219,35 +314,46 @@ def _extract_labeled_fields(text: str) -> Dict[str, str]:
         "expression": [
             r'\*\*(?:Expression|表达式)[:\s]*\*\*[:\s]*(.*?)(?:\n|$)',
             r'(?:Expression|表达式|解析式)[：:\s]+(.*?)(?:\n|$)',
-            r'\(a\)\s*(.*?)(?:\n|$)',
+            # Anchored to line start: a bare "(a)" mid-sentence is prose, and
+            # the letter must be followed by an answer, not more narration.
+            r'(?m)^\s*\(a\)\s*(.*?)(?:\n|$)',
         ],
         "domain": [
             r'\*\*(?:Domain|定义域)[:\s]*\*\*[:\s]*(.*?)(?:\n|$)',
             r'(?:Domain|定义域)[：:\s]+(.*?)(?:\n|$)',
-            r'\(b\)\s*(.*?)(?:\n|$)',
+            r'(?m)^\s*\(b\)\s*(.*?)(?:\n|$)',
         ],
         "range": [
             r'\*\*(?:Range|值域)[:\s]*\*\*[:\s]*(.*?)(?:\n|$)',
             r'(?:Range|值域)[：:\s]+(.*?)(?:\n|$)',
-            r'\(c\)\s*(.*?)(?:\n|$)',
+            r'(?m)^\s*\(c\)\s*(.*?)(?:\n|$)',
         ],
         "coordinates": [
             r'\*\*(?:Coordinates?|坐标|交点)[:\s]*\*\*[:\s]*(.*?)(?:\n|$)',
             r'(?:Coordinates?|坐标|交点|Key\s*points?)[：:\s]+(.*?)(?:\n|$)',
-            r'\(d\)\s*(.*?)(?:\n|$)',
+            r'(?m)^\s*\(d\)\s*(.*?)(?:\n|$)',
         ],
     }
 
     for key, pats in patterns.items():
         for pat in pats:
-            m = re.search(pat, text, re.IGNORECASE)
-            if m:
+            matched = False
+            for m in re.finditer(pat, text, re.IGNORECASE):
                 val = m.group(1).strip()
                 val = re.sub(r'^\$+|\$+$', '', val).strip()
                 val = re.sub(r'^\*+|\*+$', '', val).strip()
-                if val:
-                    result[key] = val
-                    break
+                if not val:
+                    continue
+                # Only `expression` is screened. domain/range are interval
+                # notation that the prose heuristic would not judge reliably,
+                # and they are not where the observed failures occurred.
+                if key == "expression" and _looks_like_prose(val):
+                    continue
+                result[key] = val
+                matched = True
+                break
+            if matched:
+                break
 
     return result
 
@@ -471,7 +577,54 @@ def parse_L3_answer(raw_response: str) -> Dict[str, Any]:
     for key in ("expression", "domain", "range", "inference_explanation"):
         if not result[key] and key in labeled:
             result[key] = labeled[key]
+
+    # Last resort: the model narrated its way to a formula without emitting JSON
+    # or a label. Observed repeatedly in real runs -- the derivation ends with a
+    # standalone "f(x) = |x| - 1" line and every earlier extractor returns
+    # nothing, scoring a fully correct answer as zero.
+    if not result["expression"]:
+        recovered = _recover_expression_from_prose(raw_response)
+        if recovered:
+            result["expression"] = recovered
     return result
+
+
+# A standalone declaration line: optional "y ="/"f(x) =" then the formula. The
+# tail must contain a digit or variable so headings like "Expression:" are
+# excluded, and the line is screened for prose before being accepted.
+_DECLARATION_LINE = re.compile(
+    r'^\s*(?:so|thus|therefore|hence)?[,:\s]*'
+    r'(?:the\s+)?(?:function|expression|answer|equation)?[,:\s]*'
+    r'(?:y|f\s*\(\s*x\s*\))\s*=\s*(?P<body>[^\n]+?)\s*$',
+    re.IGNORECASE,
+)
+
+
+def _recover_expression_from_prose(text: str) -> str:
+    """Recover a formula stated in narration, or "" when none is stated.
+
+    Scans from the end because the final declaration is the model's conclusion;
+    earlier ones are usually candidates it went on to reject. Returns "" rather
+    than guessing when nothing passes the prose screen -- a wrong expression is
+    scored, whereas an empty one is at least honestly empty.
+    """
+    if not text:
+        return ""
+    for line in reversed(text.splitlines()):
+        match = _DECLARATION_LINE.match(line)
+        if not match:
+            continue
+        body = match.group("body").strip()
+        body = re.sub(r'^\$+|\$+$', '', body).strip()
+        body = body.rstrip('.,;')
+        # Drop a trailing verification comment: "|x| - 1 ✓" or "2^x  (checks out)".
+        body = re.sub(r'\s*[✓✔].*$', '', body).strip()
+        if not body or _looks_like_prose(body):
+            continue
+        if not re.search(r'[\dxX]', body):
+            continue
+        return body
+    return ""
 
 
 # ==================== Judge Parser ====================
