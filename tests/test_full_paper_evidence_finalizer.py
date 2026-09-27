@@ -4,7 +4,11 @@ from pathlib import Path
 import pytest
 
 _DEV_LOCAL_ARTIFACTS = [
-    Path("docs/PAPER_LEVEL_EVIDENCE_PACKAGE_PLAN.md"),
+    # Archived 2026-09-23 when PAPER_BLUEPRINT.md became the single writing
+    # guide. The plan still defines the stage-status vocabulary this finalizer
+    # emits, so the test follows it rather than skipping: a silent skip would
+    # drop coverage of the finalizer without anyone noticing.
+    Path("docs/_archive_2026-09-23/PAPER_LEVEL_EVIDENCE_PACKAGE_PLAN.md"),
     Path("outputs/paper_level_evidence_package"),
 ]
 REQUIRES_PAPER_PACKAGE_ARTIFACTS = pytest.mark.skipif(
