@@ -43,6 +43,17 @@ def adapter_base():
     return module
 
 
+#: `run_paid` refuses an unapproved plan before it reads the checkpoint, and
+#: approval requires ground truth for every roster sample. `dataset/` is
+#: gitignored and distributed separately, so without it the plan stops at
+#: `missing_ground_truth` and a test aiming at the hash check never reaches it.
+#: Only the tests that call `run_paid` need this; the rest of the module builds
+#: plans and writes checkpoints, which the dataset does not gate.
+requires_dataset = pytest.mark.skipif(
+    not (Path(__file__).resolve().parents[1] / "dataset" / "ground_truth").is_dir(),
+    reason="requires dev-local dataset/ ground truth; see README")
+
+
 class TestAttemptCapIsEnforcedAtTheHttpLayer:
     def test_cap_blocks_before_the_request_is_made(self, adapter_base, monkeypatch):
         """A refused call must not reach `_call_api` -- the cap bounds money
@@ -150,6 +161,7 @@ class TestCheckpointIdentity:
         assert {(r["sample_id"], r["condition"]) for r in restored} == {
             ("absolute-clean_render_0031", "E5_raw")}
 
+    @requires_dataset
     def test_mismatched_plan_refuses_to_resume(self, tmp_path: Path):
         plan = self._plan()
         out = tmp_path / "paid_result.json"
