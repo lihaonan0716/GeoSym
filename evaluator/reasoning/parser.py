@@ -127,6 +127,57 @@ def parse_expression_answer(answer_str: str) -> str:
     return s.strip()
 
 
+def repair_unicode_math_glyphs(text: str) -> str:
+    """Rewrite U+221E / U+2212 that appear OUTSIDE JSON string literals.
+
+    A bare U+221E is not a JSON number and a U+2212 is not a minus sign, so
+    either one discards the whole object.  Inside a string they are legal JSON
+    and are the model's own prose -- rewriting them there would corrupt an
+    answer rather than recover one, so string spans are copied verbatim.
+    """
+    def rewrite(segment: str) -> str:
+        return segment.replace('∞', 'Infinity').replace('−', '-')
+
+    out, last, in_string = [], 0, False
+    index = 0
+    while index < len(text):
+        char = text[index]
+        if char == '\\' and in_string:
+            index += 2
+            continue
+        if char == '"':
+            if in_string:
+                out.append(text[last:index + 1])
+            else:
+                out.append(rewrite(text[last:index]))
+            last, in_string = index + 1 if in_string else index, not in_string
+        index += 1
+    out.append(text[last:] if in_string else rewrite(text[last:]))
+    return ''.join(out)
+
+
+def repair_interval_tuples(text: str) -> str:
+    """Rewrite a mathematical interval written as a tuple into a JSON list.
+
+    Models write monotonicity intervals in mathematical notation --
+    ``"interval": (-inf, 1]`` -- which is not JSON.  The metric reads the two
+    endpoints and the direction string and never the open/closed flags (see
+    ``_parse_monotonicity``), so normalising the bracket STYLE loses nothing
+    that is scored while recovering an answer that would otherwise be
+    discarded whole.
+
+    This matters for baseline fairness, not just recall: single-pass arms emit
+    the tuple form far more often than layered ones, so dropping those rows
+    penalises one arm for punctuation and surfaces as a between-arm effect
+    (CLAUDE.md invariant 6).
+    """
+    return re.sub(
+        r'("interval"\s*:\s*)[\(\[]([^()\[\]"]*)[\)\]]',
+        lambda m: f'{m.group(1)}[{m.group(2)}]',
+        text,
+    )
+
+
 def _loads_json_with_numeric_fraction_repair(candidate: str) -> Optional[Dict]:
     """Load JSON, repairing common LLM JSON slips only after strict parsing fails."""
     try:
@@ -166,7 +217,8 @@ def _loads_json_with_numeric_fraction_repair(candidate: str) -> Optional[Dict]:
         return str(numerator / denominator)
 
     repaired = candidate
-    for repair in (repair_non_json_infinity, repair_invalid_json_escapes):
+    for repair in (repair_unicode_math_glyphs, repair_interval_tuples,
+                   repair_non_json_infinity, repair_invalid_json_escapes):
         repaired = repair(repaired)
     repaired = re.sub(
         r'(?<!["\w])([+-]?\d+(?:\.\d+)?)\s*/\s*([+-]?\d+(?:\.\d+)?)(?!["\w])',
