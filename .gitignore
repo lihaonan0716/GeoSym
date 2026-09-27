@@ -63,6 +63,8 @@ scripts/*
 !scripts/prepare_plotqa_public_benchmark_pilot.py
 !scripts/prepare_recovery_round.py
 !scripts/freeze_recovery_repair_round.py
+!scripts/rescore_m3_attribution_json_repair.py
+!scripts/verify_writing_pack_numbers.py
 !scripts/rescore_plotqa_measured_flat_deterministic.py
 !scripts/rescore_plotqa_signed_difference_normalization.py
 !scripts/rescore_reasoning_outputs_offline.py
@@ -114,6 +116,8 @@ assets/real_charts/engisphere/engisphere_sampling_manifest.csv
 .serena/
 latex/
 CLAUDE.md
+# Locked narrative: cites unpublished results and rejection history.
+NARRATIVE.md
 agent/
 recognizer/core/config/credentials*.json
 !recognizer/core/config/credentials*.json.example
