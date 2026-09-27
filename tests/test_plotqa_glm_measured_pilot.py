@@ -14,24 +14,28 @@ from pathlib import Path
 
 import pytest
 
-from scripts.run_plotqa_glm_measured_pilot import (
-    BASELINE_CONDITION,
-    CHART_TYPES,
-    CONDITIONS,
-    EXPERIMENT_IDENTITY_FIELDS,
-    MEASURED_CONDITION,
-    NEUTRAL_BAND,
-    PILOT_SAMPLE_COUNT,
-    RETRY_HEADROOM,
-    SAMPLES_PER_CHART_TYPE,
-    experiment_identity_hash,
-    main,
-    review_plan,
-    rows_of,
-    select_roster,
-    summarize,
-)
-from scripts.run_public_benchmark_pilot import AttemptCounter
+# Dev-local scripts (`scripts/*` is gitignored): skip rather than abort the
+# suite's collection in a clean clone.
+_pilot = pytest.importorskip("scripts.run_plotqa_glm_measured_pilot")
+_public = pytest.importorskip("scripts.run_public_benchmark_pilot")
+
+BASELINE_CONDITION = _pilot.BASELINE_CONDITION
+CHART_TYPES = _pilot.CHART_TYPES
+CONDITIONS = _pilot.CONDITIONS
+EXPERIMENT_IDENTITY_FIELDS = _pilot.EXPERIMENT_IDENTITY_FIELDS
+MEASURED_CONDITION = _pilot.MEASURED_CONDITION
+NEUTRAL_BAND = _pilot.NEUTRAL_BAND
+PILOT_SAMPLE_COUNT = _pilot.PILOT_SAMPLE_COUNT
+RETRY_HEADROOM = _pilot.RETRY_HEADROOM
+SAMPLES_PER_CHART_TYPE = _pilot.SAMPLES_PER_CHART_TYPE
+experiment_identity_hash = _pilot.experiment_identity_hash
+main = _pilot.main
+review_plan = _pilot.review_plan
+rows_of = _pilot.rows_of
+select_roster = _pilot.select_roster
+summarize = _pilot.summarize
+
+AttemptCounter = _public.AttemptCounter
 
 
 def _sample(sample_id: str, qa_type: str) -> dict:

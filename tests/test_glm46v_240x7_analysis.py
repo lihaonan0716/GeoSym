@@ -10,16 +10,19 @@ from __future__ import annotations
 
 import pytest
 
-from scripts.analyze_glm46v_geosym_bench_240x7 import (
-    analysis_2_completion,
-    analysis_8_layer_health,
-    analysis_9_parse_failure_audit,
-    bootstrap_ci,
-    equal_weight_score,
-    governance_audit,
-    grouped_weight_score,
-    wilson_interval,
-)
+# The analysis script is dev-local (`scripts/*` is gitignored). Skip rather
+# than fail collection: a clean clone has no such module, and an ImportError
+# here aborts the whole suite instead of the one module that needs it.
+_module = pytest.importorskip("scripts.analyze_glm46v_geosym_bench_240x7")
+
+analysis_2_completion = _module.analysis_2_completion
+analysis_8_layer_health = _module.analysis_8_layer_health
+analysis_9_parse_failure_audit = _module.analysis_9_parse_failure_audit
+bootstrap_ci = _module.bootstrap_ci
+equal_weight_score = _module.equal_weight_score
+governance_audit = _module.governance_audit
+grouped_weight_score = _module.grouped_weight_score
+wilson_interval = _module.wilson_interval
 
 
 def _row(condition, **kwargs):

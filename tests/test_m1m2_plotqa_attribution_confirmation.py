@@ -1,18 +1,24 @@
 import json
 
-from scripts.analyze_m1m2_plotqa_attribution_confirmation import (
-    CURATED_ARM,
-    assemble,
-    exact_mcnemar_two_sided,
-    paired_stats,
-)
-from scripts.run_m1m2_plotqa_attribution_confirmation import (
-    EXPECTED_NEW_JOBS,
-    LLM_ATTEMPT_CAP,
-    build_plan,
-    partition_samples,
-    review_plan,
-)
+import pytest
+
+# Dev-local scripts (`scripts/*` is gitignored): skip rather than abort the
+# suite's collection in a clean clone.
+_analysis = pytest.importorskip(
+    "scripts.analyze_m1m2_plotqa_attribution_confirmation")
+_runner = pytest.importorskip(
+    "scripts.run_m1m2_plotqa_attribution_confirmation")
+
+CURATED_ARM = _analysis.CURATED_ARM
+assemble = _analysis.assemble
+exact_mcnemar_two_sided = _analysis.exact_mcnemar_two_sided
+paired_stats = _analysis.paired_stats
+
+EXPECTED_NEW_JOBS = _runner.EXPECTED_NEW_JOBS
+LLM_ATTEMPT_CAP = _runner.LLM_ATTEMPT_CAP
+build_plan = _runner.build_plan
+partition_samples = _runner.partition_samples
+review_plan = _runner.review_plan
 
 
 def _cached_rows(solver_ids, llm_ids):

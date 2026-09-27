@@ -5,7 +5,16 @@ caps derived from the condition list, a judge distinct from the reasoning
 model, and attribution arms kept out of the headline matrix.
 """
 
+import importlib.util
+
 import pytest
+
+#: Three tests below import the paid runner inside their own bodies. It is
+#: dev-local (`scripts/*` is gitignored), so mark just those rather than
+#: skipping a module whose other tests check the plan's cost gating.
+requires_runner = pytest.mark.skipif(
+    importlib.util.find_spec("scripts.run_glm46v_geosym_bench_240x7") is None,
+    reason="paid runner is dev-local; absent in a clean clone")
 
 from app.reasoning_pipeline import (
     ATTRIBUTION_CONDITION_MAP,
@@ -190,6 +199,7 @@ class TestPersistence:
         requirement = _plan()["persistence_requirement"]
         assert "per-layer raw text" in requirement
 
+    @requires_runner
     def test_scoring_inputs_captures_raw_text_and_parsed_answer(self):
         from scripts.run_glm46v_geosym_bench_240x7 import scoring_inputs
 
@@ -204,11 +214,13 @@ class TestPersistence:
         assert captured["step_raw_text"]["L3"] == "l3 text"
         assert captured["final_parsed"]["expression"] == "x^2"
 
+    @requires_runner
     def test_scoring_inputs_is_empty_for_an_absent_pipeline(self):
         from scripts.run_glm46v_geosym_bench_240x7 import scoring_inputs
 
         assert scoring_inputs({}) == {}
 
+    @requires_runner
     def test_scoring_inputs_skips_steps_without_text(self):
         from scripts.run_glm46v_geosym_bench_240x7 import scoring_inputs
 

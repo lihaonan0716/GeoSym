@@ -21,10 +21,15 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-from scripts.evaluate_plotqa_evidence_complementarity import (  # noqa: E402
-    bootstrap_margin,
-    contingency,
-)
+import pytest  # noqa: E402
+
+# Dev-local script (`scripts/*` is gitignored): skip rather than abort the
+# suite's collection in a clean clone.
+_module = pytest.importorskip(
+    "scripts.evaluate_plotqa_evidence_complementarity")
+
+bootstrap_margin = _module.bootstrap_margin
+contingency = _module.contingency
 
 
 def _row(sample_id: str, baseline_right: bool, reachable: bool) -> dict:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.util
 from pathlib import Path
 
 import numpy as np
@@ -8,6 +9,15 @@ import pytest
 # The replication under test is the completed seven-arm run (E5 included),
 # so its fixtures must carry seven conditions to match the gate arithmetic.
 from scripts.batch_experiment import HISTORICAL_CONDITIONS as ALL_CONDITIONS_FOR_TEST
+
+#: The paid runner is dev-local (`scripts/*` is gitignored) and is imported
+#: inside individual test bodies below, so a module-level `importorskip` would
+#: not cover them -- and skipping the whole module would also hide the six
+#: tests here that exercise the adapters and the OCR baseline, which are public
+#: code a clean clone must still check. Mark only the tests that need it.
+requires_runner = pytest.mark.skipif(
+    importlib.util.find_spec("scripts.run_glm46v_geosym_bench_240x7") is None,
+    reason="paid runner is dev-local; absent in a clean clone")
 
 from evaluator.adapters.glm import GLMAdapter
 from evaluator.adapters.qwen import QwenVLAdapter
@@ -102,6 +112,7 @@ def test_qwen_adapter_captures_finish_reason_and_returns_string() -> None:
     assert adapter.last_response_metadata["finish_reason"] == "length"
 
 
+@requires_runner
 def test_clean_grid_only_m0_fails_closed_without_mathpix(monkeypatch) -> None:
     import evaluator.adapters.recognizer as recognizer_module
     from scripts.run_glm46v_geosym_bench_240x7 import clean_grid_only_m0
@@ -136,6 +147,7 @@ def test_clean_grid_only_m0_fails_closed_without_mathpix(monkeypatch) -> None:
     assert result["error"] == "clean_grid_unavailable"
 
 
+@requires_runner
 def test_run_reasoning_all_conditions_default_signature_preserves_mathpix_path() -> None:
     import inspect
 
@@ -159,6 +171,7 @@ def _manifest_stub(sample_ids):
     }
 
 
+@requires_runner
 def test_pilot_roster_is_pre_registered_and_spans_eight_families() -> None:
     """F1: the 2026-09-15 run executed 16 consecutive `absolute` samples."""
     from collections import Counter
@@ -173,6 +186,7 @@ def test_pilot_roster_is_pre_registered_and_spans_eight_families() -> None:
     assert set(families.values()) == {2}
 
 
+@requires_runner
 def test_select_roster_returns_requested_ids_in_manifest_order() -> None:
     from scripts.run_glm46v_geosym_bench_240x7 import select_roster
 
@@ -188,6 +202,7 @@ def test_select_roster_returns_requested_ids_in_manifest_order() -> None:
     ]
 
 
+@requires_runner
 def test_select_roster_rejects_ids_outside_the_frozen_manifest() -> None:
     from scripts.run_glm46v_geosym_bench_240x7 import select_roster
 
@@ -197,6 +212,7 @@ def test_select_roster_rejects_ids_outside_the_frozen_manifest() -> None:
         select_roster(manifest, ["not-a-real-sample"])
 
 
+@requires_runner
 def test_select_roster_without_ids_runs_the_full_manifest() -> None:
     from scripts.run_glm46v_geosym_bench_240x7 import select_roster
 
@@ -205,6 +221,7 @@ def test_select_roster_without_ids_runs_the_full_manifest() -> None:
     assert len(select_roster(manifest, None)) == 2
 
 
+@requires_runner
 def test_manifest_timeout_is_600s_and_review_rejects_divergence() -> None:
     """At 180s, 26.7% of pilot rows died with APITimeoutError on hard families."""
     from scripts.run_glm46v_geosym_bench_240x7 import GLM_TIMEOUT_SECONDS, review_manifest
@@ -228,6 +245,7 @@ def test_glm_adapter_honours_the_exported_timeout_and_retry_settings(monkeypatch
     assert client.max_retries == 0
 
 
+@requires_runner
 def test_plotqa_runner_shares_the_same_glm_settings() -> None:
     """Both GLM tracks hit the same two walls; the constants must not drift."""
     from scripts.run_glm46v_geosym_bench_240x7 import GLM_MAX_TOKENS, GLM_TIMEOUT_SECONDS
@@ -240,6 +258,7 @@ def test_plotqa_runner_shares_the_same_glm_settings() -> None:
     assert float(PLOTQA_TIMEOUT) == float(GLM_TIMEOUT_SECONDS)
 
 
+@requires_runner
 def test_manifest_max_tokens_is_16384_and_review_rejects_divergence() -> None:
     """F2: 4096 was consumed by thinking tokens before any visible output."""
     from scripts.run_glm46v_geosym_bench_240x7 import GLM_MAX_TOKENS, review_manifest
@@ -250,6 +269,7 @@ def test_manifest_max_tokens_is_16384_and_review_rejects_divergence() -> None:
     assert "glm_max_tokens_mismatch" in review_manifest(manifest)["blocking_findings"]
 
 
+@requires_runner
 def test_self_consistency_records_every_call_not_just_the_winning_vote() -> None:
     """F3: keying a scalar by step name dropped 2 of E2's 3 finish reasons."""
     from scripts.run_glm46v_geosym_bench_240x7 import row_finish_reasons, step_finish_reasons
@@ -269,6 +289,7 @@ def test_self_consistency_records_every_call_not_just_the_winning_vote() -> None
     assert row_finish_reasons({"reasoning_finish_reasons": reasons}).count("length") == 1
 
 
+@requires_runner
 def test_step_finish_reasons_keeps_each_layer_of_a_multi_step_pipeline() -> None:
     from scripts.run_glm46v_geosym_bench_240x7 import step_finish_reasons
 
@@ -283,6 +304,7 @@ def test_step_finish_reasons_keeps_each_layer_of_a_multi_step_pipeline() -> None
     assert step_finish_reasons(pipeline) == {"L1": ["stop"], "L2": ["stop"], "L3": ["length"]}
 
 
+@requires_runner
 def test_empty_output_counts_exhausted_thinking_but_not_partial_truncation() -> None:
     """F4: an empty body with finish_reason='length' is the GLM failure mode."""
     from scripts.run_glm46v_geosym_bench_240x7 import empty_output_steps
@@ -298,6 +320,7 @@ def test_empty_output_counts_exhausted_thinking_but_not_partial_truncation() -> 
     assert empty_output_steps(pipeline) == ["L3"]
 
 
+@requires_runner
 def test_smoke_gate_fails_closed_on_any_empty_output() -> None:
     from scripts.run_glm46v_geosym_bench_240x7 import gate_report
 
@@ -319,6 +342,7 @@ def test_smoke_gate_fails_closed_on_any_empty_output() -> None:
     assert any(f.startswith("empty_outputs_present") for f in report["failures"])
 
 
+@requires_runner
 def test_pilot_gate_enforces_the_15pct_truncation_rule_that_was_breached() -> None:
     """The 2026-09-15 pilot hit 18.8% on E5 L3 and expanded to Stage C anyway."""
     from scripts.run_glm46v_geosym_bench_240x7 import gate_report
@@ -374,6 +398,7 @@ def _smoke_rows(overrides=None):
     return rows
 
 
+@requires_runner
 def test_smoke_gate_accepts_a_failure_that_names_its_failing_component() -> None:
     """The frozen gate allows a failure carrying a row-level error_reason."""
     from scripts.run_glm46v_geosym_bench_240x7 import SMOKE_2_ROSTER, gate_report
@@ -394,6 +419,7 @@ def test_smoke_gate_accepts_a_failure_that_names_its_failing_component() -> None
     assert any("Request timed out." in w for w in report["warnings"])
 
 
+@requires_runner
 def test_smoke_gate_blocks_a_failure_with_no_diagnosable_cause() -> None:
     from scripts.run_glm46v_geosym_bench_240x7 import SMOKE_2_ROSTER, gate_report
 
@@ -411,6 +437,7 @@ def test_smoke_gate_blocks_a_failure_with_no_diagnosable_cause() -> None:
     assert any(f.startswith("E2_undiagnosed_failure_rows") for f in report["failures"])
 
 
+@requires_runner
 def test_gate_fails_a_half_finished_run_instead_of_reporting_green() -> None:
     """A crashed run must not pass by deriving its denominator from its own rows."""
     from scripts.run_glm46v_geosym_bench_240x7 import gate_report
@@ -436,6 +463,7 @@ def test_gate_fails_a_half_finished_run_instead_of_reporting_green() -> None:
     assert "incomplete_rows:7/14" in report["failures"]
 
 
+@requires_runner
 def test_gate_passes_a_complete_smoke_run() -> None:
     from scripts.run_glm46v_geosym_bench_240x7 import SMOKE_2_ROSTER, gate_report
 
@@ -456,6 +484,7 @@ def test_gate_passes_a_complete_smoke_run() -> None:
     assert gate_report(rows, stage="smoke_2")["status"] == "green"
 
 
+@requires_runner
 def test_gate_flags_an_incomplete_full_run_against_the_manifest_roster() -> None:
     from scripts.run_glm46v_geosym_bench_240x7 import gate_report
 
@@ -479,6 +508,7 @@ def test_gate_flags_an_incomplete_full_run_against_the_manifest_roster() -> None
     assert "incomplete_roster:173/240" in report["failures"]
 
 
+@requires_runner
 def test_gate_flags_nonzero_ocr_http_attempts_as_protocol_violation() -> None:
     from scripts.run_glm46v_geosym_bench_240x7 import gate_report
 
@@ -500,6 +530,7 @@ def test_gate_flags_nonzero_ocr_http_attempts_as_protocol_violation() -> None:
     )
 
 
+@requires_runner
 def test_shards_partition_the_roster_without_overlap_or_loss() -> None:
     from scripts.run_glm46v_geosym_bench_240x7 import shard_roster
 
@@ -516,6 +547,7 @@ def test_shards_partition_the_roster_without_overlap_or_loss() -> None:
     assert len(flat) == len(set(flat))
 
 
+@requires_runner
 def test_shard_roster_rejects_an_invalid_index() -> None:
     from scripts.run_glm46v_geosym_bench_240x7 import shard_roster
 
@@ -523,6 +555,7 @@ def test_shard_roster_rejects_an_invalid_index() -> None:
         shard_roster([{"sample_id": "s0"}], 4, 4)
 
 
+@requires_runner
 def test_merge_shards_refuses_overlapping_rows() -> None:
     import json as _json
 
@@ -557,6 +590,7 @@ def test_merge_shards_refuses_overlapping_rows() -> None:
             merge_shards([a, b], manifest)
 
 
+@requires_runner
 def test_merge_shards_combines_attempts_and_rows() -> None:
     import json as _json
     import tempfile
@@ -595,6 +629,7 @@ def test_merge_shards_combines_attempts_and_rows() -> None:
     assert merged["stage_status"] == "glm46v_geosym_bench_controlled_240x7_completed"
 
 
+@requires_runner
 def test_exclusive_writer_lock_blocks_a_second_concurrent_runner() -> None:
     """Two runners on one checkpoint recompute and re-pay for the same rows."""
     import tempfile
@@ -614,6 +649,7 @@ def test_exclusive_writer_lock_blocks_a_second_concurrent_runner() -> None:
             pass
 
 
+@requires_runner
 def test_exclusive_writer_lock_allows_distinct_shard_files() -> None:
     import tempfile
 
@@ -627,6 +663,7 @@ def test_exclusive_writer_lock_allows_distinct_shard_files() -> None:
             pass  # different shards must run concurrently
 
 
+@requires_runner
 def test_summary_reports_score_with_its_denominator() -> None:
     from scripts.run_glm46v_geosym_bench_240x7 import summarize
 

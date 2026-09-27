@@ -3,12 +3,14 @@ from pathlib import Path
 
 import pytest
 
-from scripts.analyze_layer_capability_profile import (
-    LAYER_SPEC,
-    build_profile,
-    paired_delta,
-    verify_layer_spec_matches_config,
-)
+# Dev-local script (`scripts/*` is gitignored): skip rather than abort the
+# suite's collection in a clean clone.
+_module = pytest.importorskip("scripts.analyze_layer_capability_profile")
+
+LAYER_SPEC = _module.LAYER_SPEC
+build_profile = _module.build_profile
+paired_delta = _module.paired_delta
+verify_layer_spec_matches_config = _module.verify_layer_spec_matches_config
 
 ROOT = Path(__file__).resolve().parents[1]
 

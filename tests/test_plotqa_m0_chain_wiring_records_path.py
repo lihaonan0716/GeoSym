@@ -19,7 +19,9 @@ from pathlib import Path
 
 import pytest
 
-from scripts import verify_plotqa_m0_chain_wiring as wiring
+# Dev-local script (`scripts/*` is gitignored): skip rather than abort the
+# suite's collection in a clean clone.
+wiring = pytest.importorskip("scripts.verify_plotqa_m0_chain_wiring")
 
 
 class TestRecordsPathIsSelectable:
