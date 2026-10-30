@@ -209,3 +209,24 @@ def test_the_structural_gate_admits_three_gridlines(params_report):
     row = next(r for r in params_report["parameters"]
                if "min gridlines" in r["parameter"])
     assert row["found"] == "3"
+
+
+@pytest.mark.skipif(not params.SUPPLEMENTARY.exists(), reason="local manuscript absent")
+@pytest.mark.parametrize("old,new,rule", [
+    (r"|I_B(p)-I_G(p)|<8", r"\max_{c,c'}|I_c(p)-I_{c'}(p)|<8",
+     "B-G mask comparison"),
+    (r"\max(80,\lfloor W/14\rfloor)", r"\max(80,\lfloor H/14\rfloor)",
+     "horizontal grid count"),
+    ("200 uniformly spaced points", "70 uniformly spaced points",
+     "expression sample count"),
+    ("highest combined score", "nearest prediction", "extrema combined matching"),
+    ("Each\nrun contributes its midpoint", "Each strip contributes one value",
+     "per-run ordinate"),
+])
+def test_method_description_guard_rejects_the_observed_drift(old, new, rule):
+    text = params.read_metric_text(params.SUPPLEMENTARY)
+    assert old in text
+    changed = text.replace(old, new)
+    checks = {row["rule"]: row["status"]
+              for row in params.check_method_descriptions(changed)}
+    assert checks[rule] != "ok"

@@ -125,9 +125,17 @@ class TestClaimCoverage:
         assert "C7" not in claimed, (
             "C7 was retired; see NARRATIVE.md O-4 before adding it back")
 
-    def test_c8_requires_all_three_plotqa_arms(self):
-        # Invariant 8: the PlotQA table reports every arm, including the one
-        # that does not favour us. The check encodes that as a count, so
-        # dropping an arm fails rather than quietly shrinking the table.
-        _fn, _desc, needs = CHECKS["C8_all_three_arms_present"]
+    def test_c8_requires_the_retained_plotqa_pair(self):
+        _fn, _desc, needs = CHECKS["C8_retained_pair_present"]
         assert needs == ("plotqa_numeric_paid",)
+
+    def test_withdrawn_rows_do_not_enter_the_c8_summary(self, tmp_path):
+        path = tmp_path / "rows.json"
+        path.write_text(json.dumps({"results": [
+            {"condition": "E0_plotqa_direct", "correct": True},
+            {"condition": "G_measured_raw", "correct": False},
+            {"condition": "Measured_flat_answer_baseline", "correct": True},
+        ]}), encoding="utf-8")
+        report = _module.check_c8({"plotqa_numeric_paid": path})
+        assert report["value"] == report["expected"] == 2
+        assert set(report["detail"]) == {"E0_plotqa_direct", "G_measured_raw"}

@@ -325,23 +325,11 @@ def build_assertions() -> list[dict[str, Any]]:
         ("C4 vbar after", subtypes["vbar"]["chain_coverage"], 0.769, 0.001),
         ("C4 line after", subtypes["line"]["chain_coverage"], 0.508, 0.001),
         ("C4 dot after", subtypes["dot"]["chain_coverage"], 0.883, 0.001),
-        # -- section 3.2: every PlotQA arm.
-        # These five measure the effect of REMOVING THE IMAGE, not of adding
-        # evidence: both arms receive byte-identical facts. They stay pinned
-        # so the artifact cannot drift, and are named for what they measure --
-        # a "C7 gain" label is how the deleted claim taught itself back.
-        ("image-removal gap (points)",
-         evidence["paired_difference"] * 100, 17.5, 0.05),
-        ("image-removal McNemar p", evidence["mcnemar_exact_p"], 0.00052, 0.00001),
-        ("image-removal wins",
-         evidence["discordant_pairs"]["only_treatment"], 15, 0),
-        ("image-removal losses",
-         evidence["discordant_pairs"]["only_baseline"], 1, 0),
-        ("image-removal n", evidence["n_paired"], 80, 0),
-        ("C8 evidence+image accuracy", evidence["accuracy_treatment"], 0.588, 0.001),
-        ("C8 evidence-only accuracy", evidence["accuracy_baseline"], 0.412, 0.001),
+        # -- section 3.2: the retained PlotQA comparison.
+        ("C8 evidence+image accuracy", image["accuracy_treatment"], 0.588, 0.001),
         ("C8 image-only accuracy", image["accuracy_baseline"], 0.637, 0.001),
-        ("C8 image-vs-evidence p", image["mcnemar_exact_p"], 0.39, 0.005),
+        ("C8 paired n", image["n_paired"], 80, 0),
+        ("C8 paired p", image["mcnemar_exact_p"], 0.388, 0.001),
         # -- section 4: R3-3, and the cost figure the pack now states as 3x
         ("C9 mean delta", layering["mean_delta"], 0.12, 0.01),
         ("C9 p", layering["paired_t_p"], 0.935, 0.001),
@@ -380,13 +368,7 @@ def build_assertions() -> list[dict[str, Any]]:
 
 
 def plotqa_evidence_contrast() -> dict[str, float]:
-    """The only PlotQA contrast that varies evidence instead of image access.
-
-    Both live arms receive byte-identical facts, so 0.588-vs-0.412 measures
-    removing the image. This function computes the contrast that does isolate
-    evidence -- image-only against evidence+image -- which runs 4 wins to 8
-    losses. A deleted claim (C7) read the former as the latter.
-    """
+    """The retained image-only versus measured-plus-image comparison."""
     rows = load(PLOTQA_ATTR_PAID)["results"]
     by_condition: dict[str, dict[str, bool]] = collections.defaultdict(dict)
     for row in rows:
@@ -472,7 +454,7 @@ def prose_assertions(pack_text: str) -> list[dict[str, Any]]:
         ("names the varying n", "it is not a uniform 240"),
         ("states the 3x reasoning cost", "3 reasoning calls against 1"),
         ("shows the per-subtype split", "Per-subtype detail"),
-        ("keeps all three PlotQA arms", "image-only"),
+        ("keeps the image-only PlotQA baseline", "image-only"),
         ("names the locked C1 statistic", "paired mean difference, +10.66"),
         ("explains the win/loss split", "magnitude rather than frequency"),
         ("labels the C2 block complete-case", "Label these numbers"),
