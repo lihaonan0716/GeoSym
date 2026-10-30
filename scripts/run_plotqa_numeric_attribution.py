@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 """PlotQA numeric-answer attribution on the CURRENT M0' extractor.
 
-Frozen plan: ``docs/PLOTQA_NUMERIC_ATTRIBUTION_FROZEN_PLAN_2026-09-20.md``.
+The experiment plan is frozen before any paid call.
 
 Why this run exists
 -------------------
@@ -147,7 +147,7 @@ class LLMHttpAttemptCapExhausted(RuntimeError):
 class OcrCallAttempted(RuntimeError):
     """Raised if anything on this path tries to bill an OCR call.
 
-    This path must read frozen PaddleOCR boxes from disk. The R3-3 runner
+    This path must read frozen PaddleOCR boxes from disk. An earlier attribution runner
     recorded ``actual_ocr_http_attempts: 0`` as a hardcoded constant while really
     billing one Mathpix call per sample; the field was a claim, not a
     measurement. Here the number is measured and a non-zero count aborts.
@@ -300,7 +300,7 @@ def build_plan(stage: str, roster: list[dict[str, Any]], *,
         "schema_version": "plotqa_numeric_attribution_plan_v1",
         "created_at_utc": utc_now(),
         "stage": stage,
-        "frozen_plan_doc": "docs/PLOTQA_NUMERIC_ATTRIBUTION_FROZEN_PLAN_2026-09-20.md",
+        "frozen_plan_doc": "PLOTQA_NUMERIC_ATTRIBUTION_FROZEN_PLAN_2026-09-20",
         "conditions": list(CONDITIONS),
         "target_strata": [list(s) for s in TARGET_STRATA],
         "roster_rule": (

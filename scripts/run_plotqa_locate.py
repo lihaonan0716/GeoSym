@@ -45,8 +45,7 @@ CONDITIONS = ("G_measured_raw", "Measured_flat_answer_baseline")
 RETIRED_CONDITIONS = {
     "G_full_measured_geosym": (
         "retired 2026-09-19 with M1'/M2'; its only distinguishing input "
-        "(curated selection) no longer exists. Historical rows remain valid; "
-        "see docs/M1M2_RETIREMENT_AND_FGCS_REPOSITIONING_PLAN_2026-09-19.md"
+        "(curated selection) no longer exists. Historical rows remain valid."
     ),
 }
 CACHED_BASELINES = ("E0_plotqa_direct", "E1_plotqa_cot")

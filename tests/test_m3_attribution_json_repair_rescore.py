@@ -1,4 +1,4 @@
-"""Tests for the R3-3 JSON-syntax repair rescore.
+"""Tests for the layering-attribution JSON-syntax repair rescore.
 
 The rescore decides whether the layering claim survives, so its own failure
 modes matter as much as its result. Two in particular:

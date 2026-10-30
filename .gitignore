@@ -42,37 +42,16 @@ assets/geosym_bench.zip
 # but keep scripts that are imported by the public test suite. Tests are part
 # of the public artifact, so a clean clone must be able to collect them.
 scripts/*
-!scripts/analyze_robustness_pilot.py
 !scripts/analyze_plotqa_measured_flat_parseability.py
 !scripts/analyze_plotqa_remaining_bottlenecks.py
 !scripts/analyze_plotqa_repair_projection.py
-!scripts/analyze_public_benchmark_pilot.py
-!scripts/audit_robustness_source_pool.py
-!scripts/audit_plotqa_public_benchmark_plan.py
 !scripts/batch_experiment.py
-!scripts/build_evidence_selection_candidate_guided_roster.py
-!scripts/build_robustness_benchmark.py
-!scripts/export_chartqa_manifest.py
-!scripts/export_paper_results.py
-!scripts/finalize_full_paper_evidence_package.py
 !scripts/finalize_plotqa_measured_geosym_evidence.py
-!scripts/freeze_evidence_selection_candidate_guided_confirmation_manifest.py
-!scripts/freeze_evidence_selection_selective_propagation_pilot_manifest.py
-!scripts/freeze_robustness_manifest.py
-!scripts/freeze_robustness_pilot_manifest.py
 !scripts/prepare_plotqa_public_benchmark_pilot.py
-!scripts/prepare_recovery_round.py
-!scripts/freeze_recovery_repair_round.py
 !scripts/rescore_m3_attribution_json_repair.py
-!scripts/verify_writing_pack_numbers.py
 !scripts/rescore_plotqa_measured_flat_deterministic.py
 !scripts/rescore_plotqa_signed_difference_normalization.py
 !scripts/rescore_reasoning_outputs_offline.py
-!scripts/run_geosym_bench_post_remediation_subset.py
-!scripts/run_evidence_selection_candidate_guided_confirmation.py
-!scripts/run_evidence_selection_selective_propagation_pilot.py
-!scripts/run_robustness_confirmation.py
-!scripts/run_robustness_pilot.py
 !scripts/run_plotqa_direct_public_baselines.py
 !scripts/run_plotqa_locate.py
 !scripts/run_plotqa_measure.py
@@ -81,26 +60,22 @@ scripts/*
 !scripts/run_plotqa_measured_m0.py
 !scripts/run_plotqa_measured_public_confirmation.py
 !scripts/run_plotqa_openocr_survey.py
-!scripts/selective_propagation.py
-!scripts/survey_public_benchmark_metadata.py
 !scripts/run_generate.py
-!scripts/audit_extrema_filter.py
 !scripts/audit_prompt_fairness.py
-!scripts/analyze_extrema_validation.py
-!scripts/estimate_rerun_budget.py
 !scripts/prepare_public_benchmark_pilot.py
 !scripts/run_public_benchmark_pilot.py
 !scripts/run_m3_attribution_pilot.py
 !scripts/analyze_m3_attribution.py
 !scripts/run_plotqa_numeric_attribution.py
 !scripts/analyze_plotqa_numeric_attribution.py
-!scripts/run_extrema_validation.py
-!scripts/run_prompt_fairness_pilot.py
 !scripts/diagnose_plotqa_mark_segmentation.py
 !scripts/verify_plotqa_m0_chain_wiring.py
 !scripts/rescore_year_answers_offline.py
 !scripts/analyze_plotqa_template_loss_decomposition.py
 !scripts/analyze_zero_row_elimination.py
+!scripts/run_glm46v_geosym_bench_240x7.py
+!scripts/evaluate_plotqa_ruler_refit.py
+!scripts/evaluate_evidence_provider_substitutability.py
 
 # Tests are part of the public artifact — reviewers need to be able to run them.
 # The whole tree is tracked, at any depth: an exception limited to `tests/*.py`
@@ -116,7 +91,7 @@ assets/real_charts/engisphere/engisphere_sampling_manifest.csv
 .serena/
 latex/
 CLAUDE.md
-# Locked narrative: cites unpublished results and rejection history.
+# Dev-local planning notes.
 NARRATIVE.md
 agent/
 recognizer/core/config/credentials*.json
@@ -127,3 +102,41 @@ recognizer/models/config/models_config.yaml
 .drawio/
 AGENTS.md
 .codex/
+
+# Dev-local tests of retired experiments and private tooling (kept on disk).
+/tests/test_artifact_registry.py
+/tests/test_chartqa_manifest_export.py
+/tests/test_dimension_exclusion.py
+/tests/test_evidence_selection_candidate_guided_confirmation_runner.py
+/tests/test_evidence_selection_candidate_guided_protocol.py
+/tests/test_evidence_selection_selective_propagation_pilot_runner.py
+/tests/test_evidence_selection_selective_propagation_zero_cost_and_manifest.py
+/tests/test_extrema_filter_audit.py
+/tests/test_extrema_validation_analysis.py
+/tests/test_extrema_validation_runner.py
+/tests/test_full_paper_evidence_finalizer.py
+/tests/test_geosym_bench_post_remediation_runner.py
+/tests/test_glm46v_240x7_analysis.py
+/tests/test_layer_capability_profile.py
+/tests/test_m0_prose_matches_code.py
+/tests/test_m1m2_plotqa_attribution_confirmation.py
+/tests/test_paper_evidence_bundle.py
+/tests/test_paper_results_export.py
+/tests/test_plotqa_500_restoration.py
+/tests/test_plotqa_evidence_complementarity.py
+/tests/test_plotqa_glm_measured_pilot.py
+/tests/test_plotqa_plan_audit.py
+/tests/test_prompt_fairness_pilot.py
+/tests/test_public_benchmark_analysis.py
+/tests/test_public_benchmark_metadata_survey.py
+/tests/test_rerun_budget.py
+/tests/test_robustness_benchmark.py
+/tests/test_robustness_confirmation_runner.py
+/tests/test_robustness_pilot_analysis.py
+/tests/test_robustness_pilot_manifest.py
+/tests/test_robustness_pilot_runner.py
+/tests/test_robustness_source_pool.py
+/tests/test_roster_and_vocabulary.py
+/tests/test_selective_propagation_parser.py
+/tests/test_selective_propagation_payloads.py
+/tests/test_writing_pack_numbers.py

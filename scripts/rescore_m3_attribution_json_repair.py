@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-"""Re-score the R3-3 attribution artifact after repairing non-JSON answer syntax.
+"""Re-score the layering-attribution artifact after repairing non-JSON answer syntax.
 
 Zero paid calls. Zero network. The stored ``chain_text`` is re-parsed, the
 objective dimensions are recomputed locally, and the judge score is taken from
@@ -468,7 +468,7 @@ def build_report(payload: dict[str, Any], rows: list[dict[str, Any]]) -> dict[st
 
 def render(report: dict[str, Any]) -> str:
     lines = [
-        "# R3-3 attribution: JSON-syntax repair rescore (zero cost)", "",
+        "# Layering attribution: JSON-syntax repair rescore (zero cost)", "",
         f"Created: {report['created_at_utc']}",
         f"Source: `{report['source_artifact']}` "
         f"(status `{report['source_stage_status']}`)",

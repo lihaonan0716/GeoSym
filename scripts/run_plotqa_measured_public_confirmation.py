@@ -58,7 +58,7 @@ GLM_API_MODEL_ID = "glm-4.6v"
 # GLM-4.6V spends its token budget on internal thinking before emitting visible
 # text. At 4096 the GeoSym-Bench run returned finish_reason='length' with an
 # EMPTY body on 90.9% of truncated calls, which scores as a failure and confounds
-# every condition mean. See docs/GLM46V_240X7_RERUN_PLAN_2026-09-17.md section 1.
+# every condition mean.
 GLM_MAX_TOKENS = 16384
 # The GeoSym-Bench pilot lost ~17% of calls to APITimeoutError at 180s, with the
 # failures tracking problem difficulty. Same backbone, same constraint here.

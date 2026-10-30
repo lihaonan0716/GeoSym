@@ -7,7 +7,7 @@ actually cost this project money or credibility before:
 * an identity hash that includes its own timestamp, so the resume guard rejects
   its own checkpoint and re-bills every completed row;
 * an ``actual_ocr_http_attempts`` field that is a hardcoded 0 while the path
-  really bills an OCR call (the defect found in the R3-3 runner);
+  really bills an OCR call (a defect found in an earlier attribution runner);
 * ``score_prediction`` called without ``question``, which silently scores year
   answers with a numeric tolerance instead of exact equality;
 * a roster selected with anything that could encode the reference answer.
@@ -111,7 +111,7 @@ class TestCostGating:
 
 class TestOcrIsMeasuredNotAsserted:
     def test_a_mathpix_call_raises_and_is_counted(self):
-        """The R3-3 runner recorded a hardcoded 0 while billing per sample."""
+        """An earlier runner recorded a hardcoded 0 while billing per sample."""
         import recognizer.mathpix.mathpix_image_ocr as mathpix_module
 
         with attribution.forbid_paid_ocr() as attempts:

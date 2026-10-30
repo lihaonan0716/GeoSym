@@ -8,8 +8,7 @@ which subset" is not a choice made once the outcome is known -- the failure mode
 invariant 7 exists to prevent, and the one that cost this project its first
 submission.
 
-Decision rule, frozen in
-``docs/PLOTQA_NUMERIC_ATTRIBUTION_FROZEN_PLAN_2026-09-20.md``
+Decision rule, frozen before the run
 -----------------------------------------------------------
 Answers are binary here, so the paired contrast is over per-sample correctness:
 

@@ -2,7 +2,7 @@
 
 Why these exist
 ---------------
-The R3-3 attribution run produced a +13.4 point paired gap that was not
+The layering-attribution run produced a +13.4 point paired gap that was not
 reasoning. 44 of 104 single-pass rows answered CORRECTLY -- coordinates
 identical to the layered arm -- but wrote the monotonicity interval in
 mathematical notation::

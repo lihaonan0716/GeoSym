@@ -157,7 +157,7 @@ def test_run_reasoning_all_conditions_default_signature_preserves_mathpix_path()
     assert parameter.default is None
 
 
-# ── Re-run fixes F1-F4 (docs/GLM46V_240X7_RERUN_PLAN_2026-09-17.md) ──────
+# ── Re-run fixes F1-F4 ──────
 
 
 def _manifest_stub(sample_ids):

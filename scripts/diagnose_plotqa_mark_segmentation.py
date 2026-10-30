@@ -6,8 +6,7 @@ and the official PlotQA ``annotations.json``, which carries per-mark ground
 truth: for every series, the plotted ``y`` values and the pixel ``bboxes`` of
 each mark.
 
-This answers the question left open by
-``docs/PLOTQA_IDEAL_CHAIN_ZERO_COST_ANALYSIS_2026-09-18.md`` section 6b: the
+This answers an open question from the zero-cost chain analysis: the
 bottleneck was attributed to mark segmentation and pixel read-out, but "it is
 broken" is not actionable. Segmentation can fail in three distinct ways, and
 they need entirely different fixes:
