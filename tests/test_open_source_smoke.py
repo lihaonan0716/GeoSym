@@ -51,16 +51,22 @@ def test_readme_uses_repaired_public_claims():
     text = (ROOT / "README.md").read_text(encoding="utf-8")
     lower_text = text.lower()
 
+    # The README describes the executed method and the reported numbers.
     assert "GPT-5.5" in text
-    assert "Claude-Opus-4.8" in text
-    assert "480 samples" in text
-    assert "460-sample complete-case subset" in text
-    assert "verified anchors" not in lower_text
-    assert "oracle baseline" not in lower_text
-    assert "sample-wise oracle" not in lower_text
-    assert "conditional robustness" not in lower_text
-    assert "post-hoc robustness" not in lower_text
-    assert "confirmatory robustness evidence" in lower_text
+    assert "GLM-4.6V" in text
+    assert "extract_clean_cartesian_grid" in text
+    assert "benchmark/roster_240.json" in text
+    assert "+10.66" in text
+    # Null results are reported alongside the headline (layering, PlotQA accuracy).
+    assert "+0.12" in text
+    assert "p = 0.388" in text
+    # Retired framing and descriptions of code paths the method never runs.
+    for stale in ("460-sample", "hough", "stage 2.5", "oracle baseline",
+                  "sample-wise oracle", "verified anchors",
+                  "conditional robustness", "post-hoc robustness"):
+        assert stale not in lower_text, stale
+    # The weighting is unequal; the README may only mention equal weighting to deny it.
+    assert "**not** equally weighted" in text
     assert "Claude-Opus-4.6" not in text
 
 
