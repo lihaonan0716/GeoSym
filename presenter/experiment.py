@@ -131,7 +131,7 @@ def collect_single(sample_id: str, model_pattern: str = "GPT-5.4") -> Optional[D
 def collect_all(model_pattern: str = "GPT-5.4") -> Dict[str, Any]:
     """Collect results for all samples and produce an aggregated summary."""
     all_samples = []
-    for family in ["fred", "engisphere", "omniscience"]:
+    for family in ["omniscience"]:
         family_dir = _ASSETS_ROOT / family
         if not family_dir.exists():
             continue

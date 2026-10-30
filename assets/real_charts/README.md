@@ -16,7 +16,8 @@ assets/real_charts/
 
 ## M0 Modes
 
-Each sample's `meta.json` specifies an `m0_mode` field:
+Each sample's `meta.json` specifies an `m0_mode` field. All bundled samples
+use `grid_free`; `grid_aware` is supported for samples you add:
 
 - **`grid_aware`** (default): Pre-curated `candidate_facts`, `verified_facts`,
   `useful_facts` in meta.json simulate CV-based coordinate extraction (M0).

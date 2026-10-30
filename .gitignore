@@ -24,7 +24,6 @@ outputs/
 .claude/
 .playwright-cli/
 .cursor/
-private_lab/
 
 # Keep presenter demo assets versioned (readme images, real_charts).
 !assets/
