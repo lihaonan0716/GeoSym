@@ -83,8 +83,11 @@ class ModelManager:
             logger.debug("Loaded %d models", len(self.models))
             
         except FileNotFoundError:
-            logger.error("Configuration file not found: %s", self.config_path)
-            raise
+            # The config holds API keys and is not distributed. Without it no
+            # enhancement model is available; extraction paths that never call
+            # stage 0.5 (the default) must still construct.
+            logger.warning("Configuration file not found: %s; no enhancement models loaded",
+                           self.config_path)
         except yaml.YAMLError as e:
             logger.error("Failed to parse configuration file: %s", e)
             raise
