@@ -1,27 +1,22 @@
 # GeoSym
 
-**GeoSym: Geometric Evidence Extraction and Layered Reasoning for Quantitative Chart Understanding**
+**GeoSym: Explicit Evidence Construction and Layered Reasoning for Quantitative Chart Understanding**
 
-Multimodal large language models have demonstrated remarkable capabilities in visual understanding, yet they remain prone to hallucination and imprecise numerical reasoning when confronted with tasks demanding quantitative accuracy. Existing enhancement strategies — including chain-of-thought prompting, self-consistency decoding, and tool-augmented reasoning — improve general reasoning but leave evidence construction implicit in the prompt, so the quality of what the reasoner is given is neither engineered nor auditable.
+Answering a quantitative question about a chart requires recovering values encoded in pixel geometry and then computing with them. An end-to-end multimodal model does both in a single model call, so a wrong answer does not reveal which operation failed.
 
-GeoSym is a chart-evidence pipeline for quantitative reasoning that makes evidence construction an explicit pipeline stage feeding a layered reasoning chain. The framework operates through two modules:
+GeoSym separates the two. An **evidence extraction stage (EX)** recovers measured quantities from the image by geometric analysis, and a **layered reasoning stage (LR)** consumes them through reading, analysis and inference layers, each of which records its output before the next layer runs. This repository contains the pipeline, the baselines, the evaluation code and the scripts that produced the reported results.
 
-1. **M0 — Geometric Evidence Extraction**: Computation-grounded visual extraction through geometric pixel-level analysis, producing coordinates, intercepts, extrema, and monotonicity intervals.
-2. **M3 — Layered Reasoning**: Layered reasoning that presents structured evidence across reading, analysis, and inference layers aligned with Curcio's graph comprehension taxonomy, each layer receiving a layer-restricted evidence view.
+**Keywords:** chart understanding · multimodal reasoning · quantitative visual reasoning · vision-language models · evidence extraction
 
-> **Two modules, not four.** Earlier versions of this framework included **M1** (confidence-scored fact construction) and **M2** (utility-aware evidence selection). Both were **retired on 2026-09-19** after eight independent evaluations found no discriminative signal: held-out AUC fell to 0.584 as the underlying evidence improved, all eight substitute features stayed below 0.60, a seven-point budget sweep moved the score by at most +2, every per-fact suppression rule was net-negative, and the two arms produced byte-identical output on 76.8% of samples. The current pipeline performs **no reliability scoring, tiering, gating, or re-ranking** — every admitted fact is injected. Results produced under the retired modules are retained below and labelled as historical.
+## Evidence extraction — examples
 
-**Keywords:** Multimodal reasoning · Quantitative chart reasoning · Vision-language models · Visual evidence extraction · Layered reasoning
-
-## M0 Visual Evidence Extraction — Examples
-
-GeoSym's M0 module performs computation-grounded coordinate extraction via geometric pixel-level analysis. Below are examples from four function families showing original benchmark images (left) and M0 annotated outputs (right) with detected curve-grid intersection points:
+On GeoSym-Bench charts, which carry a regular integer grid, the extractor detects the grid lattice and the curve, and keeps only curve points that lie on lattice intersections. Original benchmark images (left) and the extracted coordinates (right):
 
 <table>
 <tr>
 <th>Function Family</th>
 <th>Original Image</th>
-<th>M0 Annotated Output</th>
+<th>Extracted coordinates</th>
 </tr>
 <tr>
 <td><b>Linear</b><br><code>y = ax + b</code></td>
@@ -45,48 +40,35 @@ GeoSym's M0 module performs computation-grounded coordinate extraction via geome
 </tr>
 </table>
 
-Each annotated image shows detected intersection points (green/yellow circles) with their computed real-valued coordinates. These coordinate anchors are the evidence set that M3 consumes.
+## Architecture
 
-## Framework Architecture
+### EX: evidence extraction
 
-GeoSym enforces a clear separation of concerns: a computation-grounded module (M0) produces evidence, and the reasoning module (M3) synthesizes across abstraction layers. Each module operates within its domain of competence, and each is defined by an evidence interface rather than a fixed algorithm, so implementations can be substituted.
+EX is defined by an evidence interface (`evaluator/evidence/`) rather than by a fixed algorithm. Two providers are evaluated, one per chart population:
 
-### M0: Candidate Evidence Generation
+- **Grid-geometric extractor** (`recognizer/core/clean_grid_fallback.py`, entry point `extract_clean_cartesian_grid`), used on GeoSym-Bench. It reads no text. Four steps: lattice detection from a grey-pixel mask and column/row projections; axis location from near-black projections; curve isolation by HSV thresholding inside the lattice region; integer snapping with refusal, where a candidate further than a quarter grid unit from an integer is discarded rather than rounded. Extraction fails closed when either axis is missing or fewer than three grid lines are found in either direction.
+- **PlotQA chain** (`evaluator/reasoning/plotqa_m0_chain.py`), used on real statistical charts without coordinate grids: category-axis resolution, a least-squares value-axis refit over frozen PaddleOCR tick boxes, and mark admission.
 
-M0 produces a candidate evidence set through deterministic, pixel-grounded visual extraction. The design principle is **competence separation**: OCR provides axis scale information, geometric computation establishes pixel-to-coordinate mappings, and visual analysis identifies data point locations. The framework is agnostic to the specific extraction algorithm — M0 defines an interface, allowing adaptation to different visual domains.
+The GeoSym-Bench runners select the grid-geometric extractor through the `clean_grid_only_m0()` context manager; the broader OCR-based route under `recognizer/` is not used by the reported GeoSym-Bench results. Admitted facts are injected as they are: there is no reliability scoring, tiering, gating or re-ranking.
 
-Two complementary implementations share a common ruler infrastructure:
+### LR: layered reasoning
 
-- **Function-Specialized M0** (`recognizer/`): A deterministic geometric pipeline for charts with integer coordinate grids. Detects grid lines via Hough transform, establishes pixel-to-coordinate mapping, and identifies curve-grid intersection points. Stage 2.5 adds least-squares regression cross-validation using the shared ruler module.
-- **Enhanced M0** (`presenter/`): A four-phase pipeline for real-world charts without integer grids. Phase 1 builds a coordinate ruler from OCR tick labels via least-squares regression. Phase 2 uses an LLM to locate semantically important points at the pixel level. Phase 3 converts pixel coordinates to chart units through the ruler. Phase 4 checks measurements against axis bounds and fuses evidence into a standardized format.
-- **Shared Ruler** (`presenter/ruler.py`): OCR-based coordinate system construction used by both implementations. Supports linear, logarithmic, datetime, and categorical axis scales.
+Following Curcio's graph-comprehension taxonomy, LR runs three layers:
 
-### Fact Construction
+- **L1 (reading)** receives the image and the extracted evidence, **never the task parameters**, and records coordinates, intercepts and extrema. A reader that knows the target finds it in the pixels, so withholding the task keeps the reading independent; this is enforced by construction, with no parameter to pass it through.
+- **L2 (analysis)** receives the image, the L1 output and the task parameters (prediction x-positions, rate-of-change interval), and computes predictions, rate of change, monotonicity and symmetry.
+- **L3 (inference)** receives the image and the L1 and L2 outputs, and infers the closed-form expression, domain and range.
 
-From the extracted coordinates, GeoSym infers intercepts, extrema, monotonicity intervals, and symmetry, then formats them as a single flat JSON block for injection. Facts are emitted **unannotated**: there are no confidence tiers, no scores, and no selection step. Flat injection is the only surviving profile — the tiered profile was removed with M1/M2.
-
-### M3: Layered Reasoning
-
-M3 consumes the evidence through a three-layer reasoning hierarchy:
-
-- **L1 (Reading)**: Extract or consolidate coordinates, intercepts, and extrema. Evidence is injected primarily at this layer.
-- **L2 (Analysis)**: Perform quantitative analysis — function value predictions, rate of change, monotonicity, and symmetry.
-- **L3 (Inference)**: Derive higher-order mathematical conclusions — closed-form expression, domain, and range.
-
-Evidence injection at L1 ensures that stronger visual grounding propagates upward into L2 and L3, where abstract reasoning benefits from explicit, auditable anchors rather than implicit visual impressions alone.
+Layering costs three reasoning calls per sample against one for a single pass. Its contribution is an inspectable record of what was read, computed and inferred; it is not claimed to improve accuracy (see Results).
 
 ## GeoSym-Bench
 
-GeoSym-Bench is a controlled evaluation benchmark with complete ground-truth annotations across **8 function families**. The generated cohort contains **480 samples**; historical experiments are reported on a **460-sample complete-case subset** where all compared conditions completed successfully.
+A controlled benchmark of synthetic function charts with exact algebraic ground truth.
 
-The dataset is hosted on HuggingFace: [lihaonan0716/GeoSym-Bench](https://huggingface.co/datasets/lihaonan0716/GeoSym-Bench)
+- **Data:** [huggingface.co/datasets/lihaonan0716/GeoSym-Bench](https://huggingface.co/datasets/lihaonan0716/GeoSym-Bench) (CC-BY 4.0). The released files are the canonical benchmark: a generated pool of 480 charts, 60 per family, 1440×1440 PNG with one ground-truth JSON each.
+- **Evaluated roster:** [`benchmark/roster_240.json`](benchmark/roster_240.json) lists the 240 samples behind the reported GeoSym-Bench results, with per-family counts (19–32) and SHA-256 checksums for every image and ground-truth file.
 
-```python
-from huggingface_hub import snapshot_download
-path = snapshot_download(repo_id="lihaonan0716/GeoSym-Bench", repo_type="dataset")
-```
-
-### Function Families
+### Function families
 
 | Category | Family | General Form |
 |----------|--------|--------------|
@@ -94,14 +76,14 @@ path = snapshot_download(repo_id="lihaonan0716/GeoSym-Bench", repo_type="dataset
 | Elementary | `quadratic` | y = a(x−h)² + k |
 | Elementary | `absolute` | y = a\|x−h\| + k |
 | Polynomial | `cubic` | y = a(x−h)³ + b(x−h) + k |
-| Polynomial | `piecewise_linear` | y = sᵢ(x−hᵢ) + kᵢ |
+| Piecewise | `piecewise_linear` | two affine branches joined at (h, k) |
 | Transcendental | `exponential` | y = a·b^(x−h) + k |
 | Transcendental | `logarithmic` | y = a·log₂(x−h) + k |
 | Special | `rational` | y = a/(x−h) + k |
 
-### Evaluation Dimensions
+### Evaluation dimensions
 
-Each image carries annotations across 10 evaluation dimensions. The dimensions are **not** equally weighted: they are combined by a three-group scheme defined in `config/default_config.yaml`, giving effective per-dimension weights from 0.045 to 0.150.
+Ten dimensions, combined by the three-group weighting in `config/default_config.yaml` (`reasoning.layers`). They are **not** equally weighted: effective per-dimension weights range from 0.045 to 0.150. D1–D9 are scored against exact ground truth; D10 is scored by a judge model that differs from the reasoning model. Extracted coordinates are intermediate data and are not scored.
 
 | Dimension | Group (group weight) | Effective weight | Description |
 |-----------|----------------------|:----------------:|-------------|
@@ -114,89 +96,75 @@ Each image carries annotations across 10 evaluation dimensions. The dimensions a
 | D7: Expression | G3 mathematical inference (0.40) | 0.120 | Closed-form formula |
 | D8: Domain | G3 mathematical inference (0.40) | 0.080 | Mathematical domain |
 | D9: Range | G3 mathematical inference (0.40) | 0.080 | Mathematical range |
-| D10: Inference quality | G3 mathematical inference (0.40) | 0.120 | Independently scored by judge model |
+| D10: Inference quality | G3 mathematical inference (0.40) | 0.120 | Scored by the judge model |
 
-Extracted coordinates are M0 intermediate data and are deliberately not scored.
+## Experimental conditions
 
-## Experimental Conditions
+All GeoSym-Bench conditions use the same reasoning backbone (GLM-4.6V) and judge (Qwen3-VL-Plus), at temperature 0.
 
-Six live conditions form a progressive enhancement spectrum:
+| ID | Condition | CoT | Prompt variants | OCR evidence | GeoSym | Reasoning calls / sample |
+|----|-----------|:---:|:---------------:|:------------:|:------:|:------------------------:|
+| E0 | DirectQA | | | | | 1 |
+| E1 | DirectQA-CoT | ✓ | | | | 1 |
+| E2 | DirectQA-SC | ✓ | ✓ | | | 3 |
+| E3 | OCRRulesQA | | | ✓ | | 1 |
+| E4 | OCRRules-CoT | ✓ | | ✓ | | 1 |
+| **`E5_raw`** | **GeoSym** (EX + LR) | | | | ✓ | 3 |
 
-| ID | Condition | Image | CoT | SC | OCR | GeoSym | Description |
-|----|-----------|:-----:|:---:|:--:|:---:|:------:|-------------|
-| E0 | DirectQA | ✓ | | | | | Raw image → MLLM single-pass |
-| E1 | DirectQA-CoT | ✓ | ✓ | | | | With chain-of-thought decomposition |
-| E2 | DirectQA-SC | ✓ | ✓ | ✓ | | | Aggregation over prompt variants, deterministic at `T=0` |
-| E3 | OCRRulesQA | ✓ | | | ✓ | | Mathpix OCR extraction + rule-based feature computation |
-| E4 | OCRRules-CoT | ✓ | ✓ | | ✓ | | Mathpix OCR + rule-based features + CoT |
-| **`E5_raw`** | **GeoSym** | ✓ | | | | ✓ | **M0 + M3 — the method itself, not an ablation** |
+- E2 aggregates over paraphrased prompt variants by majority vote at `T=0`. It is deterministic, unlike stochastic self-consistency sampling.
+- E3/E4 inject evidence read from tick text by local PaddleOCR (3.7.0, `PP-OCRv6_medium`) with rule-based feature computation. GeoSym against E3/E4 therefore contrasts two ways of acquiring a scale: chart geometry against recognised text.
+- The condition string is `E5_raw` in code, configs and result files. Historical result files also contain a retired arm named `E5`; filter on `E5_raw`, never on `E5`.
 
-The retired `E5` (FullGeoSym, M0+M1+M2+M3) is no longer run. Its rows remain in the historical artifacts alongside `E5_raw` rows, so the condition identifier `E5_raw` is kept byte-identical in code, configs, and data even though the prose name is simply "GeoSym".
+## Results
 
-E2 aggregates over prompt variants at `T=0` rather than sampling stochastically; it is named "self-consistency" for continuity with the literature, but it is deterministic.
+**GeoSym-Bench** (GLM-4.6V, judge Qwen3-VL-Plus). Condition means over each condition's scored samples:
 
-## Cross-Domain Evaluation
+| Condition | Mean score | Scored n |
+|-----------|:----------:|:--------:|
+| E0 DirectQA | 68.65 | 240 |
+| E1 DirectQA-CoT | 69.88 | 239 |
+| E2 DirectQA-SC | 70.64 | 240 |
+| E3 OCRRulesQA | 59.75 | 229 |
+| E4 OCRRules-CoT | 57.11 | 229 |
+| **GeoSym (`E5_raw`)** | **81.46** | 237 |
 
-Beyond the controlled benchmark, GeoSym includes real-world chart demonstrations across three domains:
+- **Headline contrast:** on the 237 samples scored under both GeoSym and E2, the strongest baseline at the same three reasoning calls per sample, GeoSym leads by a paired mean of **+10.66** points (family-clustered bootstrap 95% CI [+4.90, +16.76]).
+- **All-objective-zero rows:** none among GeoSym's 237 scored samples, against 6.2–11.8% across the scored baseline samples.
+- **The OCR baselines score below direct prompting.** Adding extracted evidence alone does not ensure a gain.
+- **Layering does not improve accuracy.** With extracted evidence held byte-identical, layered and single-pass reasoning obtain similar mean scores: paired difference +0.12 (95% CI [−2.78, +3.02], p = 0.935, n = 104). The observed gain is associated primarily with evidence construction; layering supplies separately inspectable intermediate records at three reasoning calls against one.
 
-| Dataset | Source | License | Domain |
-|---------|--------|---------|--------|
-| FRED | [Federal Reserve Economic Data](https://fred.stlouisfed.org) | Public domain | Financial time-series |
-| EngiSphere | [EngiSphere Stress-Strain Generator](https://engisphere.com/calculators/stress-strain-curve-generator/) | — | Engineering stress-strain diagrams |
-| OmniScience | [Nature Communications](https://www.nature.com) | [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/) | Scientific figures |
+**PlotQA** (real statistical charts without coordinate grids):
 
-OmniScience figures are reproduced under Creative Commons Attribution 4.0 (CC-BY 4.0). Original paper DOIs and full attribution are provided in [`assets/real_charts/README.md`](assets/real_charts/README.md).
+- **Evidence coverage:** across 499 charts, mean numerical-value coverage rises from 0.522 to 0.765 under the repaired extraction chain. The gain is concentrated in horizontal bar charts (0.035 → 0.779); line and vertical-bar charts drift slightly down.
+- **Answer accuracy:** on 80 paired samples from two numeric strata (GPT-5.5), measured evidence plus the image shows no significant difference from image-only prompting: 0.588 against 0.637, McNemar p = 0.388. Higher coverage does not by itself improve downstream question answering.
 
-M3 operates without modification across domains; only M0 requires domain-specific instantiation via the Enhanced M0 pipeline (`presenter/`). These cases illustrate measurement traceability, feature localization, and source attribution rather than constituting a systematic external benchmark.
+## Reproducing the experiments
 
-## Key Results
+Paid runners default to a dry run that builds and checks the frozen plan without network calls; spending requires an explicit flag.
 
-Across 460 evaluated samples with GPT-5.4 as the backbone MLLM:
+| Result | Script |
+|--------|--------|
+| GeoSym-Bench condition sweep (E0–E4, `E5_raw`) | `scripts/run_glm46v_geosym_bench_240x7.py` (`--roster-file`, `--run-paid`) |
+| Identical-evidence layering comparison | `scripts/run_m3_attribution_pilot.py`, rescored by `scripts/rescore_m3_attribution_json_repair.py` |
+| PlotQA extraction coverage | `scripts/verify_plotqa_m0_chain_wiring.py` (zero cost) |
+| PlotQA answer accuracy | `scripts/run_plotqa_numeric_attribution.py` (`--execute`), analysed by `scripts/analyze_plotqa_numeric_attribution.py` |
+| Extraction-interface applicability | `scripts/evaluate_evidence_provider_substitutability.py` (zero cost) |
 
-| Condition | Mean Score | Δ vs. strongest baseline condition (E0) |
-|-----------|:----------:|:----------------------------------------:|
-| E0 (DirectQA) | 79.46 | — |
-| E1 (DirectQA-CoT) | 78.88 | -0.58 |
-| E2 (DirectQA-SC) | 78.81 | -0.65 |
-| E3 (OCRRulesQA) | 78.17 | -1.30 |
-| E4 (OCRRules-CoT) | 79.25 | -0.22 |
-| **`E5_raw` (GeoSym, M0+M3)** | **93.48** | **+14.02** |
-| ~~E5 (FullGeoSym, M0+M1+M2+M3)~~ | 93.67 | +14.21 |
+The GeoSym-Bench runner reads the dataset from `dataset/images/` and `dataset/ground_truth/`; download it from Hugging Face into `dataset/`. PlotQA scripts expect the official PlotQA images and annotations, which are not redistributed here.
 
-- GeoSym (`E5_raw`) outperforms the strongest baseline condition (E0) by 14.02 points.
-- The E5 row is **historical only** and is struck through because the modules that distinguished it from `E5_raw` have been retired. It is shown for continuity with earlier reports, not as a current result.
-- The gap between the two arms is **+0.19 in E5's favour, not a significant main effect** — this is one of the eight findings that led to retiring M1/M2. The larger +2.42 effect on the 18% of samples where extraction quality degrades was selected by an outcome variable, so it was only ever reportable as a post-hoc diagnostic, never as confirmatory robustness evidence; it did not survive the fuller evaluation.
-- Sample-wise figures reported previously (best-of-baselines margin of 10.67 points; 86% of samples improving over the per-sample baseline maximum; 93.3% improving over E0) were computed for the E5 arm and are likewise historical. Recomputing them for `E5_raw` requires a re-analysis that has not yet been run.
-
-`E5_raw` merges M0 and M3 into a single arm, so these numbers do **not** separate the contribution of geometric extraction from that of layered reasoning. Disentangling the two is an open problem, not a settled result.
-
-## Repository Structure
-
-```text
-GeoSym/
-├── generator/       # Benchmark generation and mathematical ground truth
-├── recognizer/      # Function-specialized M0 (grid-based coordinate extraction)
-├── presenter/       # Enhanced M0 (ruler + LLM locate) + real-world chart showcase
-├── evaluator/       # LLM adapters, metrics, fact construction, M3 reasoning
-├── prompts/         # Prompt templates for all pipeline stages
-├── app/             # Backend orchestration modules for reasoning, cache, and schemas
-├── config/          # Configuration files and API key template
-├── scripts/         # CLI tools
-├── tests/           # Test suite
-├── docs/            # Technical documentation
-└── requirements.txt
-```
+## Repository structure
 
 | Directory | Role |
 |-----------|------|
-| `generator/` | Benchmark generation: synthetic function-graph images, perturbations, and exact ground truth |
-| `recognizer/` | GeoSym's visual extraction backbone for coordinate evidence on controlled benchmarks |
-| `presenter/` | Enhanced M0 pipeline (ruler, measure, verify) and real-world chart showcase flows |
-| `evaluator/` | Fact construction and prompt formatting, LLM adapters, reasoning scoring, judge scoring, baselines, and response parsing |
-| `app/` | Backend orchestration for reasoning pipelines, cache records, schemas, and connection checks |
-| `prompts/` | Prompt templates for reasoning layers, judge evaluation, M0 locate, visual fact inference |
-| `scripts/` | CLI tools for dataset generation, benchmark execution, analysis, audits, and paper evidence packaging |
-| `tests/` | Pytest suite covering the public surface and the evidence-channel contracts |
+| `recognizer/` | Grid-geometric extractor (`core/clean_grid_fallback.py`) and the broader OCR-based extraction route |
+| `evaluator/` | Evidence interface, PlotQA extraction chain, model adapters, scoring, baselines, response parsing |
+| `app/` | Layered-reasoning orchestration, caching and response schemas |
+| `prompts/` | Prompt templates for every condition, the judge and the PlotQA arms |
+| `generator/` | Synthetic function-chart generator |
+| `presenter/` | Tick-text ruler and LLM-located extraction for real-world charts, with demonstration assets |
+| `benchmark/` | Evaluated GeoSym-Bench roster with checksums |
+| `scripts/` | Experiment runners, rescoring and analysis |
+| `tests/` | Test suite |
 
 ## Setup
 
@@ -204,120 +172,52 @@ GeoSym/
 python -m pip install -r requirements.txt
 ```
 
-Core dependencies include OpenCV, NumPy, Pillow, PyYAML, and SymPy.
+Copy `config/api_keys.yaml.example` to `config/api_keys.yaml` and add keys for the providers you use. GPT and Claude adapters read an API-compatible gateway base URL from `ninerouter_base_url`, `NINEROUTER_BASE_URL`, `GEOSYM_OPENAI_BASE_URL` or `GEOSYM_CLAUDE_BASE_URL`. Model identifiers live in `config/default_config.yaml`.
 
-OCR backend for the E3/E4 baselines and for OCR-derived axis/tick extraction:
-
-- **PaddleOCR** (current) runs locally and needs no credentials. Install the
-  `paddlepaddle` wheel matching your device per the upstream instructions, then
-  `pip install paddleocr>=3.7.0`. Runs used PaddleOCR 3.7.0 with the
-  `PP-OCRv6_medium` detection and recognition models. Scripts that expose a
-  `--device` flag accept `cpu` or `gpu:0`; PaddleOCR keeps a model resident in
-  VRAM, so prefer `cpu` when another GPU job is in flight.
-- **Mathpix** (earlier runs) is a hosted API; configure credentials in
-  `config/api_keys.yaml`. Results produced under it are not pooled with
-  PaddleOCR results, since detector output differs.
-- **EasyOCR** is the automatic fallback in the backend ladder for environments
-  where `paddlepaddle` cannot be installed. It is not a reported baseline.
-
-Any reported OCR figure states which backend produced it.
-
-Copy `config/api_keys.yaml.example` to `config/api_keys.yaml` and fill in your API keys. GPT and Claude adapters use an API-compatible gateway base URL from `ninerouter_base_url`, `NINEROUTER_BASE_URL`, `GEOSYM_OPENAI_BASE_URL`, or `GEOSYM_CLAUDE_BASE_URL`; the public repository does not hardcode a private gateway URL.
+The E3/E4 baselines need local PaddleOCR: install the `paddlepaddle` wheel for your device, then `pip install paddleocr>=3.7.0`.
 
 ## Testing
-
-Install development dependencies and run tests through the active Python interpreter:
 
 ```bash
 python -m pip install -r requirements-dev.txt
 python -m pytest -q
 ```
 
-Using `python -m pytest` avoids accidentally invoking a globally installed `pytest` from a different Python environment.
+Tests that need the GeoSym-Bench files skip when `dataset/` is absent.
 
-## Supported LLM Providers
+## Generating new charts
+
+`generator/` produces synthetic function charts of the same kind as GeoSym-Bench:
+
+```bash
+python scripts/run_generate.py --count 20 --seed 42 --out-dir my_charts
+```
+
+The released benchmark files are the reference for the reported results. The generator in this repository does not reproduce them byte for byte, so use the Hugging Face files, checked against `benchmark/roster_240.json`, to reproduce the paper.
+
+## Supported model providers
 
 | Provider | Models | Adapter |
 |----------|--------|---------|
-| OpenAI-compatible gateway | GPT-5.5 | `evaluator/adapters/openai.py` |
-| Google | Gemini-3.1-Pro, Gemini-3-Pro | `evaluator/adapters/gemini.py` |
-| Anthropic-compatible gateway | Claude-Opus-4.8, Claude-Opus-5 | `evaluator/adapters/claude.py` |
-| Alibaba | Qwen3.5-Plus, Qwen3-VL-Plus | `evaluator/adapters/qwen.py` |
-| Moonshot | Kimi-K2.5, Moonshot-V1 | `evaluator/adapters/kimi.py` |
 | ZhipuAI | GLM-4.6V | `evaluator/adapters/glm.py` |
-
-All adapters use `temperature=0.0` for maximum determinism, except `Kimi-K2.5` (`temperature=1.0` per API constraint). OpenAI additionally sets `seed=42`.
-
-## Configuration
-
-Primary configuration: `config/default_config.yaml`
-
-Key sections:
-
-- `page`, `chart`, `coords`, `ticks`, `curves`, `noise`: image generation and perturbation
-- `reasoning.layers`: evaluation dimension definitions
-- `reasoning.intervention`: evidence injection settings (flat profile only)
-- `reasoning.judge`: judge LLM configuration
-- `models`: LLM provider and model registry
-- `output`: dataset locations
-
-## Generate Benchmark Data
-
-```bash
-python scripts/run_generate.py --count 20 --seed 42 --out-dir dataset
-```
-
-With a custom config:
-
-```bash
-python scripts/run_generate.py --count 50 --config config/my_config.yaml --out-dir dataset
-```
-
-CLI flags:
-
-- `--count`: number of samples per subset
-- `--config`: YAML config path
-- `--seed`: reproducible seed
-- `--out-dir`: target directory for `images/` and `ground_truth/`
-
-## Ground Truth Layout
-
-Each generated image has a paired JSON file containing:
-
-- `chart_bbox`, `page_size`, `layout`
-- `x_range`, `y_range`, tick metadata
-- `intersections`
-- `functions` (parameters, expressions, type)
-- `question.ground_truth` (all 10 evaluation dimensions)
-- `extended_properties` (intercepts, extrema, monotonicity, symmetry)
-- `benchmark_meta` (function family, noise profile, seed)
-
-## Minimal Programmatic Use
-
-```python
-from generator.config_loader import load_config
-from generator.core import generate_one
-
-cfg = load_config()
-img, gt = generate_one(cfg, output_image_path="out.png", output_gt_path="out.json", seed=1)
-```
+| Alibaba | Qwen3-VL-Plus, Qwen3.5-Plus | `evaluator/adapters/qwen.py` |
+| OpenAI-compatible gateway | GPT-5.5 | `evaluator/adapters/openai.py` |
+| Google | Gemini | `evaluator/adapters/gemini.py` |
+| Anthropic-compatible gateway | Claude | `evaluator/adapters/claude.py` |
+| Moonshot | Kimi | `evaluator/adapters/kimi.py` |
 
 ## License
 
-This repository is licensed under the [MIT License](LICENSE). The GeoSym-Bench dataset is hosted separately on [HuggingFace](https://huggingface.co/datasets/lihaonan0716/GeoSym-Bench) under [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+The code is released under the [MIT License](LICENSE). GeoSym-Bench is released separately on [Hugging Face](https://huggingface.co/datasets/lihaonan0716/GeoSym-Bench) under [CC-BY 4.0](https://creativecommons.org/licenses/by/4.0/). The third-party figures in `assets/real_charts/` are not covered by the MIT License; each is distributed under the licence of its source article, listed in [`assets/real_charts/README.md`](assets/real_charts/README.md).
 
 ## Citation
 
-If you use GeoSym in your research, please cite:
-
 ```bibtex
 @misc{wang2026geosym,
-  title     = {GeoSym: Geometric Evidence Extraction and Layered Reasoning for Quantitative Chart Understanding},
-  author    = {Wang, Yongqing and Zhang, Qisheng and Guo, Linyan and Li, Haonan and Sun, Tianjun and Yu, Samson S.},
-  year      = {2026},
-  note      = {Manuscript in preparation. Software and dataset available online},
-  url       = {https://github.com/lihaonan0716/GeoSym}
+  title  = {GeoSym: Explicit Evidence Construction and Layered Reasoning for Quantitative Chart Understanding},
+  author = {Wang, Yongqing and Zhang, Qisheng and Guo, Linyan and Li, Haonan and Sun, Tianjun and Yu, Samson S.},
+  year   = {2026},
+  note   = {Manuscript under review},
+  url    = {https://github.com/lihaonan0716/GeoSym}
 }
 ```
-
-> The citation will be updated with the published DOI upon acceptance.

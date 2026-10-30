@@ -1,9 +1,9 @@
 cff-version: 1.2.0
-title: "GeoSym: Geometric Evidence Extraction and Layered Reasoning for Quantitative Chart Understanding"
+title: "GeoSym: Explicit Evidence Construction and Layered Reasoning for Quantitative Chart Understanding"
 message: "If you use this software, please cite it using the metadata from this file."
 type: software
-date-released: "2026-05-12"
-version: "1.0.0"
+date-released: "2026-10-30"
+version: "1.1.0"
 authors:
   - family-names: Wang
     given-names: Yongqing
